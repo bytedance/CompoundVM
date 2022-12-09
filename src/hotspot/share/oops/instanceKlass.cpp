@@ -2596,7 +2596,13 @@ void InstanceKlass::restore_unshareable_info(ClassLoaderData* loader_data, Handl
   // Initialize @ValueBased class annotation
   if (DiagnoseSyncOnValueBasedClasses && has_value_based_class_annotation()) {
     set_is_value_based();
-    set_prototype_header(markWord::prototype());
+    markWord prototype = markWord::prototype();
+#ifdef _LP64
+    if (UseCompactObjectHeaders) {
+      prototype = prototype.set_klass(this);
+    }
+#endif
+    set_prototype_header(prototype);
   }
 }
 

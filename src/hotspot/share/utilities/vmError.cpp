@@ -820,7 +820,15 @@ void VMError::report(outputStream* st, bool _verbose) {
        st->cr();
      }
 
-  STEP("printing code blob if possible")
+  STEP("printing lock stack")
+
+    if (_verbose && _thread != nullptr && _thread->is_Java_thread() && LockingMode == LM_LIGHTWEIGHT) {
+      st->print_cr("Lock stack of current Java thread (top to bottom):");
+      _thread->as_Java_thread()->lock_stack().print_on(st);
+      st->cr();
+    }
+
+  STEP("printing code blobs if possible")
 
      if (_verbose && _context) {
        CodeBlob* cb = CodeCache::find_blob(_pc);

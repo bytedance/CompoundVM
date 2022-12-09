@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2022 Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,22 +23,27 @@
  */
 
 #include "precompiled.hpp"
-#include "asm/macroAssembler.hpp"
-#include "opto/compile.hpp"
-#include "opto/node.hpp"
-#include "opto/output.hpp"
+#include "opto/c2_MacroAssembler.hpp"
+#include "opto/c2_CodeStubs.hpp"
+#include "runtime/objectMonitor.hpp"
 #include "runtime/sharedRuntime.hpp"
+#include "runtime/stubRoutines.hpp"
 
 #define __ masm.
-void C2SafepointPollStubTable::emit_stub_impl(MacroAssembler& masm, C2SafepointPollStub* entry) const {
+
+int C2SafepointPollStub::max_size() const {
+  return 33;
+}
+
+void C2SafepointPollStub::emit(C2_MacroAssembler& masm) {
   assert(SharedRuntime::polling_page_return_handler_blob() != NULL,
          "polling page return stub not created yet");
   address stub = SharedRuntime::polling_page_return_handler_blob()->entry_point();
 
   RuntimeAddress callback_addr(stub);
 
-  __ bind(entry->_stub_label);
-  InternalAddress safepoint_pc(masm.pc() - masm.offset() + entry->_safepoint_offset);
+  __ bind(entry());
+  InternalAddress safepoint_pc(masm.pc() - masm.offset() + _safepoint_offset);
 #ifdef _LP64
   __ lea(rscratch1, safepoint_pc);
   __ movptr(Address(r15_thread, JavaThread::saved_exception_pc_offset()), rscratch1);
@@ -57,4 +62,38 @@ void C2SafepointPollStubTable::emit_stub_impl(MacroAssembler& masm, C2SafepointP
 #endif
   __ jump(callback_addr);
 }
+
+#ifdef _LP64
+int C2HandleAnonOMOwnerStub::max_size() const {
+  // Max size of stub has been determined by testing with 0, in which case
+  // C2CodeStubList::emit() will throw an assertion and report the actual size that
+  // is needed.
+  return DEBUG_ONLY(36) NOT_DEBUG(21);
+}
+
+void C2HandleAnonOMOwnerStub::emit(C2_MacroAssembler& masm) {
+  __ bind(entry());
+  Register mon = monitor();
+  Register t = tmp();
+  __ movptr(Address(mon, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner)), r15_thread);
+  __ subl(Address(r15_thread, JavaThread::lock_stack_top_offset()), oopSize);
+#ifdef ASSERT
+  __ movl(t, Address(r15_thread, JavaThread::lock_stack_top_offset()));
+  __ movptr(Address(r15_thread, t), 0);
+#endif
+  __ jmp(continuation());
+}
+
+int C2LoadNKlassStub::max_size() const {
+  return 10;
+}
+
+void C2LoadNKlassStub::emit(C2_MacroAssembler& masm) {
+  __ bind(entry());
+  Register d = dst();
+  __ movq(d, Address(d, OM_OFFSET_NO_MONITOR_VALUE_TAG(header)));
+  __ jmp(continuation());
+}
+#endif
+
 #undef __

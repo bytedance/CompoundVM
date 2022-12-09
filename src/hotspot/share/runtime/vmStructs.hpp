@@ -146,6 +146,9 @@ private:
   // Returns 1 if found, 0 if not.
   static int findType(const char* typeName) NOT_VM_STRUCTS_RETURN_(0);
 #endif // ASSERT
+
+public:
+  static void compact_headers_overrides() NOT_VM_STRUCTS_RETURN;
 };
 
 // This utility macro quotes the passed string

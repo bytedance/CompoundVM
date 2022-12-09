@@ -998,7 +998,9 @@ void MachEpilogNode::emit(CodeBuffer& cbuf, PhaseRegAlloc* ra_) const
     Label dummy_label;
     Label* code_stub = &dummy_label;
     if (!C->output()->in_scratch_emit_size()) {
-      code_stub = &C->output()->safepoint_poll_table()->add_safepoint(__ offset());
+      C2SafepointPollStub* stub = new (C->comp_arena()) C2SafepointPollStub(__ offset());
+      C->output()->add_stub(stub);
+      code_stub = &stub->entry();
     }
     __ relocate(relocInfo::poll_return_type);
     __ safepoint_poll(*code_stub, r15_thread, true /* at_return */, true /* in_nmethod */);
@@ -5190,6 +5192,7 @@ instruct loadKlass(rRegP dst, memory mem)
 // Load narrow Klass Pointer
 instruct loadNKlass(rRegN dst, memory mem)
 %{
+  predicate(!UseCompactObjectHeaders);
   match(Set dst (LoadNKlass mem));
 
   ins_cost(125); // XXX
@@ -5198,6 +5201,21 @@ instruct loadNKlass(rRegN dst, memory mem)
     __ movl($dst$$Register, $mem$$Address);
   %}
   ins_pipe(ialu_reg_mem); // XXX
+%}
+
+instruct loadNKlassCompactHeaders(rRegN dst, memory mem, rFlagsReg cr)
+%{
+  predicate(UseCompactObjectHeaders);
+  match(Set dst (LoadNKlass mem));
+  effect(KILL cr);
+  ins_cost(125); // XXX
+  format %{ "movl    $dst, $mem\t# compressed klass ptr" %}
+  ins_encode %{
+    Register index = $mem$$index != 4 ? $mem$$index$$Register : noreg;
+    Address::ScaleFactor sf = (index != noreg) ? static_cast<Address::ScaleFactor>($mem$$scale) : Address::no_scale;
+    __ load_nklass_compact_c2($dst$$Register, $mem$$base$$Register, index, sf, $mem$$disp);
+  %}
+  ins_pipe(pipe_slow); // XXX
 %}
 
 // Load Float
@@ -12225,6 +12243,7 @@ instruct compN_rReg_imm_klass(rFlagsRegU cr, rRegN op1, immNKlass op2) %{
 
 instruct compN_mem_imm_klass(rFlagsRegU cr, memory mem, immNKlass src)
 %{
+  predicate(!UseCompactObjectHeaders);
   match(Set cr (CmpN src (LoadNKlass mem)));
 
   format %{ "cmpl    $mem, $src\t# compressed klass ptr" %}
@@ -12923,7 +12942,7 @@ instruct cmpFastLockRTM(rFlagsReg cr, rRegP object, rbx_RegP box, rax_RegI tmp, 
   format %{ "fastlock $object,$box\t! kills $box,$tmp,$scr,$cx1,$cx2" %}
   ins_encode %{
     __ fast_lock($object$$Register, $box$$Register, $tmp$$Register,
-                 $scr$$Register, $cx1$$Register, $cx2$$Register,
+                 $scr$$Register, $cx1$$Register, $cx2$$Register, r15_thread,
                  _counters, _rtm_counters, _stack_rtm_counters,
                  ((Method*)(ra_->C->method()->constant_encoding()))->method_data(),
                  true, ra_->C->profile_rtm());
@@ -12939,7 +12958,7 @@ instruct cmpFastLock(rFlagsReg cr, rRegP object, rbx_RegP box, rax_RegI tmp, rRe
   format %{ "fastlock $object,$box\t! kills $box,$tmp,$scr" %}
   ins_encode %{
     __ fast_lock($object$$Register, $box$$Register, $tmp$$Register,
-                 $scr$$Register, $cx1$$Register, noreg, _counters, NULL, NULL, NULL, false, false);
+                 $scr$$Register, $cx1$$Register, noreg, r15_thread, _counters, NULL, NULL, NULL, false, false);
   %}
   ins_pipe(pipe_slow);
 %}

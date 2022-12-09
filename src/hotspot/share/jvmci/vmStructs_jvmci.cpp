@@ -190,6 +190,8 @@
   nonstatic_field(JavaThread,                  _jni_environment,                              JNIEnv)                                \
   nonstatic_field(JavaThread,                  _poll_data,                                    SafepointMechanism::ThreadData)        \
   nonstatic_field(JavaThread,                  _stack_overflow_state._reserved_stack_activation, address)                            \
+  nonstatic_field(JavaThread,                  _lock_stack,                                   LockStack)                             \
+  nonstatic_field(LockStack,                   _top,                                          uint32_t)                              \
                                                                                                                                      \
   static_field(java_lang_Class,                _klass_offset,                                 int)                                   \
   static_field(java_lang_Class,                _array_klass_offset,                           int)                                   \
@@ -452,6 +454,7 @@
   declare_constant(BranchData::not_taken_off_set)                         \
                                                                           \
   declare_constant_with_value("CardTable::dirty_card", CardTable::dirty_card_val()) \
+  declare_constant_with_value("LockStack::_end_offset", LockStack::end_offset()) \
                                                                           \
   declare_constant(CodeInstaller::VERIFIED_ENTRY)                         \
   declare_constant(CodeInstaller::UNVERIFIED_ENTRY)                       \
@@ -580,6 +583,10 @@
   declare_constant(InstanceKlass::being_initialized)                      \
   declare_constant(InstanceKlass::fully_initialized)                      \
                                                                           \
+  declare_constant(LockingMode::LM_MONITOR)                               \
+  declare_constant(LockingMode::LM_LEGACY)                                \
+  declare_constant(LockingMode::LM_LIGHTWEIGHT)                           \
+                                                                          \
   /*********************************/                                     \
   /* InstanceKlass _misc_flags */                                         \
   /*********************************/                                     \
@@ -628,6 +635,9 @@
   declare_constant(MultiBranchData::per_case_cell_count)                  \
                                                                           \
   declare_constant(ReceiverTypeData::nonprofiled_count_off_set)           \
+                                                                          \
+  declare_constant(ObjectMonitor::ANONYMOUS_OWNER)                        \
+                                                                          \
   declare_constant(ReceiverTypeData::receiver_type_row_cell_count)        \
   declare_constant(ReceiverTypeData::receiver0_offset)                    \
   declare_constant(ReceiverTypeData::count0_offset)                       \

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,37 +21,40 @@
  * questions.
  *
  */
-#include "precompiled.hpp"
-#include "jfr/leakprofiler/chains/bitset.inline.hpp"
 
-BitSet::BitMapFragment::BitMapFragment(uintptr_t granule, BitMapFragment* next) :
-    _bits(_bitmap_granularity_size >> LogMinObjAlignmentInBytes, mtTracing, true /* clear */),
-    _next(next) {
-}
+package sun.jvm.hotspot.runtime;
 
-BitSet::BitMapFragmentTable::~BitMapFragmentTable() {
-  for (int index = 0; index < table_size(); index ++) {
-    Entry* e = bucket(index);
-    while (e != nullptr) {
-      Entry* tmp = e;
-      e = e->next();
-      free_entry(tmp);
-    }
+import sun.jvm.hotspot.types.TypeDataBase;
+
+
+/** Encapsulates the LockingMode enum in globalDefinitions.hpp in
+    the VM. */
+
+public class LockingMode {
+  private static int monitor;
+  private static int legacy;
+  private static int lightweight;
+
+  static {
+    VM.registerVMInitializedObserver(
+        (o, d) -> initialize(VM.getVM().getTypeDataBase()));
   }
-}
 
-BitSet::BitSet() :
-    _bitmap_fragments(32),
-    _fragment_list(NULL),
-    _last_fragment_bits(NULL),
-    _last_fragment_granule(UINTPTR_MAX) {
-}
+  private static synchronized void initialize(TypeDataBase db) {
+    monitor     = db.lookupIntConstant("LM_MONITOR").intValue();
+    legacy      = db.lookupIntConstant("LM_LEGACY").intValue();
+    lightweight = db.lookupIntConstant("LM_LIGHTWEIGHT").intValue();
+  }
 
-BitSet::~BitSet() {
-  BitMapFragment* current = _fragment_list;
-  while (current != NULL) {
-    BitMapFragment* next = current->next();
-    delete current;
-    current = next;
+  public static int getMonitor() {
+    return monitor;
+  }
+
+  public static int getLegacy() {
+    return legacy;
+  }
+
+  public static int getLightweight() {
+    return lightweight;
   }
 }

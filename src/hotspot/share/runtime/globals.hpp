@@ -131,6 +131,9 @@ const size_t minimumSymbolTableSize = 1024;
           "Use 32-bit class pointers in 64-bit VM. "                        \
           "lp64_product means flag is always constant in 32 bit VM")        \
                                                                             \
+  product(bool, UseCompactObjectHeaders, false, EXPERIMENTAL,               \
+          "Use 64-bit object headers instead of 96-bit headers")            \
+                                                                            \
   product(intx, ObjectAlignmentInBytes, 8,                                  \
           "Default object alignment in bytes, 8 is minimum")                \
           range(8, 256)                                                     \
@@ -148,6 +151,7 @@ const size_t minimumSymbolTableSize = 1024;
                            constraint)
 const bool UseCompressedOops = false;
 const bool UseCompressedClassPointers = false;
+const bool UseCompactObjectHeaders = false;
 const intx ObjectAlignmentInBytes = 8;
 
 #endif // _LP64
@@ -2094,6 +2098,19 @@ const intx ObjectAlignmentInBytes = 8;
           false AARCH64_ONLY(DEBUG_ONLY(||true)),                           \
              "Mark all threads after a safepoint, and clear on a modify "   \
              "fence. Add cleanliness checks.")                              \
+                                                                            \
+  product(bool, HeapObjectStats, false, DIAGNOSTIC,                         \
+             "Enable gathering of heap object statistics")                  \
+                                                                            \
+  product(size_t, HeapObjectStatsSamplingInterval, 500, DIAGNOSTIC,         \
+             "Heap object statistics sampling interval (ms)")               \
+                                                                            \
+  product(int, LockingMode, LM_LEGACY, EXPERIMENTAL,                        \
+          "Select locking mode: "                                           \
+          "0: monitors only (LM_MONITOR), "                                 \
+          "1: monitors & legacy stack-locking (LM_LEGACY, default), "       \
+          "2: monitors & new lightweight locking (LM_LIGHTWEIGHT)")         \
+          range(0, 2)                                                       \
                                                                             \
   develop(bool, TraceOptimizedUpcallStubs, false,                              \
                 "Trace optimized upcall stub generation")                      \

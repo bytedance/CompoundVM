@@ -208,6 +208,7 @@ public class Threads {
 
     // refer to Threads::owning_thread_from_monitor_owner
     public JavaThread owningThreadFromMonitor(Address o) {
+        assert(VM.getVM().getCommandLineFlag("LockingMode").getInt() != LockingMode.getLightweight());
         if (o == null) return null;
         for (int i = 0; i < getNumberOfThreads(); i++) {
             JavaThread thread = getJavaThreadAt(i);
@@ -225,7 +226,28 @@ public class Threads {
     }
 
     public JavaThread owningThreadFromMonitor(ObjectMonitor monitor) {
-        return owningThreadFromMonitor(monitor.owner());
+        if (VM.getVM().getCommandLineFlag("LockingMode").getInt() == LockingMode.getLightweight()) {
+            if (monitor.isOwnedAnonymous()) {
+                OopHandle object = monitor.object();
+                for (int i = 0; i < getNumberOfThreads(); i++) {
+                    JavaThread thread = getJavaThreadAt(i);
+                    if (thread.isLockOwned(object)) {
+                        return thread;
+                     }
+                }
+                // We should have found the owner, however, as the VM could be in any state, including the middle
+                // of performing GC, it is not always possible to do so. Just return null if we can't locate it.
+                System.out.println("Warning: We failed to find a thread that owns an anonymous lock. This is likely");
+                System.out.println("due to the JVM currently running a GC. Locking information may not be accurate.");
+                return null;
+            }
+            // Owner can only be threads at this point.
+            Address o = monitor.owner();
+            if (o == null) return null;
+            return new JavaThread(o);
+        } else {
+            return owningThreadFromMonitor(monitor.owner());
+        }
     }
 
     // refer to Threads::get_pending_threads

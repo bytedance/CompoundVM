@@ -74,6 +74,7 @@
 #include "runtime/stackFrameStream.inline.hpp"
 #include "runtime/stackWatermarkSet.hpp"
 #include "runtime/stubRoutines.hpp"
+#include "runtime/synchronizer.hpp"
 #include "runtime/thread.hpp"
 #include "runtime/threadSMR.hpp"
 #include "runtime/threadWXSetters.inline.hpp"
@@ -1472,7 +1473,7 @@ bool Deoptimization::relock_objects(JavaThread* thread, GrowableArray<MonitorInf
           markWord unbiased_prototype = markWord::prototype().set_age(mark.age());
           obj->set_mark(unbiased_prototype);
         } else if (exec_mode == Unpack_none) {
-          if (mark.has_locker() && fr.sp() > (intptr_t*)mark.locker()) {
+          if (LockingMode == LM_LEGACY && mark.has_locker() && fr.sp() > (intptr_t*)mark.locker()) {
             // With exec_mode == Unpack_none obj may be thread local and locked in
             // a callee frame. In this case the bias was revoked before in revoke_for_object_deoptimization().
             // Make the lock in the callee a recursive lock and restore the displaced header.
@@ -1491,9 +1492,19 @@ bool Deoptimization::relock_objects(JavaThread* thread, GrowableArray<MonitorInf
             }
           }
         }
-        BasicLock* lock = mon_info->lock();
-        ObjectSynchronizer::enter(obj, lock, deoptee_thread);
-        assert(mon_info->owner()->is_locked(), "object must be locked now");
+        if (LockingMode == LM_LIGHTWEIGHT && exec_mode == Unpack_none) {
+          // We have lost information about the correct state of the lock stack.
+          // Inflate the locks instead. Enter then inflate to avoid races with
+          // deflation.
+          ObjectSynchronizer::enter_for(obj, nullptr, deoptee_thread);
+          assert(mon_info->owner()->is_locked(), "object must be locked now");
+          ObjectMonitor* mon = ObjectSynchronizer::inflate_for(deoptee_thread, obj(), ObjectSynchronizer::inflate_cause_vm_internal);
+          assert(mon->owner() == deoptee_thread, "must be");
+        } else {
+          BasicLock* lock = mon_info->lock();
+          ObjectSynchronizer::enter_for(obj, lock, deoptee_thread);
+          assert(mon_info->owner()->is_locked(), "object must be locked now");
+        }
       }
     }
   }

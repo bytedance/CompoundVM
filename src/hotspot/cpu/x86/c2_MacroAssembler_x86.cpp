@@ -28,9 +28,11 @@
 #include "asm/assembler.hpp"
 #include "asm/assembler.inline.hpp"
 #include "oops/methodData.hpp"
+#include "opto/c2_CodeStubs.hpp"
 #include "opto/c2_MacroAssembler.hpp"
 #include "opto/intrinsicnode.hpp"
 #include "opto/opcodes.hpp"
+#include "opto/output.hpp"
 #include "opto/subnode.hpp"
 #include "runtime/biasedLocking.hpp"
 #include "runtime/objectMonitor.hpp"
@@ -448,7 +450,7 @@ void C2_MacroAssembler::rtm_inflated_locking(Register objReg, Register boxReg, R
 // rax,: tmp -- KILLED
 // scr: tmp -- KILLED
 void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmpReg,
-                                 Register scrReg, Register cx1Reg, Register cx2Reg,
+                                 Register scrReg, Register cx1Reg, Register cx2Reg, Register thread,
                                  BiasedLockingCounters* counters,
                                  RTMLockingCounters* rtm_counters,
                                  RTMLockingCounters* stack_rtm_counters,
@@ -515,29 +517,38 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
 
   movptr(tmpReg, Address(objReg, oopDesc::mark_offset_in_bytes()));          // [FETCH]
   testptr(tmpReg, markWord::monitor_value); // inflated vs stack-locked|neutral|biased
-  jccb(Assembler::notZero, IsInflated);
+  jcc(Assembler::notZero, IsInflated);
 
-  // Attempt stack-locking ...
-  orptr (tmpReg, markWord::unlocked_value);
-  movptr(Address(boxReg, 0), tmpReg);          // Anticipate successful CAS
-  lock();
-  cmpxchgptr(boxReg, Address(objReg, oopDesc::mark_offset_in_bytes()));      // Updates tmpReg
-  if (counters != NULL) {
-    cond_inc32(Assembler::equal,
-               ExternalAddress((address)counters->fast_path_entry_count_addr()));
-  }
-  jcc(Assembler::equal, DONE_LABEL);           // Success
+  if (LockingMode == LM_MONITOR) {
+    // Clear ZF so that we take the slow path at the DONE label. objReg is known to be not 0.
+    testptr(objReg, objReg);
+  } else if (LockingMode == LM_LEGACY) {
+    // Attempt stack-locking ...
+    orptr (tmpReg, markWord::unlocked_value);
+    movptr(Address(boxReg, 0), tmpReg);          // Anticipate successful CAS
+    lock();
+    cmpxchgptr(boxReg, Address(objReg, oopDesc::mark_offset_in_bytes()));      // Updates tmpReg
+    if (counters != NULL) {
+      cond_inc32(Assembler::equal,
+                 ExternalAddress((address)counters->fast_path_entry_count_addr()));
+    }
+    jcc(Assembler::equal, DONE_LABEL);           // Success
 
-  // Recursive locking.
-  // The object is stack-locked: markword contains stack pointer to BasicLock.
-  // Locked by current thread if difference with current SP is less than one page.
-  subptr(tmpReg, rsp);
-  // Next instruction set ZFlag == 1 (Success) if difference is less then one page.
-  andptr(tmpReg, (int32_t) (NOT_LP64(0xFFFFF003) LP64_ONLY(7 - os::vm_page_size())) );
-  movptr(Address(boxReg, 0), tmpReg);
-  if (counters != NULL) {
-    cond_inc32(Assembler::equal,
-               ExternalAddress((address)counters->fast_path_entry_count_addr()));
+    // Recursive locking.
+    // The object is stack-locked: markword contains stack pointer to BasicLock.
+    // Locked by current thread if difference with current SP is less than one page.
+    subptr(tmpReg, rsp);
+    // Next instruction set ZFlag == 1 (Success) if difference is less then one page.
+    andptr(tmpReg, (int32_t) (NOT_LP64(0xFFFFF003) LP64_ONLY(7 - os::vm_page_size())) );
+    movptr(Address(boxReg, 0), tmpReg);
+    if (counters != NULL) {
+      cond_inc32(Assembler::equal,
+                 ExternalAddress((address)counters->fast_path_entry_count_addr()));
+    }
+  } else {
+    assert(LockingMode == LM_LIGHTWEIGHT, "");
+    lightweight_lock(objReg, tmpReg, thread, scrReg, DONE_LABEL);
+    xorl(tmpReg, tmpReg); // Set ZF=1 to indicate success
   }
   jmp(DONE_LABEL);
 
@@ -686,13 +697,35 @@ void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register t
   }
 #endif
 
-  cmpptr(Address(boxReg, 0), (int32_t)NULL_WORD);                   // Examine the displaced header
-  jcc   (Assembler::zero, DONE_LABEL);                              // 0 indicates recursive stack-lock
+  if (LockingMode == LM_LEGACY) {
+    cmpptr(Address(boxReg, 0), (int32_t)NULL_WORD);                   // Examine the displaced header
+    jcc   (Assembler::zero, DONE_LABEL);                              // 0 indicates recursive stack-lock
+  }
   movptr(tmpReg, Address(objReg, oopDesc::mark_offset_in_bytes())); // Examine the object's markword
-  testptr(tmpReg, markWord::monitor_value);                         // Inflated?
-  jccb  (Assembler::zero, Stacked);
+  if (LockingMode != LM_MONITOR) {
+    testptr(tmpReg, markWord::monitor_value);                         // Inflated?
+    jcc(Assembler::zero, Stacked);
+  }
 
   // It's inflated.
+  if (LockingMode == LM_LIGHTWEIGHT) {
+    // If the owner is ANONYMOUS, we need to fix it.
+    testb(Address(tmpReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner)), (int32_t) ObjectMonitor::ANONYMOUS_OWNER);
+#ifdef _LP64
+    if (!Compile::current()->output()->in_scratch_emit_size()) {
+      C2HandleAnonOMOwnerStub* stub = new (Compile::current()->comp_arena()) C2HandleAnonOMOwnerStub(tmpReg, boxReg);
+      Compile::current()->output()->add_stub(stub);
+      jcc(Assembler::notEqual, stub->entry());
+      bind(stub->continuation());
+    } else
+#endif
+    {
+      // We can't easily implement this optimization on 32 bit because we don't have a thread register.
+      // Call the slow-path instead.
+      jcc(Assembler::notEqual, DONE_LABEL);
+    }
+  }
+
 #if INCLUDE_RTM_OPT
   if (use_rtm) {
     Label L_regular_inflated_unlock;
@@ -701,7 +734,7 @@ void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register t
     testptr(boxReg, boxReg);
     jccb(Assembler::notZero, L_regular_inflated_unlock);
     xend();
-    jmpb(DONE_LABEL);
+    jmp(DONE_LABEL);
     bind(L_regular_inflated_unlock);
   }
 #endif
@@ -736,19 +769,10 @@ void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register t
   jccb  (Assembler::notZero, DONE_LABEL);
   movptr(boxReg, Address(tmpReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(EntryList)));
   orptr(boxReg, Address(tmpReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(cxq)));
-  jccb  (Assembler::notZero, CheckSucc);
+  jccb  (Assembler::notZero, DONE_LABEL);
   movptr(Address(tmpReg, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner)), NULL_WORD);
   jmpb  (DONE_LABEL);
 
-  bind (Stacked);
-  // It's not inflated and it's not recursively stack-locked and it's not biased.
-  // It must be stack-locked.
-  // Try to reset the header to displaced header.
-  // The "box" value on the stack is stable, so we can reload
-  // and be assured we observe the same value as above.
-  movptr(tmpReg, Address(boxReg, 0));
-  lock();
-  cmpxchgptr(tmpReg, Address(objReg, oopDesc::mark_offset_in_bytes())); // Uses RAX which is box
   // Intention fall-thru into DONE_LABEL
 
   // DONE_LABEL is a hot target - we'd really like to place it at the
@@ -832,12 +856,19 @@ void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register t
   testl (boxReg, 0);                      // set ICC.ZF=1 to indicate success
   jmpb  (DONE_LABEL);
 
-  bind  (Stacked);
-  movptr(tmpReg, Address (boxReg, 0));      // re-fetch
-  lock();
-  cmpxchgptr(tmpReg, Address(objReg, oopDesc::mark_offset_in_bytes())); // Uses RAX which is box
-
 #endif
+  if (LockingMode != LM_MONITOR) {
+    bind  (Stacked);
+    if (LockingMode == LM_LIGHTWEIGHT) {
+      mov(boxReg, tmpReg);
+      lightweight_unlock(objReg, boxReg, tmpReg, DONE_LABEL);
+      xorl(tmpReg, tmpReg);
+    } else if (LockingMode == LM_LEGACY) {
+      movptr(tmpReg, Address (boxReg, 0));      // re-fetch
+      lock();
+      cmpxchgptr(tmpReg, Address(objReg, oopDesc::mark_offset_in_bytes())); // Uses RAX which is box
+    }
+  }
   bind(DONE_LABEL);
 }
 
@@ -3982,3 +4013,25 @@ void C2_MacroAssembler::rearrange_bytes(XMMRegister dst, XMMRegister shuffle, XM
   evshufi64x2(xtmp3, src, src, 0xFF, vlen_enc);
   evpshufb(dst, ktmp, xtmp3, shuffle, true, vlen_enc);
 }
+
+#ifdef _LP64
+void C2_MacroAssembler::load_nklass_compact_c2(Register dst, Register obj, Register index, Address::ScaleFactor scale, int disp) {
+  C2LoadNKlassStub* stub = new (Compile::current()->comp_arena()) C2LoadNKlassStub(dst);
+  Compile::current()->output()->add_stub(stub);
+
+  // Note: Don't clobber obj anywhere in that method!
+
+  // The incoming address is pointing into obj-start + klass_offset_in_bytes. We need to extract
+  // obj-start, so that we can load from the object's mark-word instead. Usually the address
+  // comes as obj-start in obj and klass_offset_in_bytes in disp. However, sometimes C2
+  // emits code that pre-computes obj-start + klass_offset_in_bytes into a register, and
+  // then passes that register as obj and 0 in disp. The following code extracts the base
+  // and offset to load the mark-word.
+  int offset = oopDesc::mark_offset_in_bytes() + disp - oopDesc::klass_offset_in_bytes();
+  movq(dst, Address(obj, index, scale, offset));
+  testb(dst, markWord::monitor_value);
+  jcc(Assembler::notZero, stub->entry());
+  bind(stub->continuation());
+  shrq(dst, markWord::klass_shift);
+}
+#endif

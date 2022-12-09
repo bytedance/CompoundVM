@@ -48,7 +48,7 @@ inline void PreservedMarks::push_if_necessary(oop obj, markWord m) {
 }
 
 inline void PreservedMarks::init_forwarded_mark(oop obj) {
-  obj->init_mark();
+  obj->forward_safe_init_mark();
 }
 
 inline PreservedMarks::PreservedMarks()

@@ -101,6 +101,10 @@ bool JVMCIGlobals::check_jvmci_flags_are_consistent() {
           "-XX:+BootstrapJVMCI is not compatible with -XX:TieredStopAtLevel=%d\n", TieredStopAtLevel);
       return false;
     }
+    if (UseCompactObjectHeaders) {
+      log_warning(jvmci)("-XX:+UseCompactObjectHeaders not supported by JVMCI, disabling UseCompactObjectHeaders");
+      FLAG_SET_DEFAULT(UseCompactObjectHeaders, false);
+    }
   }
 
   if (!EnableJVMCI) {
@@ -116,7 +120,6 @@ bool JVMCIGlobals::check_jvmci_flags_are_consistent() {
   CHECK_NOT_SET(JVMCITraceLevel,              EnableJVMCI)
   CHECK_NOT_SET(JVMCICounterSize,             EnableJVMCI)
   CHECK_NOT_SET(JVMCICountersExcludeCompiler, EnableJVMCI)
-  CHECK_NOT_SET(JVMCIUseFastLocking,          EnableJVMCI)
   CHECK_NOT_SET(JVMCINMethodSizeLimit,        EnableJVMCI)
   CHECK_NOT_SET(JVMCIPrintProperties,         EnableJVMCI)
   CHECK_NOT_SET(UseJVMCINativeLibrary,        EnableJVMCI)

@@ -55,6 +55,8 @@ public class ObjectMonitor extends VMObject {
     contentionsField  = type.getJIntField("_contentions");
     waitersField = type.getJIntField("_waiters");
     recursionsField = type.getCIntegerField("_recursions");
+
+    ANONYMOUS_OWNER = db.lookupLongConstant("ObjectMonitor::ANONYMOUS_OWNER").longValue();
   }
 
   public ObjectMonitor(Address addr) {
@@ -77,6 +79,10 @@ public class ObjectMonitor extends VMObject {
       return true;
     }
     return false;
+  }
+
+  public boolean isOwnedAnonymous() {
+    return addr.getAddressAt(ownerFieldOffset).asLongValue() == ANONYMOUS_OWNER;
   }
 
   public Address owner() { return addr.getAddressAt(ownerFieldOffset); }
@@ -114,5 +120,7 @@ public class ObjectMonitor extends VMObject {
   private static JIntField     contentionsField;
   private static JIntField     waitersField;
   private static CIntegerField recursionsField;
+  private static long          ANONYMOUS_OWNER;
+
   // FIXME: expose platform-dependent stuff
 }
