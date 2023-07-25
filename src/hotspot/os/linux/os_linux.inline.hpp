@@ -142,4 +142,13 @@ inline int os::unlink(const char *path) {
 }
 #endif
 
+// Trim-native support
+inline bool os::can_trim_native_heap() {
+#ifdef __GLIBC__
+  return true;
+#else
+  return false; // musl
+#endif
+}
+
 #endif // OS_LINUX_OS_LINUX_INLINE_HPP

@@ -32,7 +32,7 @@ import jdk.test.lib.process.OutputAnalyzer;
  * @test
  * @summary Test of diagnostic command VM.trim_libc_heap
  * @library /test/lib
- * @requires os.family == "linux"
+ * @requires (os.family=="linux") & !vm.musl
  * @modules java.base/jdk.internal.misc
  *          java.compiler
  *          java.management
