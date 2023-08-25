@@ -650,4 +650,6 @@ public class WhiteBox {
   public native void lockCritical();
 
   public native void unlockCritical();
+
+  public native void preTouchMemory(long addr, long size);
 }

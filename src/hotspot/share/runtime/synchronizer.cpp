@@ -61,6 +61,7 @@
 #include "runtime/thread.hpp"
 #include "runtime/thread.inline.hpp"
 #include "runtime/timer.hpp"
+#include "runtime/trimNativeHeap.hpp"
 #include "runtime/vframe.hpp"
 #include "runtime/vmThread.hpp"
 #include "utilities/align.hpp"
@@ -1820,6 +1821,8 @@ size_t ObjectSynchronizer::deflate_idle_monitors() {
         timer.start();
       }
     }
+
+    NativeHeapTrimmer::SuspendMark sm("monitor deletion");
 
     // After the handshake, safely free the ObjectMonitors that were
     // deflated in this cycle.
