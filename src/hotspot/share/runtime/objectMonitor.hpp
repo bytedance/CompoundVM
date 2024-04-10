@@ -310,6 +310,7 @@ private:
   jint      contentions() const;
   void      add_to_contentions(jint value);
   intx      recursions() const                                         { return _recursions; }
+  void      set_recursions(size_t recursions);
 
   // JVM/TI GetObjectMonitorUsage() needs this:
   ObjectWaiter* first_waiter()                                         { return _WaitSet; }
