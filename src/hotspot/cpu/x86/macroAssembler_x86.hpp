@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -148,6 +148,8 @@ class MacroAssembler: public Assembler {
 
   void increment(Register reg, int value = 1) { LP64_ONLY(incrementq(reg, value)) NOT_LP64(incrementl(reg, value)) ; }
   void decrement(Register reg, int value = 1) { LP64_ONLY(decrementq(reg, value)) NOT_LP64(decrementl(reg, value)) ; }
+  void increment(Address dst, int value = 1)  { LP64_ONLY(incrementq(dst, value)) NOT_LP64(incrementl(dst, value)) ; }
+  void decrement(Address dst, int value = 1)  { LP64_ONLY(decrementq(dst, value)) NOT_LP64(decrementl(dst, value)) ; }
 
   void decrementl(Address dst, int value = 1);
   void decrementl(Register reg, int value = 1);
@@ -1922,8 +1924,8 @@ public:
 
   void vallones(XMMRegister dst, int vector_len);
 
-  void lightweight_lock(Register obj, Register hdr, Register thread, Register tmp, Label& slow);
-  void lightweight_unlock(Register obj, Register hdr, Register tmp, Label& slow);
+  void lightweight_lock(Register obj, Register reg_rax, Register thread, Register tmp, Label& slow);
+  void lightweight_unlock(Register obj, Register reg_rax, Register thread, Register tmp, Label& slow);
 };
 
 /**

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2022 Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -63,27 +63,76 @@ void C2SafepointPollStub::emit(C2_MacroAssembler& masm) {
   __ jump(callback_addr);
 }
 
-#ifdef _LP64
-int C2HandleAnonOMOwnerStub::max_size() const {
-  // Max size of stub has been determined by testing with 0, in which case
-  // C2CodeStubList::emit() will throw an assertion and report the actual size that
-  // is needed.
-  return DEBUG_ONLY(36) NOT_DEBUG(21);
+int C2FastUnlockLightweightStub::max_size() const {
+  return 128;
 }
 
-void C2HandleAnonOMOwnerStub::emit(C2_MacroAssembler& masm) {
-  __ bind(entry());
-  Register mon = monitor();
-  Register t = tmp();
-  __ movptr(Address(mon, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner)), r15_thread);
-  __ subl(Address(r15_thread, JavaThread::lock_stack_top_offset()), oopSize);
+void C2FastUnlockLightweightStub::emit(C2_MacroAssembler& masm) {
+  assert(_t == rax, "must be");
+
+  Label slow_path;
+
+  { // Restore lock-stack and handle the unlock in runtime.
+
+    __ bind(_push_and_slow_path);
 #ifdef ASSERT
-  __ movl(t, Address(r15_thread, JavaThread::lock_stack_top_offset()));
-  __ movptr(Address(r15_thread, t), 0);
+    // The obj was only cleared in debug.
+    __ movl(_t, Address(_thread, JavaThread::lock_stack_top_offset()));
+    __ movptr(Address(_thread, _t), _obj);
 #endif
-  __ jmp(continuation());
+    __ addl(Address(_thread, JavaThread::lock_stack_top_offset()), oopSize);
+  }
+
+  { // Slow path.
+
+    __ bind(slow_path);
+    // Clear ZF.
+    __ testptr(_thread, _thread);
+    __ jmp(slow_path_continuation());
+  }
+
+  { // Handle monitor medium path.
+
+    __ bind(_check_successor);
+
+    Label fix_zf_and_unlocked;
+    const Register monitor = _mark;
+
+#ifndef _LP64
+    __ jmpb(slow_path);
+#else // _LP64
+    // successor null check.
+    __ cmpptr(Address(monitor, OM_OFFSET_NO_MONITOR_VALUE_TAG(succ)), NULL_WORD);
+    __ jccb(Assembler::equal, slow_path);
+
+    // Release lock.
+    __ movptr(Address(monitor, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner)), NULL_WORD);
+
+    // Fence.
+    // Instead of MFENCE we use a dummy locked add of 0 to the top-of-stack.
+    __ lock(); __ addl(Address(rsp, 0), 0);
+
+    // Recheck successor.
+    __ cmpptr(Address(monitor, OM_OFFSET_NO_MONITOR_VALUE_TAG(succ)), NULL_WORD);
+    // Observed a successor after the release -> fence we have handed off the monitor
+    __ jccb(Assembler::notEqual, fix_zf_and_unlocked);
+
+    // Try to relock, if it fails the monitor has been handed over
+    // TODO: Caveat, this may fail due to deflation, which does
+    //       not handle the monitor handoff. Currently only works
+    //       due to the responsible thread.
+    __ xorptr(rax, rax);
+    __ lock(); __ cmpxchgptr(_thread, Address(monitor, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner)));
+    __ jccb  (Assembler::equal, slow_path);
+#endif
+
+    __ bind(fix_zf_and_unlocked);
+    __ xorl(rax, rax);
+    __ jmp(unlocked_continuation());
+  }
 }
 
+#ifdef _LP64
 int C2LoadNKlassStub::max_size() const {
   return 10;
 }

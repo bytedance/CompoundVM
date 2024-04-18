@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -2112,8 +2112,6 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
       __ jcc(Assembler::notEqual, slow_path_lock);
     } else {
       assert(LockingMode == LM_LIGHTWEIGHT, "must be");
-      // Load object header
-      __ movptr(swap_reg, Address(obj_reg, oopDesc::mark_offset_in_bytes()));
       __ lightweight_lock(obj_reg, swap_reg, r15_thread, rscratch1, slow_path_lock);
     }
 
@@ -2266,9 +2264,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
       __ jcc(Assembler::notEqual, slow_path_unlock);
     } else {
       assert(LockingMode == LM_LIGHTWEIGHT, "must be");
-      __ movptr(swap_reg, Address(obj_reg, oopDesc::mark_offset_in_bytes()));
-      __ andptr(swap_reg, ~(int32_t)markWord::lock_mask_in_place);
-      __ lightweight_unlock(obj_reg, swap_reg, lock_reg, slow_path_unlock);
+      __ lightweight_unlock(obj_reg, swap_reg, r15_thread, lock_reg, slow_path_unlock);
     }
 
     // slow path re-enters here

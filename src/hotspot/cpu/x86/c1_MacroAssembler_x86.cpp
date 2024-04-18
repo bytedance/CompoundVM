@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1999, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -34,9 +34,11 @@
 #include "oops/markWord.hpp"
 #include "runtime/basicLock.hpp"
 #include "runtime/biasedLocking.hpp"
+#include "runtime/globals.hpp"
 #include "runtime/os.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/stubRoutines.hpp"
+#include "utilities/globalDefinitions.hpp"
 
 int C1_MacroAssembler::lock_object(Register hdr, Register obj, Register disp_hdr, Register scratch, Label& slow_case) {
   const Register rklass_decode_tmp = LP64_ONLY(rscratch1) NOT_LP64(noreg);
@@ -67,8 +69,6 @@ int C1_MacroAssembler::lock_object(Register hdr, Register obj, Register disp_hdr
     const Register thread = disp_hdr;
     get_thread(thread);
 #endif
-    // Load object header
-    movptr(hdr, Address(obj, hdr_offset));
     lightweight_lock(obj, hdr, thread, scratch, slow_case);
   } else {
     Label done;
@@ -129,12 +129,14 @@ void C1_MacroAssembler::unlock_object(Register hdr, Register obj, Register disp_
   assert(hdr != obj && hdr != disp_hdr && obj != disp_hdr, "registers must be different");
 
   if (LockingMode == LM_LIGHTWEIGHT) {
-    // load object
-    movptr(obj, Address(disp_hdr, BasicObjectLock::obj_offset_in_bytes()));
-    verify_oop(obj);
-    movptr(disp_hdr, Address(obj, hdr_offset));
-    andptr(disp_hdr, ~(int32_t)markWord::lock_mask_in_place);
-    lightweight_unlock(obj, disp_hdr, hdr, slow_case);
+#ifdef _LP64
+    lightweight_unlock(obj, disp_hdr, r15_thread, hdr, slow_case);
+#else
+    // This relies on the implementation of lightweight_unlock being able to handle
+    // that the reg_rax and thread Register parameters may alias each other.
+    get_thread(disp_hdr);
+    lightweight_unlock(obj, disp_hdr, disp_hdr, hdr, slow_case);
+#endif
   } else {
     Label done;
 
