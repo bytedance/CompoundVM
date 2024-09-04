@@ -1144,9 +1144,11 @@ intptr_t ObjectSynchronizer::FastHashCode(Thread* current, oop obj) {
 
     // Inflate the monitor to set the hash.
 
-    // An async deflation can race after the inflate() call and before we
-    // can update the ObjectMonitor's header with the hash value below.
-    monitor = inflate(current, obj, inflate_cause_hash_code);
+    // There's no need to inflate if the mark has already got a monitor.
+    // NOTE: an async deflation can race after we get the monitor and
+    // before we can update the ObjectMonitor's header with the hash
+    // value below.
+    monitor = mark.has_monitor() ? mark.monitor() : inflate(current, obj, inflate_cause_hash_code);
     // Load ObjectMonitor's header/dmw field and see if it has a hash.
     mark = monitor->header();
     assert(mark.is_neutral(), "invariant: header=" INTPTR_FORMAT, mark.value());
@@ -1746,8 +1748,7 @@ public:
 };
 
 // This function is called by the MonitorDeflationThread to deflate
-// ObjectMonitors. It is also called via do_final_audit_and_print_stats()
-// by the VMThread.
+// ObjectMonitors.
 size_t ObjectSynchronizer::deflate_idle_monitors() {
   Thread* current = Thread::current();
   if (current->is_Java_thread()) {
@@ -1774,12 +1775,8 @@ size_t ObjectSynchronizer::deflate_idle_monitors() {
 
   // Deflate some idle ObjectMonitors.
   size_t deflated_count = deflate_monitor_list(current, ls, &timer);
-  if (deflated_count > 0 || is_final_audit()) {
-    // There are ObjectMonitors that have been deflated or this is the
-    // final audit and all the remaining ObjectMonitors have been
-    // deflated, BUT the MonitorDeflationThread blocked for the final
-    // safepoint during unlinking.
-
+  if (deflated_count > 0) {
+    // There are ObjectMonitors that have been deflated.
     // Unlink deflated ObjectMonitors from the in-use list.
     ResourceMark rm;
     GrowableArray<ObjectMonitor*> delete_list((int)deflated_count);
@@ -1949,12 +1946,6 @@ void ObjectSynchronizer::do_final_audit_and_print_stats() {
   log_info(monitorinflation)("Starting the final audit.");
 
   if (log_is_enabled(Info, monitorinflation)) {
-    // Do a deflation in order to reduce the in-use monitor population
-    // that is reported by ObjectSynchronizer::log_in_use_monitor_details()
-    // which is called by ObjectSynchronizer::audit_and_print_stats().
-    while (ObjectSynchronizer::deflate_idle_monitors() != 0) {
-      ; // empty
-    }
     // The other audit_and_print_stats() call is done at the Debug
     // level at a safepoint in ObjectSynchronizer::do_safepoint_work().
     ObjectSynchronizer::audit_and_print_stats(true /* on_exit */);
@@ -2003,7 +1994,7 @@ void ObjectSynchronizer::audit_and_print_stats(bool on_exit) {
     // When exiting this log output is at the Info level. When called
     // at a safepoint, this log output is at the Trace level since
     // there can be a lot of it.
-    log_in_use_monitor_details(ls);
+    log_in_use_monitor_details(ls, !on_exit /* log_all */);
   }
 
   ls->flush();
@@ -2089,9 +2080,9 @@ void ObjectSynchronizer::chk_in_use_entry(ObjectMonitor* n, outputStream* out,
 // Log details about ObjectMonitors on the in_use_list. The 'BHL'
 // flags indicate why the entry is in-use, 'object' and 'object type'
 // indicate the associated object and its type.
-void ObjectSynchronizer::log_in_use_monitor_details(outputStream* out) {
-  stringStream ss;
+void ObjectSynchronizer::log_in_use_monitor_details(outputStream* out, bool log_all) {
   if (_in_use_list.count() > 0) {
+    stringStream ss;
     out->print_cr("In-use monitor info:");
     out->print_cr("(B -> is_busy, H -> has hash code, L -> lock status)");
     out->print_cr("%18s  %s  %18s  %18s",
@@ -2099,16 +2090,19 @@ void ObjectSynchronizer::log_in_use_monitor_details(outputStream* out) {
     out->print_cr("==================  ===  ==================  ==================");
     MonitorList::Iterator iter = _in_use_list.iterator();
     while (iter.has_next()) {
-      ObjectMonitor* mid = iter.next();
-      const oop obj = mid->object_peek();
-      const intptr_t hash = UseObjectMonitorTable ? mid->hash() : mid->header().hash();
+      ObjectMonitor* monitor = iter.next();
+      if (!log_all && !monitor->has_owner() && !monitor->is_busy()) {
+        continue;
+      }
 
+      const oop obj = monitor->object_peek();
+      const intptr_t hash = UseObjectMonitorTable ? monitor->hash() : monitor->header().hash();
       ResourceMark rm;
-      out->print(INTPTR_FORMAT "  %d%d%d  " INTPTR_FORMAT "  %s", p2i(mid),
-                 mid->is_busy(), hash != 0, mid->owner() != NULL,
+      out->print(INTPTR_FORMAT "  %d%d%d  " INTPTR_FORMAT "  %s", p2i(monitor),
+                 monitor->is_busy(), hash != 0, monitor->owner() != NULL,
                  p2i(obj), obj == NULL ? "" : obj->klass()->external_name());
-      if (mid->is_busy()) {
-        out->print(" (%s)", mid->is_busy_to_string(&ss));
+      if (monitor->is_busy()) {
+        out->print(" (%s)", monitor->is_busy_to_string(&ss));
         ss.reset();
       }
       out->cr();

@@ -31,7 +31,6 @@
 #include "metaprogramming/conditional.hpp"
 #include "metaprogramming/isConst.hpp"
 #include "oops/oop.hpp"
-#include "runtime/objectMonitor.hpp"
 #include "runtime/safepoint.hpp"
 #include "utilities/align.hpp"
 #include "utilities/count_trailing_zeros.hpp"
@@ -263,7 +262,6 @@ public:
       if (_is_alive->do_object_b(v)) {
         result = _f(ptr);
       } else {
-        ObjectMonitor::maybe_deflate_dead(ptr);
         *ptr = NULL;            // Clear dead value.
       }
     }
