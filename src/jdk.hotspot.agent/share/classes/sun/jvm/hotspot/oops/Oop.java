@@ -85,10 +85,6 @@ public class Oop {
 
   private static Klass getKlass(Mark mark) {
     assert(VM.getVM().isCompactObjectHeadersEnabled());
-    if (mark.hasMonitor()) {
-      ObjectMonitor mon = mark.monitor();
-      mark = mon.header();
-    }
     return mark.getKlass();
   }
 

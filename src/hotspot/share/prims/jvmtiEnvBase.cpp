@@ -51,6 +51,7 @@
 #include "runtime/objectMonitor.inline.hpp"
 #include "runtime/osThread.hpp"
 #include "runtime/signature.hpp"
+#include "runtime/synchronizer.inline.hpp"
 #include "runtime/thread.inline.hpp"
 #include "runtime/threadSMR.hpp"
 #include "runtime/vframe.inline.hpp"
@@ -962,7 +963,6 @@ JvmtiEnvBase::get_object_monitor_usage(JavaThread* calling_thread, jobject objec
 
   ThreadsListHandle tlh(current_thread);
   JavaThread *owning_thread = NULL;
-  ObjectMonitor *mon = NULL;
   jvmtiMonitorUsage ret = {
       NULL, 0, 0, NULL, 0, NULL
   };
@@ -984,9 +984,11 @@ JvmtiEnvBase::get_object_monitor_usage(JavaThread* calling_thread, jobject objec
 
   jint nWant = 0, nWait = 0;
   markWord mark = hobj->mark();
-  if (mark.has_monitor()) {
-    mon = mark.monitor();
-    assert(mon != NULL, "must have monitor");
+  ObjectMonitor* mon = mark.has_monitor()
+      ? ObjectSynchronizer::read_monitor(current_thread, hobj(), mark)
+      : nullptr;
+
+  if (mon != nullptr) {
     // this object has a heavyweight monitor
     nWant = mon->contentions(); // # of threads contending for monitor
     nWait = mon->waiters();     // # of threads in Object.wait()

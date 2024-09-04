@@ -108,8 +108,7 @@ Klass* oopDesc::klass() const {
 #ifdef _LP64
   if (UseCompactObjectHeaders) {
     assert(UseCompressedClassPointers, "only with compressed class pointers");
-    markWord header = resolve_mark();
-    return header.klass();
+    return mark().klass();
   } else if (UseCompressedClassPointers) {
     return CompressedKlassPointers::decode_not_null(_metadata._compressed_klass);
   } else
@@ -121,8 +120,7 @@ Klass* oopDesc::klass_or_null() const {
 #ifdef _LP64
   if (UseCompactObjectHeaders) {
     assert(UseCompressedClassPointers, "only with compressed class pointers");
-    markWord header = resolve_mark();
-    return header.klass_or_null();
+    return mark().klass_or_null();
   } else if (UseCompressedClassPointers) {
     return CompressedKlassPointers::decode(_metadata._compressed_klass);
   } else
@@ -134,11 +132,7 @@ Klass* oopDesc::klass_or_null_acquire() const {
 #ifdef _LP64
   if (UseCompactObjectHeaders) {
     assert(UseCompressedClassPointers, "only with compressed class pointers");
-    markWord header = mark_acquire();
-    if (header.has_monitor()) {
-      header = header.monitor()->header();
-    }
-    return header.klass_or_null();
+    return mark_acquire().klass_or_null();
   } else if (UseCompressedClassPointers) {
      narrowKlass nklass = Atomic::load_acquire(&_metadata._compressed_klass);
      return CompressedKlassPointers::decode(nklass);

@@ -70,6 +70,7 @@ class OSThread;
 class ThreadStatistics;
 class ConcurrentLocksDump;
 class MonitorInfo;
+class MonitorChunk;
 
 class vframeArray;
 class vframe;
@@ -83,8 +84,11 @@ class ICRefillVerifier;
 
 class Metadata;
 class ResourceArea;
+class RegisterMap;
 
 class OopStorage;
+
+class CompiledMethod;
 
 DEBUG_ONLY(class ResourceMark;)
 
@@ -1618,6 +1622,7 @@ public:
 
 private:
   LockStack _lock_stack;
+  OMCache _om_cache;
 
 public:
   LockStack& lock_stack() { return _lock_stack; }
@@ -1628,6 +1633,13 @@ public:
   // is typically in a dedicated register.
   static ByteSize lock_stack_top_offset()  { return lock_stack_offset() + LockStack::top_offset(); }
   static ByteSize lock_stack_base_offset() { return lock_stack_offset() + LockStack::base_offset(); }
+
+  static ByteSize om_cache_offset()        { return byte_offset_of(JavaThread, _om_cache); }
+  static ByteSize om_cache_oops_offset()   { return om_cache_offset() + OMCache::entries_offset(); }
+
+  void om_set_monitor_cache(ObjectMonitor* monitor);
+  void om_clear_monitor_cache();
+  ObjectMonitor* om_get_from_monitor_cache(oop obj);
 
   static OopStorage* thread_oop_storage();
 

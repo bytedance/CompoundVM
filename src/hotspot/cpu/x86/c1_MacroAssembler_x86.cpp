@@ -65,11 +65,13 @@ int C1_MacroAssembler::lock_object(Register hdr, Register obj, Register disp_hdr
   if (LockingMode == LM_LIGHTWEIGHT) {
 #ifdef _LP64
     const Register thread = r15_thread;
+    lightweight_lock(disp_hdr, obj, hdr, thread, scratch, slow_case);
 #else
-    const Register thread = disp_hdr;
-    get_thread(thread);
+    // Implicit null check.
+    movptr(hdr, Address(obj, oopDesc::mark_offset_in_bytes()));
+    // Lacking registers and thread on x86_32. Always take slow path.
+    jmp(slow_case);
 #endif
-    lightweight_lock(obj, hdr, thread, scratch, slow_case);
   } else {
     Label done;
 
@@ -129,13 +131,13 @@ void C1_MacroAssembler::unlock_object(Register hdr, Register obj, Register disp_
   assert(hdr != obj && hdr != disp_hdr && obj != disp_hdr, "registers must be different");
 
   if (LockingMode == LM_LIGHTWEIGHT) {
+    movptr(obj, Address(disp_hdr, BasicObjectLock::obj_offset_in_bytes()));
+    verify_oop(obj);
 #ifdef _LP64
     lightweight_unlock(obj, disp_hdr, r15_thread, hdr, slow_case);
 #else
-    // This relies on the implementation of lightweight_unlock being able to handle
-    // that the reg_rax and thread Register parameters may alias each other.
-    get_thread(disp_hdr);
-    lightweight_unlock(obj, disp_hdr, disp_hdr, hdr, slow_case);
+    // Lacking registers and thread on x86_32. Always take slow path.
+    jmp(slow_case);
 #endif
   } else {
     Label done;

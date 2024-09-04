@@ -2112,6 +2112,17 @@ const intx ObjectAlignmentInBytes = 8;
           "2: monitors & new lightweight locking (LM_LIGHTWEIGHT)")         \
           range(0, 2)                                                       \
                                                                             \
+  product(bool, UseObjectMonitorTable, false, DIAGNOSTIC,                   \
+          "With Lightweight Locking mode, use a table to record inflated "  \
+          "monitors rather than the first word of the object.")             \
+                                                                            \
+  product(int, LightweightFastLockingSpins, 13, DIAGNOSTIC,                 \
+          "Specifies the number of time lightweight fast locking will "     \
+          "attempt to CAS the markWord before inflating. Between each "     \
+          "CAS it will spin for exponentially more time, resulting in "     \
+          "a total number of spins on the order of O(2^value)")             \
+          range(1, 30)                                                      \
+                                                                            \
   develop(bool, TraceOptimizedUpcallStubs, false,                              \
                 "Trace optimized upcall stub generation")                      \
                                                                             \

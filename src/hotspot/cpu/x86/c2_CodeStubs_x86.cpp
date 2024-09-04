@@ -86,6 +86,7 @@ void C2FastUnlockLightweightStub::emit(C2_MacroAssembler& masm) {
   { // Slow path.
 
     __ bind(slow_path);
+    __ bind(_slow_path);
     // Clear ZF.
     __ testptr(_thread, _thread);
     __ jmp(slow_path_continuation());
@@ -101,19 +102,23 @@ void C2FastUnlockLightweightStub::emit(C2_MacroAssembler& masm) {
 #ifndef _LP64
     __ jmpb(slow_path);
 #else // _LP64
+    const ByteSize monitor_tag = in_ByteSize(UseObjectMonitorTable ? 0 : checked_cast<int>(markWord::monitor_value));
+    const Address succ_address{monitor, ObjectMonitor::succ_offset() - monitor_tag};
+    const Address owner_address{monitor, ObjectMonitor::owner_offset() - monitor_tag};
+
     // successor null check.
-    __ cmpptr(Address(monitor, OM_OFFSET_NO_MONITOR_VALUE_TAG(succ)), NULL_WORD);
+    __ cmpptr(succ_address, NULL_WORD);
     __ jccb(Assembler::equal, slow_path);
 
     // Release lock.
-    __ movptr(Address(monitor, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner)), NULL_WORD);
+    __ movptr(owner_address, NULL_WORD);
 
     // Fence.
     // Instead of MFENCE we use a dummy locked add of 0 to the top-of-stack.
     __ lock(); __ addl(Address(rsp, 0), 0);
 
     // Recheck successor.
-    __ cmpptr(Address(monitor, OM_OFFSET_NO_MONITOR_VALUE_TAG(succ)), NULL_WORD);
+    __ cmpptr(succ_address, NULL_WORD);
     // Observed a successor after the release -> fence we have handed off the monitor
     __ jccb(Assembler::notEqual, fix_zf_and_unlocked);
 
@@ -122,7 +127,7 @@ void C2FastUnlockLightweightStub::emit(C2_MacroAssembler& masm) {
     //       not handle the monitor handoff. Currently only works
     //       due to the responsible thread.
     __ xorptr(rax, rax);
-    __ lock(); __ cmpxchgptr(_thread, Address(monitor, OM_OFFSET_NO_MONITOR_VALUE_TAG(owner)));
+    __ lock(); __ cmpxchgptr(_thread, owner_address);
     __ jccb  (Assembler::equal, slow_path);
 #endif
 
@@ -131,18 +136,5 @@ void C2FastUnlockLightweightStub::emit(C2_MacroAssembler& masm) {
     __ jmp(unlocked_continuation());
   }
 }
-
-#ifdef _LP64
-int C2LoadNKlassStub::max_size() const {
-  return 10;
-}
-
-void C2LoadNKlassStub::emit(C2_MacroAssembler& masm) {
-  __ bind(entry());
-  Register d = dst();
-  __ movq(d, Address(d, OM_OFFSET_NO_MONITOR_VALUE_TAG(header)));
-  __ jmp(continuation());
-}
-#endif
 
 #undef __

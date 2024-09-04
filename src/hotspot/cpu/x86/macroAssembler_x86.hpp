@@ -343,7 +343,7 @@ class MacroAssembler: public Assembler {
   // oop manipulations
   void load_klass(Register dst, Register src, Register tmp, bool null_check_src = false);
 #ifdef _LP64
-  void load_nklass(Register dst, Register src);
+  void load_nklass_compact(Register dst, Register src);
 #endif
   void store_klass(Register dst, Register src, Register tmp);
 
@@ -1924,7 +1924,7 @@ public:
 
   void vallones(XMMRegister dst, int vector_len);
 
-  void lightweight_lock(Register obj, Register reg_rax, Register thread, Register tmp, Label& slow);
+  void lightweight_lock(Register basic_lock, Register obj, Register reg_rax, Register thread, Register tmp, Label& slow);
   void lightweight_unlock(Register obj, Register reg_rax, Register thread, Register tmp, Label& slow);
 };
 

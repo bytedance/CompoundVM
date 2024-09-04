@@ -4752,23 +4752,9 @@ void MacroAssembler::load_method_holder(Register holder, Register method) {
 }
 
 #ifdef _LP64
-void MacroAssembler::load_nklass(Register dst, Register src) {
-  assert(UseCompressedClassPointers, "expect compressed class pointers");
-
-  if (!UseCompactObjectHeaders) {
-    movl(dst, Address(src, oopDesc::klass_offset_in_bytes()));
-    return;
-  }
-
- Label fast;
+void MacroAssembler::load_nklass_compact(Register dst, Register src) {
+  assert(UseCompactObjectHeaders, "expect compact object headers");
   movq(dst, Address(src, oopDesc::mark_offset_in_bytes()));
-  testb(dst, markWord::monitor_value);
-  jccb(Assembler::zero, fast);
-
-  // Fetch displaced header
-  movq(dst, Address(dst, OM_OFFSET_NO_MONITOR_VALUE_TAG(header)));
-
-  bind(fast);
   shrq(dst, markWord::klass_shift);
 }
 #endif
@@ -4776,20 +4762,18 @@ void MacroAssembler::load_nklass(Register dst, Register src) {
 void MacroAssembler::load_klass(Register dst, Register src, Register tmp, bool null_check_src) {
   assert_different_registers(src, tmp);
   assert_different_registers(dst, tmp);
-  if (null_check_src) {
-    if (UseCompactObjectHeaders) {
-      null_check(src, oopDesc::mark_offset_in_bytes());
-    } else {
-      null_check(src, oopDesc::klass_offset_in_bytes());
-    }
-  }
 #ifdef _LP64
-  if (UseCompressedClassPointers) {
-    load_nklass(dst, src);
+  if (UseCompactObjectHeaders) {
+    load_nklass_compact(dst, src);
+    decode_klass_not_null(dst, tmp);
+  } else if (UseCompressedClassPointers) {
+    movl(dst, Address(src, oopDesc::klass_offset_in_bytes()));
     decode_klass_not_null(dst, tmp);
   } else
 #endif
+  {
     movptr(dst, Address(src, oopDesc::klass_offset_in_bytes()));
+  }
 }
 
 void MacroAssembler::load_prototype_header(Register dst, Register src, Register tmp) {
@@ -4816,7 +4800,7 @@ void MacroAssembler::cmp_klass(Register klass, Register obj, Register tmp) {
     // NOTE: We need to deal with possible ObjectMonitor in object header.
     // Eventually we might be able to do simple movl & cmpl like in
     // the CCP path below.
-    load_nklass(tmp, obj);
+    load_nklass_compact(tmp, obj);
     cmpl(klass, tmp);
   } else if (UseCompressedClassPointers) {
     cmpl(klass, Address(obj, oopDesc::klass_offset_in_bytes()));
@@ -4835,8 +4819,8 @@ void MacroAssembler::cmp_klass(Register src, Register dst, Register tmp1, Regist
     // the CCP path below.
     assert(tmp2 != noreg, "need tmp2");
     assert_different_registers(src, dst, tmp1, tmp2);
-    load_nklass(tmp1, src);
-    load_nklass(tmp2, dst);
+    load_nklass_compact(tmp1, src);
+    load_nklass_compact(tmp2, dst);
     cmpl(tmp1, tmp2);
   } else if (UseCompressedClassPointers) {
     movl(tmp1, Address(src, oopDesc::klass_offset_in_bytes()));
@@ -4896,6 +4880,7 @@ void MacroAssembler::store_heap_oop_null(Address dst) {
 
 #ifdef _LP64
 void MacroAssembler::store_klass_gap(Register dst, Register src) {
+  assert(!UseCompactObjectHeaders, "Don't use with compact headers");
   if (UseCompressedClassPointers) {
     // Store to klass gap in destination
     movl(Address(dst, oopDesc::klass_gap_offset_in_bytes()), src);
@@ -8780,9 +8765,9 @@ void MacroAssembler::get_thread(Register thread) {
 // reg_rax: rax
 // thread: the thread which attempts to lock obj
 // tmp: a temporary register
-void MacroAssembler::lightweight_lock(Register obj, Register reg_rax, Register thread, Register tmp, Label& slow) {
+void MacroAssembler::lightweight_lock(Register basic_lock, Register obj, Register reg_rax, Register thread, Register tmp, Label& slow) {
   assert(reg_rax == rax, "");
-  assert_different_registers(obj, reg_rax, thread, tmp);
+  assert_different_registers(basic_lock, obj, reg_rax, thread, tmp);
 
   Label push;
   const Register top = tmp;
@@ -8790,6 +8775,11 @@ void MacroAssembler::lightweight_lock(Register obj, Register reg_rax, Register t
   // Preload the markWord. It is important that this is the first
   // instruction emitted as it is part of C1's null check semantics.
   movptr(reg_rax, Address(obj, oopDesc::mark_offset_in_bytes()));
+
+  if (UseObjectMonitorTable) {
+    // Clear cache in case fast locking succeeds.
+    movptr(Address(basic_lock, BasicObjectLock::lock_offset() + in_ByteSize((BasicLock::object_monitor_cache_offset_in_bytes()))), 0);
+  }
 
   // Load top.
   movl(top, Address(thread, JavaThread::lock_stack_top_offset()));
@@ -8829,13 +8819,9 @@ void MacroAssembler::lightweight_lock(Register obj, Register reg_rax, Register t
 // reg_rax: rax
 // thread: the thread
 // tmp: a temporary register
-//
-// x86_32 Note: reg_rax and thread may alias each other due to limited register
-//              availiability.
 void MacroAssembler::lightweight_unlock(Register obj, Register reg_rax, Register thread, Register tmp, Label& slow) {
   assert(reg_rax == rax, "");
-  assert_different_registers(obj, reg_rax, tmp);
-  LP64_ONLY(assert_different_registers(obj, reg_rax, thread, tmp);)
+  assert_different_registers(obj, reg_rax, thread, tmp);
 
   Label unlocked, push_and_slow;
   const Register top = tmp;
@@ -8875,10 +8861,6 @@ void MacroAssembler::lightweight_unlock(Register obj, Register reg_rax, Register
 
   bind(push_and_slow);
   // Restore lock-stack and handle the unlock in runtime.
-  if (thread == reg_rax) {
-    // On x86_32 we may lose the thread.
-    get_thread(thread);
-  }
 #ifdef ASSERT
   movl(top, Address(thread, JavaThread::lock_stack_top_offset()));
   movptr(Address(thread, top), obj);
