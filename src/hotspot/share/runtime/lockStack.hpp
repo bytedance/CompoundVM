@@ -123,9 +123,6 @@ public:
 
   // Printing
   void print_on(outputStream* st);
-
-  // Verify Lock Stack consistent with lock order
-  void verify_consistent_lock_order(GrowableArray<oop>& lock_order, bool leaf_frame) const NOT_DEBUG_RETURN;
 };
 
 class OMCache {
