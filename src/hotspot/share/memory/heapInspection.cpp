@@ -100,9 +100,16 @@ const char* KlassInfoEntry::name() const {
 void KlassInfoEntry::print_on(outputStream* st) const {
   ResourceMark rm;
 
-  // simplify the formatting (ILP32 vs LP64) - always cast the numbers to 64-bit
   ModuleEntry* module = _klass->module();
-  if (module->is_named()) {
+  bool should_print_module;
+#if defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
+  should_print_module = false;
+#else
+  should_print_module = module->is_named();
+#endif
+
+  // simplify the formatting (ILP32 vs LP64) - always cast the numbers to 64-bit
+  if (should_print_module) {
     st->print_cr(INT64_FORMAT_W(13) "  " UINT64_FORMAT_W(13) "  %s (%s%s%s)",
                  (int64_t)_instance_count,
                  (uint64_t)_instance_words * HeapWordSize,
@@ -500,8 +507,13 @@ void KlassHierarchy::print_class(outputStream* st, KlassInfoEntry* cie, bool pri
 }
 
 void KlassInfoHisto::print_histo_on(outputStream* st) {
+#if defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
+  st->print_cr(" num     #instances         #bytes  class name");
+  st->print_cr("----------------------------------------------");
+#else
   st->print_cr(" num     #instances         #bytes  class name (module)");
   st->print_cr("-------------------------------------------------------");
+#endif
   print_elements(st);
 }
 

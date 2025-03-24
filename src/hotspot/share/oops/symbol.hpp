@@ -293,6 +293,9 @@ class Symbol : public MetaspaceObj {
   Symbol() { }
 
   static size_t _total_count;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  void assert_all_latin1();
+#endif
 #endif
 };
 

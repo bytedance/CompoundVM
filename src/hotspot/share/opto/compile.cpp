@@ -1821,7 +1821,12 @@ void Compile::inline_string_calls(bool parse_time) {
     PhaseRemoveUseless pru(initial_gvn(), for_igvn());
   }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // for diagnosis purpose
+  if (UseStringOpts) {
+#else
   {
+#endif
     ResourceMark rm;
     print_method(PHASE_BEFORE_STRINGOPTS, 3);
     PhaseStringOpts pso(initial_gvn(), for_igvn());

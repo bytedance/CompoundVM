@@ -95,11 +95,28 @@ void GCConfig::fail_if_non_included_gc_is_selected() {
   NOT_ZGC(         FAIL_IF_SELECTED(UseZGC));
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+void GCConfig::select_gc_ergonomically() {
+  if (os::is_server_class_machine()) {
+#if INCLUDE_PARALLELGC
+    FLAG_SET_ERGO_IF_DEFAULT(UseParallelGC, true);
+#elif INCLUDE_G1GC
+    FLAG_SET_ERGO_IF_DEFAULT(UseG1GC, true);
+#elif INCLUDE_SERIALGC
+    FLAG_SET_ERGO_IF_DEFAULT(UseSerialGC, true);
+#endif
+  } else {
+#if INCLUDE_SERIALGC
+    FLAG_SET_ERGO_IF_DEFAULT(UseSerialGC, true);
+#endif
+  }
+}
+#elif HOTSPOT_TARGET_CLASSLIB == 17
 void GCConfig::select_gc_ergonomically() {
   if (os::is_server_class_machine()) {
 #if INCLUDE_G1GC
     FLAG_SET_ERGO_IF_DEFAULT(UseG1GC, true);
-#elif INCLUDE_PARALLELGC
+#elif INCLUDE_G1GC PARALLELGC
     FLAG_SET_ERGO_IF_DEFAULT(UseParallelGC, true);
 #elif INCLUDE_SERIALGC
     FLAG_SET_ERGO_IF_DEFAULT(UseSerialGC, true);
@@ -110,6 +127,7 @@ void GCConfig::select_gc_ergonomically() {
 #endif
   }
 }
+#endif
 
 bool GCConfig::is_no_gc_selected() {
   FOR_EACH_INCLUDED_GC(gc) {

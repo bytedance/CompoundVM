@@ -22,6 +22,9 @@
  *
  */
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#include "jni.h"
+#endif
 #include "precompiled.hpp"
 #include "jvm.h"
 #include "classfile/javaClasses.inline.hpp"
@@ -43,6 +46,9 @@
 #include "oops/oop.inline.hpp"
 #include "oops/typeArrayOop.inline.hpp"
 #include "prims/jvmtiExport.hpp"
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#include "runtime/arguments.hpp"
+#endif
 #include "runtime/fieldDescriptor.inline.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/javaCalls.hpp"
@@ -394,6 +400,38 @@ arrayOop Reflection::reflect_new_multi_array(oop element_mirror, typeArrayOop di
   return arrayOop(obj);
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+oop Reflection::array_component_type(oop mirror, TRAPS) {
+  if (java_lang_Class::is_primitive(mirror)) {
+    return NULL;
+  }
+
+  Klass* klass = java_lang_Class::as_Klass(mirror);
+  if (!klass->is_array_klass()) {
+    return NULL;
+  }
+
+  oop result = java_lang_Class::component_mirror(klass->java_mirror());
+#ifdef ASSERT
+/* TODO
+  oop result2 = NULL;
+  if (ArrayKlass::cast(klass)->dimension() == 1) {
+    if (klass->is_typeArray_klass()) {
+      result2 = basic_type_arrayklass_to_mirror(klass, CHECK_NULL);
+    } else {
+      result2 = ObjArrayKlass::cast(klass)->element_klass()->java_mirror();
+    }
+  } else {
+    Klass* lower_dim = ArrayKlass::cast(klass)->lower_dimension();
+    assert(lower_dim->oop_is_array(), "just checking");
+    result2 = lower_dim->java_mirror();
+  }
+  assert(result == result2, "results must be consistent");
+*/
+#endif //ASSERT
+  return result;
+}
+#endif
 
 static bool can_relax_access_check_for(const Klass* accessor,
                                        const Klass* accessee,
@@ -457,6 +495,9 @@ Reflection::VerifyClassAccessResults Reflection::verify_class_access(
 
   // module boundaries
   if (new_class->is_public()) {
+#if defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
+      return ACCESS_OK;
+#endif
     // Ignore modules for DumpSharedSpaces because we do not have any package
     // or module information for modules other than java.base.
     if (DumpSharedSpaces) {

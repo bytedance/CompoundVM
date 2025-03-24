@@ -68,7 +68,13 @@ static jint get_properties(AttachOperation* op, outputStream* out, Symbol* seria
   HandleMark hm(THREAD);
 
   // load VMSupport
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  Symbol* klass = vmSymbols::sun_misc_VMSupport();
+#elif HOTSPOT_TARGET_CLASSLIB == 17
   Symbol* klass = vmSymbols::jdk_internal_vm_VMSupport();
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
   InstanceKlass* k = load_and_initialize_klass(klass, THREAD);
   if (HAS_PENDING_EXCEPTION) {
     java_lang_Throwable::print(PENDING_EXCEPTION, out);
@@ -114,6 +120,7 @@ static jint load_agent(AttachOperation* op, outputStream* out) {
   const char* absParam = op->arg(1);
   const char* options = op->arg(2);
 
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
   // If loading a java agent then need to ensure that the java.instrument module is loaded
   if (strcmp(agent, "instrument") == 0) {
     JavaThread* THREAD = JavaThread::current(); // For exception macros.
@@ -133,6 +140,7 @@ static jint load_agent(AttachOperation* op, outputStream* out) {
       return JNI_ERR;
     }
   }
+#endif
 
   return JvmtiExport::load_agent_library(agent, absParam, options, out);
 }

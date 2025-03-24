@@ -106,6 +106,9 @@ void ClassLoaderData::init_null_class_loader_data() {
 void ClassLoaderData::initialize_name(Handle class_loader) {
   ResourceMark rm;
 
+  // skip for classlib8
+  CLASSLIB8_EARLY_RETURN_();
+
   // Obtain the class loader's name.  If the class loader's name was not
   // explicitly set during construction, the CLD's _name field will be null.
   oop cl_name = java_lang_ClassLoader::name(class_loader());
@@ -894,6 +897,19 @@ void ClassLoaderData::free_deallocate_list_C_heap_structures() {
     }
   }
 }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+// These anonymous class loaders are to contain classes used for JSR292
+ClassLoaderData* ClassLoaderData::anonymous_class_loader_data(oop loader, TRAPS) {
+  return ClassLoaderData::class_loader_data_or_null(loader);
+  // Add a new class loader data to the graph.
+  //return ClassLoaderDataGraph::add(Handle(THREAD, loader),
+  //      // TODO: the second parameter has different meanings in jdk8 and jdk17,
+  //      //    will crash java/lang/invoke/6998541/Test6998541.java in either direction
+  //      //    have to fix this.
+  //      true /*has_class_mirror_holder*/);
+}
+#endif
 
 // Caller needs ResourceMark
 // If the class loader's _name has not been explicitly set, the class loader's

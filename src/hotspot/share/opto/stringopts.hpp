@@ -90,6 +90,9 @@ class PhaseStringOpts : public Phase {
 
   // Allocate a byte array of specified length.
   Node* allocate_byte_array(GraphKit& kit, IdealKit* ideal, Node* length);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  Node* allocate_char_array(GraphKit& kit, IdealKit* ideal, Node* length);
+#endif
 
   // Returns the coder of a constant string
   jbyte get_constant_coder(GraphKit& kit, Node* str);

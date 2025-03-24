@@ -339,7 +339,11 @@ oop MethodHandles::init_method_MemberName(Handle mname, CallInfo& info) {
 
   oop mname_oop = mname();
   java_lang_invoke_MemberName::set_flags  (mname_oop, flags);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  java_lang_invoke_MemberName::set_vmtarget(mname_oop, m());
+#else
   java_lang_invoke_MemberName::set_method (mname_oop, resolved_method());
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
   java_lang_invoke_MemberName::set_vmindex(mname_oop, vmindex);   // vtable/itable index
   java_lang_invoke_MemberName::set_clazz  (mname_oop, m_klass->java_mirror());
   // Note:  name and type can be lazily computed by resolve_MemberName,
@@ -360,7 +364,11 @@ oop MethodHandles::init_field_MemberName(Handle mname, fieldDescriptor& fd, bool
 
   oop mname_oop = mname();
   java_lang_invoke_MemberName::set_flags  (mname_oop, flags);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    java_lang_invoke_MemberName::set_vmtarget(mname_oop, NULL);
+#else // HOTSPOT_TARGET_CLASSLIB == 8
   java_lang_invoke_MemberName::set_method (mname_oop, NULL);
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
   java_lang_invoke_MemberName::set_vmindex(mname_oop, vmindex);
   java_lang_invoke_MemberName::set_clazz  (mname_oop, ik->java_mirror());
 
@@ -393,8 +401,11 @@ bool MethodHandles::is_method_handle_invoke_name(Klass* klass, Symbol* name) {
   // The following test will fail spuriously during bootstrap of MethodHandle itself:
   //    if (klass != vmClasses::MethodHandle_klass())
   // Test the name instead:
-  if (klass->name() != vmSymbols::java_lang_invoke_MethodHandle() &&
-      klass->name() != vmSymbols::java_lang_invoke_VarHandle()) {
+  if (klass->name() != vmSymbols::java_lang_invoke_MethodHandle()
+#if HOTSPOT_TARGET_CLASSLIB == 17
+   && klass->name() != vmSymbols::java_lang_invoke_VarHandle()
+#endif
+   ) {
     return false;
   }
 
@@ -491,11 +502,13 @@ vmIntrinsics::ID MethodHandles::signature_polymorphic_name_id(Symbol* name) {
     return vmIntrinsics::_invokeGeneric;
   }
 
+#if HOTSPOT_TARGET_CLASSLIB == 17
   // Cover the case of methods on VarHandle.
   Klass* vh_klass = vmClasses::klass_at(VM_CLASS_ID(VarHandle_klass));
   if (vh_klass != NULL && is_method_handle_invoke_name(vh_klass, name)) {
     return vmIntrinsics::_invokeGeneric;
   }
+#endif
 
   // Note: The pseudo-intrinsic _compiledLambdaForm is never linked against.
   // Instead it is used to mark lambda forms bound to invokehandle or invokedynamic.
@@ -504,8 +517,11 @@ vmIntrinsics::ID MethodHandles::signature_polymorphic_name_id(Symbol* name) {
 
 vmIntrinsics::ID MethodHandles::signature_polymorphic_name_id(Klass* klass, Symbol* name) {
   if (klass != NULL &&
-      (klass->name() == vmSymbols::java_lang_invoke_MethodHandle() ||
-       klass->name() == vmSymbols::java_lang_invoke_VarHandle())) {
+      (klass->name() == vmSymbols::java_lang_invoke_MethodHandle()
+#if HOTSPOT_TARGET_CLASSLIB == 17
+       || klass->name() == vmSymbols::java_lang_invoke_VarHandle()
+#endif
+       )) {
     vmIntrinsics::ID iid = signature_polymorphic_name_id(name);
     if (iid != vmIntrinsics::_none)
       return iid;
@@ -691,6 +707,10 @@ Handle MethodHandles::resolve_MemberName(Handle mname, Klass* caller, int lookup
                                          bool speculative_resolve, TRAPS) {
   Handle empty;
   assert(java_lang_invoke_MemberName::is_instance(mname()), "");
+  CLASSLIB8_DEBUG_ONLY(
+    if (VerifyLatin1NamesOnly && caller != NULL) {
+      caller->name()->assert_all_latin1();
+    })
 
   if (java_lang_invoke_MemberName::vmtarget(mname()) != NULL) {
     // Already resolved.
@@ -733,12 +753,18 @@ Handle MethodHandles::resolve_MemberName(Handle mname, Klass* caller, int lookup
   // convert the external string name to an internal symbol
   TempNewSymbol name = java_lang_String::as_symbol_or_null(name_str());
   if (name == NULL)  return empty;  // no such name
+  CLASSLIB8_DEBUG_ONLY(if (VerifyLatin1NamesOnly) { name->assert_all_latin1(); });
   if (name == vmSymbols::class_initializer_name())
     return empty; // illegal name
+  CLASSLIB8_DEBUG_ONLY(if (VerifyLatin1NamesOnly) { name->assert_all_latin1(); });
 
   vmIntrinsics::ID mh_invoke_id = vmIntrinsics::_none;
   if ((flags & ALL_KINDS) == IS_METHOD &&
-      (defc == vmClasses::MethodHandle_klass() || defc == vmClasses::VarHandle_klass()) &&
+      (defc == vmClasses::MethodHandle_klass()
+#if HOTSPOT_TARGET_CLASSLIB == 17
+       || defc == vmClasses::VarHandle_klass()
+#endif
+       ) &&
       (ref_kind == JVM_REF_invokeVirtual ||
        ref_kind == JVM_REF_invokeSpecial ||
        // static invocation mode is required for _linkToVirtual, etc.:
@@ -755,6 +781,8 @@ Handle MethodHandles::resolve_MemberName(Handle mname, Klass* caller, int lookup
   // convert the external string or reflective type to an internal signature
   TempNewSymbol type = lookup_signature(type_str(), (mh_invoke_id != vmIntrinsics::_none), CHECK_(empty));
   if (type == NULL)  return empty;  // no such signature exists in the VM
+
+  CLASSLIB8_DEBUG_ONLY(if (VerifyLatin1NamesOnly) { type->assert_all_latin1(); });
 
   // skip access check if it's trusted lookup
   LinkInfo::AccessCheck access_check = caller != NULL ?
@@ -1208,8 +1236,14 @@ JVM_ENTRY(void, MHN_expand_Mem(JNIEnv *env, jobject igcls, jobject mname_jh)) {
 JVM_END
 
 // void resolve(MemberName self, Class<?> caller)
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(jobject, MHN_resolve_Mem(JNIEnv *env, jobject igcls, jobject mname_jh, jclass caller_jh)) {
+  jint lookup_mode = LM_TRUSTED;
+  jboolean speculative_resolve = JNI_FALSE;
+#else
 JVM_ENTRY(jobject, MHN_resolve_Mem(JNIEnv *env, jobject igcls, jobject mname_jh, jclass caller_jh,
     jint lookup_mode, jboolean speculative_resolve)) {
+#endif
   if (mname_jh == NULL) { THROW_MSG_NULL(vmSymbols::java_lang_InternalError(), "mname is null"); }
   Handle mname(THREAD, JNIHandles::resolve_non_null(mname_jh));
 
@@ -1529,6 +1563,71 @@ JVM_END
 
 /// JVM_RegisterMethodHandleMethods
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+
+//
+// Here are the native methods in java.lang.invoke.MethodHandleNatives
+// They are the private interface between this JVM and the HotSpot-specific
+// Java code that implements JSR 292 method handles.
+//
+// Note:  We use a JVM_ENTRY macro to define each of these, for this is the way
+// that intrinsic (non-JNI) native methods are defined in HotSpot.
+//
+
+JVM_ENTRY(jint, MHN_getConstant(JNIEnv *env, jobject igcls, jint which)) {
+//  switch (which) {
+//  case MethodHandles::GC_COUNT_GWT:
+//#ifdef COMPILER2
+//    return true;
+//#else
+//    return false;
+//#endif
+//  }
+  return 0;
+}
+JVM_END
+
+#define LANG "Ljava/lang/"
+#define JLINV "Ljava/lang/invoke/"
+
+#define OBJ   LANG "Object;"
+#define CLS   LANG "Class;"
+#define STRG  LANG "String;"
+#define CS    JLINV "CallSite;"
+#define MT    JLINV "MethodType;"
+#define MH    JLINV "MethodHandle;"
+#define MEM   JLINV "MemberName;"
+
+#define CC (char*)  /*cast a literal from (const char*)*/
+#define FN_PTR(f) CAST_FROM_FN_PTR(void*, &f)
+
+// These are the native methods on java.lang.invoke.MethodHandleNatives.
+static JNINativeMethod MHN_methods[] = {
+  {CC "init",                      CC "(" MEM "" OBJ ")V",                     FN_PTR(MHN_init_Mem)},
+  {CC"expand",                     CC "(" MEM ")V",                          FN_PTR(MHN_expand_Mem)},
+  {CC "resolve",                   CC "(" MEM "" CLS ")" MEM,                   FN_PTR(MHN_resolve_Mem)},
+  {CC "getConstant",               CC "(I)I",                              FN_PTR(MHN_getConstant)},
+  //  static native int getNamedCon(int which, Object[] name)
+  {CC "getNamedCon",               CC "(I[" OBJ ")I",                        FN_PTR(MHN_getNamedCon)},
+  //  static native int getMembers(Class<?> defc, String matchName, String matchSig,
+  //          int matchFlags, Class<?> caller, int skip, MemberName[] results);
+  {CC "getMembers",                CC "(" CLS "" STRG "" STRG "I" CLS "I[" MEM ")I", FN_PTR(MHN_getMembers)},
+  {CC "objectFieldOffset",         CC "(" MEM ")J",                          FN_PTR(MHN_objectFieldOffset)},
+  {CC "setCallSiteTargetNormal",   CC "(" CS "" MH ")V",                       FN_PTR(MHN_setCallSiteTargetNormal)},
+  {CC "setCallSiteTargetVolatile", CC "(" CS "" MH ")V",                       FN_PTR(MHN_setCallSiteTargetVolatile)},
+  {CC "staticFieldOffset",         CC "(" MEM ")J",                          FN_PTR(MHN_staticFieldOffset)},
+  {CC "staticFieldBase",           CC "(" MEM ")" OBJ,                        FN_PTR(MHN_staticFieldBase)},
+  {CC "getMemberVMInfo",           CC "(" MEM ")" OBJ,                        FN_PTR(MHN_getMemberVMInfo)}
+};
+
+static JNINativeMethod MH_methods[] = {
+  // UnsupportedOperationException throwers
+  {CC "invoke",                    CC "([" OBJ ")" OBJ,                       FN_PTR(MH_invoke_UOE)},
+  {CC "invokeExact",               CC "([" OBJ ")" OBJ,                       FN_PTR(MH_invokeExact_UOE)}
+};
+
+#else // HOTSPOT_TARGET_CLASSLIB == 8
+
 #define LANG "Ljava/lang/"
 #define JLINV "Ljava/lang/invoke/"
 
@@ -1557,8 +1656,6 @@ static JNINativeMethod MHN_methods[] = {
   {CC "objectFieldOffset",         CC "(" MEM ")J",                          FN_PTR(MHN_objectFieldOffset)},
   {CC "setCallSiteTargetNormal",   CC "(" CS "" MH ")V",                     FN_PTR(MHN_setCallSiteTargetNormal)},
   {CC "setCallSiteTargetVolatile", CC "(" CS "" MH ")V",                     FN_PTR(MHN_setCallSiteTargetVolatile)},
-  {CC "copyOutBootstrapArguments", CC "(" CLS "[III[" OBJ "IZ" OBJ ")V",     FN_PTR(MHN_copyOutBootstrapArguments)},
-  {CC "clearCallSiteContext",      CC "(" CTX ")V",                          FN_PTR(MHN_clearCallSiteContext)},
   {CC "staticFieldOffset",         CC "(" MEM ")J",                          FN_PTR(MHN_staticFieldOffset)},
   {CC "staticFieldBase",           CC "(" MEM ")" OBJ,                        FN_PTR(MHN_staticFieldBase)},
   {CC "getMemberVMInfo",           CC "(" MEM ")" OBJ,                       FN_PTR(MHN_getMemberVMInfo)}
@@ -1569,6 +1666,8 @@ static JNINativeMethod MH_methods[] = {
   {CC "invoke",                    CC "([" OBJ ")" OBJ,                       FN_PTR(MH_invoke_UOE)},
   {CC "invokeExact",               CC "([" OBJ ")" OBJ,                       FN_PTR(MH_invokeExact_UOE)}
 };
+
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
 
 /**
  * This one function is exported, used by NativeLookup.

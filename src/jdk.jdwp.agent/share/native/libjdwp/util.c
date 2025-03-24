@@ -44,6 +44,12 @@ static jboolean isInterface(jclass clazz);
 static jboolean isArrayClass(jclass clazz);
 static char * getPropertyUTF8(JNIEnv *env, char *propertyName);
 
+#if defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
+#define VM_SUPPORT_CLASS "sun/misc/VMSupport"
+#else
+#define VM_SUPPORT_CLASS "jdk/internal/vm/VMSupport"
+#endif
+
 /* Save an object reference for use later (create a NewGlobalRef) */
 void
 saveGlobalRef(JNIEnv *env, jobject obj, jobject *pobj)
@@ -264,7 +270,7 @@ util_initialize(JNIEnv *env)
 
         /* Get agent properties: invoke VMSupport.getAgentProperties */
         localVMSupportClass = JNI_FUNC_PTR(env,FindClass)
-                                          (env, "jdk/internal/vm/VMSupport");
+                                          (env, VM_SUPPORT_CLASS);
         if (localVMSupportClass == NULL) {
             gdata->agent_properties = NULL;
             if (JNI_FUNC_PTR(env,ExceptionOccurred)(env)) {

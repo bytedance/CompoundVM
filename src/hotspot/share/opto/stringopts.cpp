@@ -654,8 +654,12 @@ PhaseStringOpts::PhaseStringOpts(PhaseGVN* gvn, Unique_Node_List*):
     return;
   }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  byte_adr_idx = C->get_alias_index(TypeAryPtr::CHARS);
+#else
   // Collect the types needed to talk about the various slices of memory
   byte_adr_idx = C->get_alias_index(TypeAryPtr::BYTES);
+#endif
 
   // For each locally allocated StringBuffer see if the usages can be
   // collapsed into a single String construction.
@@ -1368,7 +1372,11 @@ void PhaseStringOpts::getChars(GraphKit& kit, Node* arg, Node* dst_array, BasicT
   Node* charPos = new PhiNode(head, TypeInt::INT);
   charPos->init_req(1, end);
   kit.gvn().set_type(charPos, TypeInt::INT);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  Node* mem = PhiNode::make(head, kit.memory(byte_adr_idx), Type::MEMORY, TypeAryPtr::CHARS);
+#else
   Node* mem = PhiNode::make(head, kit.memory(byte_adr_idx), Type::MEMORY, TypeAryPtr::BYTES);
+#endif
   kit.gvn().set_type(mem, Type::MEMORY);
 
   kit.set_control(head);
@@ -1377,11 +1385,19 @@ void PhaseStringOpts::getChars(GraphKit& kit, Node* arg, Node* dst_array, BasicT
   Node* q = __ DivI(kit.null(), i_phi, __ intcon(10));
   Node* r = __ SubI(i_phi, __ AddI(__ LShiftI(q, __ intcon(3)),
                                    __ LShiftI(q, __ intcon(1))));
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  Node* index = __ SubI(charPos, __ intcon(1));
+  Node* ch = __ AddI(r, __ intcon('0'));
+  Node* st = __ store_to_memory(kit.control(), kit.array_element_address(dst_array, index, T_CHAR),
+                                ch, bt, byte_adr_idx, MemNode::unordered, false /* require_atomic_access */,
+                                false /* unaligned */, true /* mismatched */);
+#else
   Node* index = __ SubI(charPos, __ intcon((bt == T_BYTE) ? 1 : 2));
   Node* ch = __ AddI(r, __ intcon('0'));
   Node* st = __ store_to_memory(kit.control(), kit.array_element_address(dst_array, index, T_BYTE),
                                 ch, bt, byte_adr_idx, MemNode::unordered, false /* require_atomic_access */,
                                 false /* unaligned */, (bt != T_BYTE) /* mismatched */);
+#endif
 
   iff = kit.create_and_map_if(head, __ Bool(__ CmpI(q, __ intcon(0)), BoolTest::ne),
                               PROB_FAIR, COUNT_UNKNOWN);
@@ -1417,10 +1433,17 @@ void PhaseStringOpts::getChars(GraphKit& kit, Node* arg, Node* dst_array, BasicT
     final_merge->init_req(merge_index + 1, C->top());
     final_mem->init_req(merge_index + 1, C->top());
   } else {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    Node* index = __ SubI(charPos, __ intcon(1));
+    st = __ store_to_memory(kit.control(), kit.array_element_address(dst_array, index, T_CHAR),
+                            sign, bt, byte_adr_idx, MemNode::unordered, false /* require_atomic_access */,
+                            false /* unaligned */, true /* mismatched */);
+#else
     Node* index = __ SubI(charPos, __ intcon((bt == T_BYTE) ? 1 : 2));
     st = __ store_to_memory(kit.control(), kit.array_element_address(dst_array, index, T_BYTE),
                             sign, bt, byte_adr_idx, MemNode::unordered, false /* require_atomic_access */,
                             false /* unaligned */, (bt != T_BYTE) /* mismatched */);
+#endif
 
     final_merge->init_req(merge_index + 1, kit.control());
     final_mem->init_req(merge_index + 1, st);
@@ -1430,8 +1453,13 @@ void PhaseStringOpts::getChars(GraphKit& kit, Node* arg, Node* dst_array, BasicT
 // Copy the characters representing arg into dst_array starting at start
 Node* PhaseStringOpts::int_getChars(GraphKit& kit, Node* arg, Node* dst_array, Node* dst_coder, Node* start, Node* size) {
   bool dcon = dst_coder->is_Con();
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  bool dbyte = false;
+  Node* end = __ AddI(start, size);
+#else
   bool dbyte = dcon ? (dst_coder->get_int() == java_lang_String::CODER_LATIN1) : false;
   Node* end = __ AddI(start, __ LShiftI(size, dst_coder));
+#endif
 
   // The final_merge node has 4 entries in case the encoding is known:
   // (0) Control, (1) result w/ sign, (2) result w/o sign, (3) result for Integer.min_value
@@ -1440,7 +1468,11 @@ Node* PhaseStringOpts::int_getChars(GraphKit& kit, Node* arg, Node* dst_array, N
   RegionNode* final_merge = new RegionNode(dcon ? 4 : 6);
   kit.gvn().set_type(final_merge, Type::CONTROL);
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  Node* final_mem = PhiNode::make(final_merge, kit.memory(byte_adr_idx), Type::MEMORY, TypeAryPtr::CHARS);
+#else
   Node* final_mem = PhiNode::make(final_merge, kit.memory(byte_adr_idx), Type::MEMORY, TypeAryPtr::BYTES);
+#endif
   kit.gvn().set_type(final_mem, Type::MEMORY);
 
   // need to handle arg == Integer.MIN_VALUE specially because negating doesn't make it positive
@@ -1463,6 +1495,14 @@ Node* PhaseStringOpts::int_getChars(GraphKit& kit, Node* arg, Node* dst_array, N
   kit.set_control(__ IfTrue(iff));
   kit.set_memory(old_mem, byte_adr_idx);
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    // Destination is UTF16
+    int merge_index = 0;
+    if (!dcon) {
+      merge_index = 3; // Account for Latin1 case
+    }
+    getChars(kit, arg, dst_array, T_CHAR, end, final_merge, final_mem, merge_index);
+#else
   if (!dcon) {
     // Check encoding of destination
     iff = kit.create_and_map_if(kit.control(), __ Bool(__ CmpI(dst_coder, __ intcon(0)), BoolTest::eq),
@@ -1486,6 +1526,7 @@ Node* PhaseStringOpts::int_getChars(GraphKit& kit, Node* arg, Node* dst_array, N
     }
     getChars(kit, arg, dst_array, T_CHAR, end, final_merge, final_mem, merge_index);
   }
+#endif
 
   // Final merge point for Latin1 and UTF16 case
   kit.set_control(final_merge);
@@ -1498,6 +1539,24 @@ Node* PhaseStringOpts::int_getChars(GraphKit& kit, Node* arg, Node* dst_array, N
 
 // Copy 'count' bytes/chars from src_array to dst_array starting at index start
 void PhaseStringOpts::arraycopy(GraphKit& kit, IdealKit& ideal, Node* src_array, Node* dst_array, BasicType elembt, Node* start, Node* count) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(elembt == T_CHAR, "Invalid type for arraycopy");
+  Node* extra = NULL;
+#ifdef _LP64
+  count = __ ConvI2L(count);
+  extra = C->top();
+#endif
+  Node* src_ptr = __ array_element_address(src_array, __ intcon(0), T_CHAR);
+  Node* dst_ptr = __ array_element_address(dst_array, start, T_CHAR);
+  // Check if destination address is aligned to HeapWordSize
+  const TypeInt* tdst = __ gvn().type(start)->is_int();
+  bool aligned = tdst->is_con() && ((tdst->get_con() * type2aelembytes(T_CHAR)) % HeapWordSize == 0);
+  // Figure out which arraycopy runtime method to call (disjoint, uninitialized).
+  const char* copyfunc_name = "arraycopy";
+  address     copyfunc_addr = StubRoutines::select_arraycopy_function(elembt, aligned, true, copyfunc_name, true);
+  ideal.make_leaf_call_no_fp(OptoRuntime::fast_arraycopy_Type(), copyfunc_addr, copyfunc_name,
+                             TypeAryPtr::CHARS, src_ptr, dst_ptr, count, extra);
+#else
   assert(elembt == T_BYTE || elembt == T_CHAR, "Invalid type for arraycopy");
 
   if (elembt == T_CHAR) {
@@ -1521,6 +1580,7 @@ void PhaseStringOpts::arraycopy(GraphKit& kit, IdealKit& ideal, Node* src_array,
   address     copyfunc_addr = StubRoutines::select_arraycopy_function(elembt, aligned, true, copyfunc_name, true);
   ideal.make_leaf_call_no_fp(OptoRuntime::fast_arraycopy_Type(), copyfunc_addr, copyfunc_name,
                              TypeAryPtr::BYTES, src_ptr, dst_ptr, count, extra);
+#endif
 }
 
 #undef __
@@ -1529,6 +1589,7 @@ void PhaseStringOpts::arraycopy(GraphKit& kit, IdealKit& ideal, Node* src_array,
 // Copy contents of a Latin1 encoded string from src_array to dst_array
 void PhaseStringOpts::copy_latin1_string(GraphKit& kit, IdealKit& ideal, Node* src_array, IdealVariable& count,
                                          Node* dst_array, Node* dst_coder, Node* start) {
+  CLASSLIB8_ONLY(ShouldNotReachHere());
   bool dcon = dst_coder->is_Con();
   bool dbyte = dcon ? (dst_coder->get_int() == java_lang_String::CODER_LATIN1) : false;
 
@@ -1565,6 +1626,10 @@ void PhaseStringOpts::copy_latin1_string(GraphKit& kit, IdealKit& ideal, Node* s
 
 // Read two bytes from index and index+1 and convert them to a char
 static jchar readChar(ciTypeArray* array, int index) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "classlib8 forbids CompactStrings");
+  return array->char_at(index);
+#else
   int shift_high, shift_low;
 #ifdef VM_LITTLE_ENDIAN
     shift_high = 0;
@@ -1577,11 +1642,25 @@ static jchar readChar(ciTypeArray* array, int index) {
   jchar b1 = ((jchar) array->byte_at(index)) & 0xff;
   jchar b2 = ((jchar) array->byte_at(index+1)) & 0xff;
   return (b1 << shift_high) | (b2 << shift_low);
+#endif
 }
 
 // Copy contents of constant src_array to dst_array by emitting individual stores
 void PhaseStringOpts::copy_constant_string(GraphKit& kit, IdealKit& ideal, ciTypeArray* src_array, IdealVariable& count,
                                            bool src_is_byte, Node* dst_array, Node* dst_coder, Node* start) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  int length = src_array->length();
+  // Destination is UTF16. Copy each char of src_array into dst_array.
+  Node* index = start;
+  for (int i = 0; i < length; i++) {
+    Node* adr = kit.array_element_address(dst_array, index, T_CHAR);
+    jchar val;
+    val = readChar(src_array, i);
+    __ store(__ ctrl(), adr, __ ConI(val), T_CHAR, byte_adr_idx, MemNode::unordered, false /* require_atomic_access */,
+             true /* mismatched */);
+    index = __ AddI(index, __ ConI(1));
+  }
+#else
   bool dcon = dst_coder->is_Con();
   bool dbyte = dcon ? (dst_coder->get_int() == java_lang_String::CODER_LATIN1) : false;
   int length = src_array->length();
@@ -1622,9 +1701,11 @@ void PhaseStringOpts::copy_constant_string(GraphKit& kit, IdealKit& ideal, ciTyp
       __ set(count, __ ConI(2 * length));
     }
   }
+
   if (!dcon) {
     __ end_if();
   }
+#endif
 }
 
 // Compress copy contents of the byte/char String str into dst_array starting at index start.
@@ -1639,12 +1720,19 @@ Node* PhaseStringOpts::copy_string(GraphKit& kit, Node* str, Node* dst_array, No
     ciTypeArray* src_array_type = get_constant_value(kit, str);
 
     // Check encoding of constant string
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    bool src_is_byte = false;
+    __ set(count, __ ConI(src_array_type->length()));
+    int src_len = src_array_type->length();
+#else
     bool src_is_byte = (get_constant_coder(kit, str) == java_lang_String::CODER_LATIN1);
 
     // For small constant strings just emit individual stores.
     // A length of 6 seems like a good space/speed tradeof.
     __ set(count, __ ConI(src_array_type->length()));
     int src_len = src_array_type->length() / (src_is_byte ? 1 : 2);
+#endif
+
     if (src_len < unroll_string_copy_length) {
       // Small constant string
       copy_constant_string(kit, ideal, src_array_type, count, src_is_byte, dst_array, dst_coder, start);
@@ -1687,6 +1775,12 @@ Node* PhaseStringOpts::copy_char(GraphKit& kit, Node* val, Node* dst_array, Node
 
   IdealKit ideal(&kit, true, true);
   IdealVariable end(ideal); __ declarations_done();
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  Node* adr = kit.array_element_address(dst_array, start, T_CHAR);
+  __ store(__ ctrl(), adr, val, T_CHAR, byte_adr_idx, MemNode::unordered, false /* require_atomic_access */,
+           true /* mismatched */);
+  __ set(end, __ AddI(start, __ ConI(1)));
+#else
   Node* adr = kit.array_element_address(dst_array, start, T_BYTE);
   if (!dcon){
     __ if_then(dst_coder, BoolTest::eq, __ ConI(java_lang_String::CODER_LATIN1));
@@ -1708,6 +1802,7 @@ Node* PhaseStringOpts::copy_char(GraphKit& kit, Node* val, Node* dst_array, Node
   if (!dcon) {
     __ end_if();
   }
+#endif
   // Finally sync IdealKit and GraphKit.
   kit.sync_kit(ideal);
   return __ value(end);
@@ -1716,8 +1811,42 @@ Node* PhaseStringOpts::copy_char(GraphKit& kit, Node* val, Node* dst_array, Node
 #undef __
 #define __ kit.
 
+// Allocate a char array of specified length.
+#if HOTSPOT_TARGET_CLASSLIB == 8
+Node* PhaseStringOpts::allocate_char_array(GraphKit& kit, IdealKit* ideal, Node* length) {
+  if (ideal != NULL) {
+    // Sync IdealKit and graphKit.
+    kit.sync_kit(*ideal);
+  }
+  Node* array = NULL;
+  {
+    PreserveReexecuteState preexecs(&kit);
+    // The original jvms is for an allocation of either a String or
+    // StringBuffer so no stack adjustment is necessary for proper
+    // reexecution.  If we deoptimize in the slow path the bytecode
+    // will be reexecuted and the char[] allocation will be thrown away.
+    kit.jvms()->set_should_reexecute(true);
+    // The var name here is a little confusing, fix later
+    array = kit.new_array(__ makecon(TypeKlassPtr::make(ciTypeArrayKlass::make(T_CHAR))),
+                               length, 1);
+  }
+
+  // Mark the allocation so that zeroing is skipped since the code
+  // below will overwrite the entire array
+  AllocateArrayNode* alloc = AllocateArrayNode::Ideal_array_allocation(array, _gvn);
+  alloc->maybe_set_complete(_gvn);
+
+  if (ideal != NULL) {
+    // Sync IdealKit and graphKit.
+    ideal->sync_kit(&kit);
+  }
+  return array;
+}
+#endif
+
 // Allocate a byte array of specified length.
 Node* PhaseStringOpts::allocate_byte_array(GraphKit& kit, IdealKit* ideal, Node* length) {
+  CLASSLIB8_ONLY(ShouldNotReachHere());
   if (ideal != NULL) {
     // Sync IdealKit and graphKit.
     kit.sync_kit(*ideal);
@@ -1747,12 +1876,17 @@ Node* PhaseStringOpts::allocate_byte_array(GraphKit& kit, IdealKit* ideal, Node*
 }
 
 jbyte PhaseStringOpts::get_constant_coder(GraphKit& kit, Node* str) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "classlib8 forbids CompactStrings");
+  return java_lang_String::CODER_UTF16;
+#else
   assert(str->is_Con(), "String must be constant");
   const TypeOopPtr* str_type = kit.gvn().type(str)->isa_oopptr();
   ciInstance* str_instance = str_type->const_oop()->as_instance();
   jbyte coder = str_instance->field_value_by_offset(java_lang_String::coder_offset()).as_byte();
   assert(CompactStrings || (coder == java_lang_String::CODER_UTF16), "Strings must be UTF16 encoded");
   return coder;
+#endif
 }
 
 int PhaseStringOpts::get_constant_length(GraphKit& kit, Node* str) {
@@ -1932,6 +2066,12 @@ void PhaseStringOpts::replace_string_concat(StringConcat* sc) {
           // Constant string. Get constant coder and length.
           jbyte const_coder = get_constant_coder(kit, arg);
           int const_length = get_constant_length(kit, arg);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+          assert(const_coder == java_lang_String::CODER_UTF16, "Classlib-8 expects UTF16 coder");
+          coder_fixed = true; // fake flag
+          coder = __ intcon(const_coder);
+          count = __ intcon(const_length);
+#else
           if (const_coder == java_lang_String::CODER_LATIN1) {
             // Can be latin1 encoded
             arg_coder = __ intcon(const_coder);
@@ -1942,6 +2082,7 @@ void PhaseStringOpts::replace_string_concat(StringConcat* sc) {
             coder = __ intcon(const_coder);
             count = __ intcon(const_length / 2);
           }
+#endif // #if HOTSPOT_TARGET_CLASSLIB == 8
         }
 
         if (!coder_fixed) {
@@ -1955,6 +2096,10 @@ void PhaseStringOpts::replace_string_concat(StringConcat* sc) {
         // one character only
         const TypeInt* t = kit.gvn().type(arg)->is_int();
         if (!coder_fixed && t->is_con()) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+          coder_fixed = true; // fake flag
+          coder = __ intcon(java_lang_String::CODER_UTF16);
+#else
           // Constant char
           if (t->get_con() <= 255) {
             // Can be latin1 encoded
@@ -1964,6 +2109,7 @@ void PhaseStringOpts::replace_string_concat(StringConcat* sc) {
             coder_fixed = true;
             coder = __ intcon(java_lang_String::CODER_UTF16);
           }
+#endif // #if HOTSPOT_TARGET_CLASSLIB == 8
         } else if (!coder_fixed) {
           // Not constant
 #undef __
@@ -1971,11 +2117,15 @@ void PhaseStringOpts::replace_string_concat(StringConcat* sc) {
           IdealKit ideal(&kit, true, true);
           IdealVariable char_coder(ideal); __ declarations_done();
           // Check if character can be latin1 encoded
+        #if HOTSPOT_TARGET_CLASSLIB == 8
+          __ set(char_coder, __ ConI(java_lang_String::CODER_UTF16));
+        #else
           __ if_then(arg, BoolTest::le, __ ConI(0xFF));
             __ set(char_coder, __ ConI(java_lang_String::CODER_LATIN1));
           __ else_();
             __ set(char_coder, __ ConI(java_lang_String::CODER_UTF16));
           __ end_if();
+        #endif
           kit.sync_kit(ideal);
           coder = __ OrI(coder, __ value(char_coder));
 #undef __
@@ -2019,10 +2169,14 @@ void PhaseStringOpts::replace_string_concat(StringConcat* sc) {
       // In this case, we can just pull the value from the String itself.
       dst_array = kit.load_String_value(sc->argument(0), true);
     } else {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+      dst_array = allocate_char_array(kit, NULL, length);
+#else
       // Allocate destination byte array according to coder
       dst_array = allocate_byte_array(kit, NULL, __ LShiftI(length, coder));
 
       // Now copy the string representations into the final byte[]
+#endif
       Node* start = __ intcon(0);
       for (int argi = 0; argi < sc->num_arguments(); argi++) {
         Node* arg = sc->argument(argi);
@@ -2058,6 +2212,11 @@ void PhaseStringOpts::replace_string_concat(StringConcat* sc) {
       kit.jvms()->set_should_reexecute(true);
       result = kit.new_instance(__ makecon(TypeKlassPtr::make(C->env()->String_klass())));
     }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    assert(!CompactStrings && (coder->is_Con() && coder->get_int() == java_lang_String::CODER_UTF16),
+           "Classlib8 forbids CompactStrings, thus coder must be UTF16");
+#endif
 
     // Initialize the string
     kit.store_String_value(result, dst_array);

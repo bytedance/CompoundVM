@@ -115,6 +115,10 @@ class Abstract_VM_Version: AllStatic {
   // Gets the jvm_version_info.jvm_version
   static unsigned int jvm_version();
 
+#if defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
+  static unsigned int jvm_version_for_jdk8();
+#endif
+
   // Internal version providing additional build information
   static const char* internal_vm_info_string();
   static const char* jre_release_version();

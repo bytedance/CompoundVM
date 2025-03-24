@@ -551,6 +551,12 @@ class os: AllStatic {
   static FILE* fopen(const char* path, const char* mode);
   static int close(int fd);
   static jlong lseek(int fd, jlong offset, int whence);
+#if defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
+  // Only for handling the `JVM_O_DELETE` flag used in
+  // jdk8u's Java_java_util_zip_ZipFile_open() at the
+  // JVM-interface-level instead of the os-call-level
+  static int unlink(const char *path);
+#endif
   // This function, on Windows, canonicalizes a given path (see os_windows.cpp for details).
   // On Posix, this function is a noop: it does not change anything and just returns
   // the input pointer.
@@ -749,6 +755,9 @@ class os: AllStatic {
 
   // Returns native Java library, loads if necessary
   static void*    native_java_library();
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static void*    native_java_library17();
+#endif
 
   // Fills in path to jvm.dll/libjvm.so (used by the Disassembler)
   static void     jvm_path(char *buf, jint buflen);
@@ -797,6 +806,25 @@ class os: AllStatic {
   static int raw_send(int fd, char* buf, size_t nBytes, uint flags);
   static int connect(int fd, struct sockaddr* him, socklen_t len);
   static struct hostent* get_host_by_name(char* name);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static int socket_shutdown(int fd, int howto);
+  static int timeout(int fd, long timeout);
+  static int listen(int fd, int count);
+  static int bind(int fd, struct sockaddr* him, socklen_t len);
+  static int accept(int fd, struct sockaddr* him, socklen_t* len);
+  static int recvfrom(int fd, char* buf, size_t nbytes, uint flags,
+                      struct sockaddr* from, socklen_t* fromlen);
+  static int get_sock_name(int fd, struct sockaddr* him, socklen_t* len);
+  static int sendto(int fd, char* buf, size_t len, uint flags,
+                    struct sockaddr* to, socklen_t tolen);
+  static int socket_available(int fd, jint* pbytes);
+
+  static int get_sock_opt(int fd, int level, int optname,
+                          char* optval, socklen_t* optlen);
+  static int set_sock_opt(int fd, int level, int optname,
+                          const char* optval, socklen_t optlen);
+  static int get_host_name(char* name, int namelen);
+#endif
 
   // Support for signals (see JVM_RaiseSignal, JVM_RegisterSignal)
   static void  initialize_jdk_signal_support(TRAPS);
@@ -1028,6 +1056,10 @@ class os: AllStatic {
                                 char pathSep);
   static bool set_boot_path(char fileSep, char pathSep);
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+ private:
+  static bool set_boot_path8(char fileSep, char pathSep);
+#endif
 };
 
 // Note that "PAUSE" is almost always used with synchronization

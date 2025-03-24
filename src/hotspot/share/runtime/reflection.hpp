@@ -73,6 +73,10 @@ class Reflection: public AllStatic {
   // Reflective array access. Returns type code. Throws ArrayIndexOutOfBoundsException.
   static BasicType array_get(jvalue* value, arrayOop a, int index, TRAPS);
   static void      array_set(jvalue* value, arrayOop a, int index, BasicType value_type, TRAPS);
+#if HOTSPOT_TARGET_CLASSLIB == 8  
+  // Returns mirror on array element type (NULL for basic type arrays and non-arrays).
+  static oop       array_component_type(oop mirror, TRAPS);
+#endif
 
   // Object creation
   static arrayOop reflect_new_array(oop element_mirror, jint length, TRAPS);

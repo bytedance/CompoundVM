@@ -220,7 +220,13 @@ JfrDCmd::JfrDCmd(outputStream* output, bool heap, int num_arguments) : DCmd(outp
 void JfrDCmd::invoke(JfrJavaArguments& method, TRAPS) const {
   JavaValue constructor_result(T_OBJECT);
   JfrJavaArguments constructor_args(&constructor_result);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  constructor_args.set_klass(method.klass());
+#elif HOTSPOT_TARGET_CLASSLIB == 17
   constructor_args.set_klass(javaClass(), CHECK);
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
 
   HandleMark hm(THREAD);
   JNIHandleBlockManager jni_handle_management(THREAD);
@@ -358,7 +364,25 @@ GrowableArray<DCmdArgumentInfo*>* JfrDCmd::argument_info_array() const {
   JavaThread* thread = JavaThread::current();
   GrowableArray<DCmdArgumentInfo*>* const array = new GrowableArray<DCmdArgumentInfo*>(_num_arguments);
   JavaValue result(T_OBJECT);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  const char* class_name = javaClass();
+  const char* method_name = NULL;
+  if (strcmp(class_name, "jdk/jfr/internal/dcmd/DCmdStop") == 0) {
+    method_name = "DCmdStopGetArgumentInfos";
+  } else if (strcmp(class_name, "jdk/jfr/internal/dcmd/DCmdCheck") == 0) {
+    method_name = "DCmdCheckGetArgumentInfos";
+  } else if (strcmp(class_name, "jdk/jfr/internal/dcmd/DCmdDump") == 0) {
+    method_name = "DCmdDumpGetArgumentInfos";
+  } else if (strcmp(class_name, "jdk/jfr/internal/dcmd/DCmdStart") == 0) {
+    method_name = "DCmdStartGetArgumentInfos";
+  }
+  assert(method_name != NULL, "invalid JFR command");
+  JfrJavaArguments getArgumentInfos(&result, "jdk/jfr/internal/dcmd/DCmdAll", method_name, signature, thread);
+#elif HOTSPOT_TARGET_CLASSLIB == 17
   JfrJavaArguments getArgumentInfos(&result, javaClass(), "getArgumentInfos", signature, thread);
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
   invoke(getArgumentInfos, thread);
   if (thread->has_pending_exception()) {
     // Most likely an OOME, but the DCmdFramework is not the best place to handle it.

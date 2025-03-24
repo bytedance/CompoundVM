@@ -222,9 +222,21 @@ bool vmIntrinsics::disabled_by_jvm_flags(vmIntrinsics::ID id) {
     case vmIntrinsics::_getAndSetInt:
     case vmIntrinsics::_getAndSetLong:
     case vmIntrinsics::_getAndSetReference:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    case vmIntrinsics::_getAndAddInt2:
+    case vmIntrinsics::_getAndAddLong2:
+    case vmIntrinsics::_getAndSetInt2:
+    case vmIntrinsics::_getAndSetLong2:
+    case vmIntrinsics::_getAndSetObject:
+#endif
     case vmIntrinsics::_loadFence:
     case vmIntrinsics::_storeFence:
     case vmIntrinsics::_fullFence:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    case vmIntrinsics::_loadFence_sun:
+    case vmIntrinsics::_storeFence_sun:
+    case vmIntrinsics::_fullFence_sun:
+#endif
     case vmIntrinsics::_hasNegatives:
     case vmIntrinsics::_Reference_get:
       break;
@@ -311,6 +323,63 @@ bool vmIntrinsics::disabled_by_jvm_flags(vmIntrinsics::ID id) {
   case vmIntrinsics::_putLong:
   case vmIntrinsics::_putFloat:
   case vmIntrinsics::_putDouble:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_putOrderedObject:
+  case vmIntrinsics::_putOrderedLong:
+  case vmIntrinsics::_putOrderedInt:
+  case vmIntrinsics::_getObject2:
+  case vmIntrinsics::_getBoolean2:
+  case vmIntrinsics::_getByte2:
+  case vmIntrinsics::_getShort2:
+  case vmIntrinsics::_getChar2:
+  case vmIntrinsics::_getInt2:
+  case vmIntrinsics::_getLong2:
+  case vmIntrinsics::_getFloat2:
+  case vmIntrinsics::_getDouble2:
+  case vmIntrinsics::_putObject2:
+  case vmIntrinsics::_putBoolean2:
+  case vmIntrinsics::_putByte2:
+  case vmIntrinsics::_putShort2:
+  case vmIntrinsics::_putChar2:
+  case vmIntrinsics::_putInt2:
+  case vmIntrinsics::_putLong2:
+  case vmIntrinsics::_putFloat2:
+  case vmIntrinsics::_putDouble2:
+  case vmIntrinsics::_getByte_raw:
+  case vmIntrinsics::_getShort_raw:
+  case vmIntrinsics::_getChar_raw:
+  case vmIntrinsics::_getInt_raw:
+  case vmIntrinsics::_getLong_raw:
+  case vmIntrinsics::_getFloat_raw:
+  case vmIntrinsics::_getDouble_raw:
+  case vmIntrinsics::_getAddress_raw:
+  case vmIntrinsics::_putByte_raw:
+  case vmIntrinsics::_putShort_raw:
+  case vmIntrinsics::_putChar_raw:
+  case vmIntrinsics::_putInt_raw:
+  case vmIntrinsics::_putLong_raw:
+  case vmIntrinsics::_putFloat_raw:
+  case vmIntrinsics::_putDouble_raw:
+  case vmIntrinsics::_putAddress_raw:
+  case vmIntrinsics::_getObjectVolatile2:
+  case vmIntrinsics::_getBooleanVolatile2:
+  case vmIntrinsics::_getByteVolatile2:
+  case vmIntrinsics::_getShortVolatile2:
+  case vmIntrinsics::_getCharVolatile2:
+  case vmIntrinsics::_getIntVolatile2:
+  case vmIntrinsics::_getLongVolatile2:
+  case vmIntrinsics::_getFloatVolatile2:
+  case vmIntrinsics::_getDoubleVolatile2:
+  case vmIntrinsics::_putObjectVolatile2:
+  case vmIntrinsics::_putBooleanVolatile2:
+  case vmIntrinsics::_putByteVolatile2:
+  case vmIntrinsics::_putShortVolatile2:
+  case vmIntrinsics::_putCharVolatile2:
+  case vmIntrinsics::_putIntVolatile2:
+  case vmIntrinsics::_putLongVolatile2:
+  case vmIntrinsics::_putFloatVolatile2:
+  case vmIntrinsics::_putDoubleVolatile2:
+#endif
   case vmIntrinsics::_getReferenceVolatile:
   case vmIntrinsics::_getBooleanVolatile:
   case vmIntrinsics::_getByteVolatile:
@@ -373,6 +442,14 @@ bool vmIntrinsics::disabled_by_jvm_flags(vmIntrinsics::ID id) {
   case vmIntrinsics::_loadFence:
   case vmIntrinsics::_storeFence:
   case vmIntrinsics::_fullFence:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_loadFence_sun:
+  case vmIntrinsics::_storeFence_sun:
+  case vmIntrinsics::_fullFence_sun:
+  case vmIntrinsics::_compareAndSwapLong:
+  case vmIntrinsics::_compareAndSwapInt:
+  case vmIntrinsics::_compareAndSwapObject:
+#endif
   case vmIntrinsics::_compareAndSetLong:
   case vmIntrinsics::_weakCompareAndSetLong:
   case vmIntrinsics::_weakCompareAndSetLongPlain:
@@ -408,6 +485,9 @@ bool vmIntrinsics::disabled_by_jvm_flags(vmIntrinsics::ID id) {
   case vmIntrinsics::_putIntUnaligned:
   case vmIntrinsics::_putLongUnaligned:
   case vmIntrinsics::_allocateInstance:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_allocateInstance_sun:
+#endif
     if (!InlineUnsafeOps || !UseUnalignedAccesses) return true;
     break;
   case vmIntrinsics::_hashCode:
@@ -465,6 +545,9 @@ bool vmIntrinsics::disabled_by_jvm_flags(vmIntrinsics::ID id) {
     if (!UseAdler32Intrinsics) return true;
     break;
   case vmIntrinsics::_copyMemory:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_copyMemory_sun:
+#endif
     if (!InlineArrayCopy || !InlineUnsafeOps) return true;
     break;
 #ifdef COMPILER1
@@ -708,7 +791,9 @@ public:
     // A few slightly irregular cases. See Method::init_intrinsic_id
     set_class_map(SID_ENUM(java_lang_StrictMath));
     set_class_map(SID_ENUM(java_lang_invoke_MethodHandle));
+#if HOTSPOT_TARGET_CLASSLIB == 17
     set_class_map(SID_ENUM(java_lang_invoke_VarHandle));
+#endif // HOTSPOT_TARGET_CLASSLIB == 17
   }
 
   bool class_has_intrinsics(vmSymbolID holder) const {

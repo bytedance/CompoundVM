@@ -7685,7 +7685,13 @@ address generate_avx_ghash_processBlocks() {
       if (VM_Version::supports_avx()) {
         StubRoutines::x86::_ghash_shuffmask_addr = ghash_shufflemask_addr();
         StubRoutines::x86::_ghash_poly_addr = ghash_polynomial_addr();
+#if HOTSPOT_TARGET_CLASSLIB == 8
+        StubRoutines::_ghash_processBlocks = generate_ghash_processBlocks();
+#elif HOTSPOT_TARGET_CLASSLIB == 17
         StubRoutines::_ghash_processBlocks = generate_avx_ghash_processBlocks();
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
       } else {
         StubRoutines::_ghash_processBlocks = generate_ghash_processBlocks();
       }

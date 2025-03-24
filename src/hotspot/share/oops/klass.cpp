@@ -86,6 +86,7 @@ void Klass::set_is_cloneable() {
 void Klass::set_name(Symbol* n) {
   _name = n;
   if (_name != NULL) _name->increment_refcount();
+  CLASSLIB8_DEBUG_ONLY(if (VerifyLatin1NamesOnly) { _name->assert_all_latin1(); });
 
   if (Arguments::is_dumping_archive() && is_instance_klass()) {
     SystemDictionaryShared::init_dumptime_info(InstanceKlass::cast(this));
@@ -203,7 +204,12 @@ void* Klass::operator new(size_t size, ClassLoaderData* loader_data, size_t word
 // which doesn't zero out the memory before calling the constructor.
 Klass::Klass(KlassID id) : _id(id),
                            _prototype_header(markWord::prototype()),
+#if HOTSPOT_TARGET_CLASSLIB == 8
+                           _shared_class_path_index(-1),
+                           _alt_kernel_ver(0) {
+#else
                            _shared_class_path_index(-1) {
+#endif
   CDS_ONLY(_shared_class_flags = 0;)
   CDS_JAVA_HEAP_ONLY(_archived_mirror_index = -1;)
   _primary_supers[0] = this;

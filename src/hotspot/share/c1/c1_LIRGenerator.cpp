@@ -3142,17 +3142,36 @@ void LIRGenerator::do_Intrinsic(Intrinsic* x) {
   case vmIntrinsics::_compareAndSetLong:
     do_CompareAndSwap(x, longType);
     break;
-
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_compareAndSwapObject:
+    do_CompareAndSwap(x, objectType);
+    break;
+  case vmIntrinsics::_compareAndSwapInt:
+    do_CompareAndSwap(x, intType);
+    break;
+  case vmIntrinsics::_compareAndSwapLong:
+    do_CompareAndSwap(x, longType);
+    break;
+#endif
   case vmIntrinsics::_loadFence :
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_loadFence_sun :
+#endif
     __ membar_acquire();
     break;
   case vmIntrinsics::_storeFence:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_storeFence_sun:
+#endif
     __ membar_release();
     break;
   case vmIntrinsics::_storeStoreFence:
     __ membar_storestore();
     break;
   case vmIntrinsics::_fullFence :
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_fullFence_sun :
+#endif
     __ membar();
     break;
   case vmIntrinsics::_onSpinWait:

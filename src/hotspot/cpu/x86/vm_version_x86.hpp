@@ -387,7 +387,16 @@ enum Extended_Family {
     CPU_MODEL_HASWELL_E3     = 0x3c,
     CPU_MODEL_HASWELL_E7     = 0x3f,
     CPU_MODEL_BROADWELL      = 0x3d,
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    CPU_MODEL_SKYLAKE        = 0x55,
+    CPU_MODEL_CASCADELAKE    = 0x55,
+    CPU_MODEL_ICELAKE_A      = 0x6a,
+    CPU_MODEL_ICELAKE_C      = 0x6c
+#elif HOTSPOT_TARGET_CLASSLIB == 17
     CPU_MODEL_SKYLAKE        = 0x55
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
   };
 
   // cpuid information block.  All info derived from executing cpuid with
@@ -905,6 +914,13 @@ public:
 
   static bool is_intel_skylake() { return is_intel_family_core() &&
                                           extended_cpu_model() == CPU_MODEL_SKYLAKE; }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static bool is_intel_cascadelake() { return is_intel_family_core() &&
+                                          extended_cpu_model() == CPU_MODEL_CASCADELAKE && cpu_stepping() == 0x07; }
+  static bool is_intel_icelake() { return is_intel_family_core() &&
+                                          ((extended_cpu_model() == CPU_MODEL_ICELAKE_A && cpu_stepping() == 0x06) ||
+                                           (extended_cpu_model() == CPU_MODEL_ICELAKE_C && cpu_stepping() == 0x01)); }
+#endif
 
   static bool is_intel_tsc_synched_at_init()  {
     if (is_intel_family_core()) {

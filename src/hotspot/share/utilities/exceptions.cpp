@@ -22,6 +22,9 @@
  *
  */
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#include "jni.h"
+#endif
 #include "precompiled.hpp"
 #include "classfile/javaClasses.hpp"
 #include "classfile/systemDictionary.hpp"
@@ -43,6 +46,9 @@
 #include "runtime/atomic.hpp"
 #include "utilities/events.hpp"
 #include "utilities/exceptions.hpp"
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#include "runtime/arguments.hpp"
+#endif
 
 // Implementation of ThreadShadow
 void check_ThreadShadow() {
@@ -177,7 +183,6 @@ void Exceptions::_throw(JavaThread* thread, const char* file, int line, Handle h
   // vm log
   Events::log_exception(thread, h_exception, message, file, line);
 }
-
 
 void Exceptions::_throw_msg(JavaThread* thread, const char* file, int line, Symbol* name, const char* message,
                             Handle h_loader, Handle h_protection_domain) {

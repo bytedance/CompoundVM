@@ -724,6 +724,23 @@ protected:
 
   // for error reporting
   static bool is_valid(Klass* k);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+private:
+  // Alternative kernel class version, can only be 8 or 17
+  // 0 by default, means it is not a kernel class
+  int _alt_kernel_ver;
+public:
+  bool is_alt_kernel() {
+    return (0 != _alt_kernel_ver);
+  }
+  bool is_alt_kernel(int ver) {
+    return (ver == _alt_kernel_ver);
+  }
+  void set_alt_kernel_ver(int ver) {
+    _alt_kernel_ver = ver;
+  }
+#endif
+
 };
 
 #endif // SHARE_OOPS_KLASS_HPP

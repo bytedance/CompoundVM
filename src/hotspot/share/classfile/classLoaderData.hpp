@@ -306,6 +306,9 @@ class ClassLoaderData : public CHeapObj<mtClass> {
 
   static ClassLoaderData* class_loader_data(oop loader);
   static ClassLoaderData* class_loader_data_or_null(oop loader);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static ClassLoaderData* anonymous_class_loader_data(oop loader, TRAPS);
+#endif
 
   // Returns Klass* of associated class loader, or NULL if associated loader is 'bootstrap'.
   // Also works if unloading.

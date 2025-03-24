@@ -72,6 +72,7 @@ ciInstanceKlass::ciInstanceKlass(Klass* k) :
   _has_injected_fields = -1;
   _implementor = NULL; // we will fill these lazily
 
+#if HOTSPOT_TARGET_CLASSLIB == 17
   // Ensure that the metadata wrapped by the ciMetadata is kept alive by GC.
   // This is primarily useful for metadata which is considered as weak roots
   // by the GC but need to be strong roots if reachable from a current compilation.
@@ -87,6 +88,7 @@ ciInstanceKlass::ciInstanceKlass(Klass* k) :
     assert(holder != NULL, "holder of hidden class is the mirror which is never null");
     (void)CURRENT_ENV->get_object(holder);
   }
+#endif
 
   Thread *thread = Thread::current();
   if (ciObjectFactory::is_initialized()) {

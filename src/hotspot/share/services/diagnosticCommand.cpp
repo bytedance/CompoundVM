@@ -63,6 +63,7 @@
 #endif
 
 static void loadAgentModule(TRAPS) {
+#if HOTSPOT_TARGET_CLASSLIB == 17
   ResourceMark rm(THREAD);
   HandleMark hm(THREAD);
 
@@ -74,6 +75,7 @@ static void loadAgentModule(TRAPS) {
                          vmSymbols::loadModule_signature(),
                          h_module_name,
                          THREAD);
+#endif
 }
 
 void DCmdRegistrant::register_dcmds(){
@@ -338,7 +340,13 @@ void JVMTIAgentLoadDCmd::execute(DCmdSource source, TRAPS) {
 
 void PrintSystemPropertiesDCmd::execute(DCmdSource source, TRAPS) {
   // load VMSupport
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  Symbol* klass = vmSymbols::sun_misc_VMSupport();
+#elif HOTSPOT_TARGET_CLASSLIB == 17
   Symbol* klass = vmSymbols::jdk_internal_vm_VMSupport();
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
   Klass* k = SystemDictionary::resolve_or_fail(klass, true, CHECK);
   InstanceKlass* ik = InstanceKlass::cast(k);
   if (ik->should_be_initialized()) {
@@ -679,7 +687,13 @@ void JMXStartRemoteDCmd::execute(DCmdSource source, TRAPS) {
 
     loadAgentModule(CHECK);
     Handle loader = Handle(THREAD, SystemDictionary::java_system_loader());
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::sun_management_Agent(), loader, Handle(), true, CHECK);
+#elif HOTSPOT_TARGET_CLASSLIB == 17
     Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::jdk_internal_agent_Agent(), loader, Handle(), true, CHECK);
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
 
     JavaValue result(T_VOID);
 
@@ -752,7 +766,13 @@ void JMXStartLocalDCmd::execute(DCmdSource source, TRAPS) {
 
     loadAgentModule(CHECK);
     Handle loader = Handle(THREAD, SystemDictionary::java_system_loader());
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::sun_management_Agent(), loader, Handle(), true, CHECK);
+#elif HOTSPOT_TARGET_CLASSLIB == 17
     Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::jdk_internal_agent_Agent(), loader, Handle(), true, CHECK);
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
 
     JavaValue result(T_VOID);
     JavaCalls::call_static(&result, k, vmSymbols::startLocalAgent_name(), vmSymbols::void_method_signature(), CHECK);
@@ -769,7 +789,13 @@ void JMXStopRemoteDCmd::execute(DCmdSource source, TRAPS) {
 
     loadAgentModule(CHECK);
     Handle loader = Handle(THREAD, SystemDictionary::java_system_loader());
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::sun_management_Agent(), loader, Handle(), true, CHECK);
+#elif HOTSPOT_TARGET_CLASSLIB == 17
     Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::jdk_internal_agent_Agent(), loader, Handle(), true, CHECK);
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
 
     JavaValue result(T_VOID);
     JavaCalls::call_static(&result, k, vmSymbols::stopRemoteAgent_name(), vmSymbols::void_method_signature(), CHECK);
@@ -790,7 +816,13 @@ void JMXStatusDCmd::execute(DCmdSource source, TRAPS) {
 
   loadAgentModule(CHECK);
   Handle loader = Handle(THREAD, SystemDictionary::java_system_loader());
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::sun_management_Agent(), loader, Handle(), true, CHECK);
+#elif HOTSPOT_TARGET_CLASSLIB == 17
   Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::jdk_internal_agent_Agent(), loader, Handle(), true, CHECK);
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
 
   JavaValue result(T_OBJECT);
   JavaCalls::call_static(&result, k, vmSymbols::getAgentStatus_name(), vmSymbols::void_string_signature(), CHECK);

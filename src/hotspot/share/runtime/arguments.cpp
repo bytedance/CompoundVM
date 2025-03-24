@@ -103,13 +103,17 @@ abort_hook_t     Arguments::_abort_hook         = NULL;
 exit_hook_t      Arguments::_exit_hook          = NULL;
 vfprintf_hook_t  Arguments::_vfprintf_hook      = NULL;
 
-
 SystemProperty *Arguments::_sun_boot_library_path = NULL;
 SystemProperty *Arguments::_java_library_path = NULL;
 SystemProperty *Arguments::_java_home = NULL;
 SystemProperty *Arguments::_java_class_path = NULL;
 SystemProperty *Arguments::_jdk_boot_class_path_append = NULL;
 SystemProperty *Arguments::_vm_info = NULL;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+SystemProperty *Arguments::_sun_boot_class_path = NULL;
+SystemProperty *Arguments::_java_ext_dirs = NULL;
+SystemProperty *Arguments::_java_endorsed_dirs = NULL;
+#endif
 
 GrowableArray<ModulePatchPath*> *Arguments::_patch_mod_prefix = NULL;
 PathString *Arguments::_system_boot_class_path = NULL;
@@ -155,6 +159,32 @@ void PathString::append_value(const char *value) {
     }
   }
 }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+void PathString::prepend_value(const char *value) {
+  char *sp = NULL;
+  size_t len = 0;
+  if (value != NULL) {
+    len = strlen(value);
+    if (_value != NULL) {
+      len += strlen(_value);
+    }
+    sp = AllocateHeap(len+2, mtArguments);
+    assert(sp != NULL, "Unable to allocate space for new append path value");
+    if (sp != NULL) {
+      if (_value != NULL) {
+        strcpy(sp, value);
+        strcat(sp, os::path_separator());
+        strcat(sp, _value);
+        FreeHeap(_value);
+      } else {
+        strcpy(sp, value);
+      }
+      _value = sp;
+    }
+  }
+}
+#endif
 
 PathString::PathString(const char* value) {
   if (value == NULL) {
@@ -408,6 +438,14 @@ void Arguments::init_system_properties() {
   //    - -Xbootclasspath/a:
   //    - AddToBootstrapClassLoaderSearch during JVMTI OnLoad phase
   _jdk_boot_class_path_append = new SystemProperty("jdk.boot.class.path.append", "", false, true);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  _sun_boot_class_path = new SystemProperty("sun.boot.class.path", NULL,  true);
+  _java_ext_dirs = new SystemProperty("java.ext.dirs", NULL,  true);
+  _java_endorsed_dirs = new SystemProperty("java.endorsed.dirs", NULL,  true);
+
+  PropertyList_add(&_system_properties, _java_ext_dirs);
+  PropertyList_add(&_system_properties, _java_endorsed_dirs);
+#endif
 
   // Add to System Property list.
   PropertyList_add(&_system_properties, _sun_boot_library_path);
@@ -416,6 +454,9 @@ void Arguments::init_system_properties() {
   PropertyList_add(&_system_properties, _java_class_path);
   PropertyList_add(&_system_properties, _jdk_boot_class_path_append);
   PropertyList_add(&_system_properties, _vm_info);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  PropertyList_add(&_system_properties, _sun_boot_class_path);
+#endif
 
   // Set OS specific system properties values
   os::init_system_properties_values();
@@ -2294,6 +2335,21 @@ jint Arguments::parse_xss(const JavaVMOption* option, const char* tail, intx* ou
   return JNI_OK;
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+// append to c-heap string
+// will overwrite the old buffer variable
+static void sappend(char*& buf, const char* s) {
+  if (buf == NULL || s == NULL) {
+    return;
+  }
+  size_t cap = strlen(buf) + strlen(s) + 1;
+  char* nbuf = NEW_C_HEAP_ARRAY(char, cap, mtArguments);
+  jio_snprintf(nbuf, cap, "%s%s", buf, s);
+  FREE_C_HEAP_ARRAY(char, buf);
+  buf = nbuf;
+}
+#endif
+
 jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, bool* patch_mod_javabase, JVMFlagOrigin origin) {
   // For match_option to return remaining or value part of option string
   const char* tail;
@@ -2346,9 +2402,15 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, bool* patch_m
       JavaAssertions::setSystemClassDefault(enable);
     // -bootclasspath:
     } else if (match_option(option, "-Xbootclasspath:", &tail)) {
+      #if HOTSPOT_TARGET_CLASSLIB == 8
+        Arguments::reset_sysclasspath(tail);
+      #elif HOTSPOT_TARGET_CLASSLIB == 17
         jio_fprintf(defaultStream::output_stream(),
           "-Xbootclasspath is no longer a supported option.\n");
         return JNI_EINVAL;
+      #else
+        #error "Only classlib 8 and 17 are supported."
+      #endif
     // -bootclasspath/a:
     } else if (match_option(option, "-Xbootclasspath/a:", &tail)) {
       Arguments::append_sysclasspath(tail);
@@ -2358,9 +2420,15 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, bool* patch_m
 #endif
     // -bootclasspath/p:
     } else if (match_option(option, "-Xbootclasspath/p:", &tail)) {
+      #if HOTSPOT_TARGET_CLASSLIB == 8
+        Arguments::prepend_sysclasspath(tail);
+      #elif HOTSPOT_TARGET_CLASSLIB == 17
         jio_fprintf(defaultStream::output_stream(),
           "-Xbootclasspath/p is no longer a supported option.\n");
         return JNI_EINVAL;
+      #else
+        #error "Only classlib 8 and 17 are supported."
+      #endif
     // -Xrun
     } else if (match_option(option, "-Xrun", &tail)) {
       if (tail != NULL) {
@@ -2381,6 +2449,12 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, bool* patch_m
           return JNI_ERR;
         }
 #endif // !INCLUDE_JVMTI
+#if HOTSPOT_TARGET_CLASSLIB == 8
+        // convert jdwp arguments to jdwp17 agent
+        if (strcmp(name, "jdwp") == 0) {
+          sappend(name, "17");
+        }
+#endif
         add_init_library(name, options);
       }
     } else if (match_option(option, "--add-reads=", &tail)) {
@@ -2438,6 +2512,11 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, bool* patch_m
           name = NEW_C_HEAP_ARRAY(char, len + 1, mtArguments);
           memcpy(name, tail, len);
           name[len] = '\0';
+#if HOTSPOT_TARGET_CLASSLIB == 8
+          if (!is_absolute_path && strcmp(name, "jdwp") == 0) {
+            sappend(name, "17");
+          }
+#endif
         }
 
         char *options = NULL;
@@ -2615,6 +2694,7 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, bool* patch_m
     // -D
     } else if (match_option(option, "-D", &tail)) {
       const char* value;
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
       if (match_option(option, "-Djava.endorsed.dirs=", &value) &&
             *value!= '\0' && strcmp(value, "\"\"") != 0) {
         // abort if -Djava.endorsed.dirs is set
@@ -2630,6 +2710,7 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, bool* patch_m
           "-Djava.ext.dirs=%s is not supported.  Use -classpath instead.\n", value);
         return JNI_EINVAL;
       }
+#endif
       // Check for module related properties.  They must be set using the modules
       // options. For example: use "--add-modules=java.sql", not
       // "-Djdk.module.addmods=java.sql"
@@ -3029,6 +3110,8 @@ jint Arguments::finalize_vm_init_args(bool patch_mod_javabase) {
   const char* fileSep = os::file_separator();
   jio_snprintf(path, JVM_MAXPATHLEN, "%s%slib%sendorsed", Arguments::get_java_home(), fileSep, fileSep);
 
+  // disable legacy checking for cvm
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
   DIR* dir = os::opendir(path);
   if (dir != NULL) {
     jio_fprintf(defaultStream::output_stream(),
@@ -3047,6 +3130,7 @@ jint Arguments::finalize_vm_init_args(bool patch_mod_javabase) {
     os::closedir(dir);
     return JNI_ERR;
   }
+#endif
 
   // This must be done after all arguments have been processed
   // and the container support has been initialized since AggressiveHeap
@@ -3774,6 +3858,14 @@ static void apply_debugger_ergo() {
 jint Arguments::parse(const JavaVMInitArgs* initial_cmd_args) {
   assert(verify_special_jvm_flags(false), "deprecated and obsolete flag table inconsistent");
   JVMFlag::check_all_flag_declarations();
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  FLAG_SET_DEFAULT(IgnoreUnrecognizedVMOptions, true);
+  // forcefully disable vector support for JDK8
+  FLAG_SET_DEFAULT(EnableVectorSupport, false);
+  FLAG_SET_DEFAULT(CompactStrings, false);
+  FLAG_SET_DEFAULT(AllowRedefinitionToAddDeleteMethods, true);
+#endif
 
   // If flag "-XX:Flags=flags-file" is used it will be the first option to be processed.
   const char* hotspotrc = ".hotspotrc";

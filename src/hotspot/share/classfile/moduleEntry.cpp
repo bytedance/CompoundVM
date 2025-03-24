@@ -263,6 +263,8 @@ void ModuleEntry::delete_reads() {
 }
 
 ModuleEntry* ModuleEntry::create_unnamed_module(ClassLoaderData* cld) {
+  CLASSLIB8_EARLY_RETURN(create_boot_unnamed_module(cld));
+
   // The java.lang.Module for this loader's
   // corresponding unnamed module can be found in the java.lang.ClassLoader object.
   oop module = java_lang_ClassLoader::unnamedModule(cld->class_loader());

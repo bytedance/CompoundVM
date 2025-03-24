@@ -297,6 +297,14 @@ const char *Abstract_VM_Version::printable_jdk_debug_level() {
   return strcmp(DEBUG_LEVEL, "release") == 0 ? "" : DEBUG_LEVEL " ";
 }
 
+#if defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
+unsigned int Abstract_VM_Version::jvm_version_for_jdk8() {
+  return ((Abstract_VM_Version::vm_major_version() & 0xFF) << 24) |
+         ((Abstract_VM_Version::vm_minor_version() & 0xFFFF) << 8) |
+         (Abstract_VM_Version::vm_build_number() & 0xFF);
+}
+#endif
+
 unsigned int Abstract_VM_Version::jvm_version() {
   return ((Abstract_VM_Version::vm_major_version() & 0xFF) << 24) |
          ((Abstract_VM_Version::vm_minor_version() & 0xFF) << 16) |

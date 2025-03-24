@@ -607,4 +607,29 @@
 #define NOT_CDS_JAVA_HEAP_RETURN_(code) { return code; }
 #endif
 
+#if !defined(HOTSPOT_TARGET_CLASSLIB)
+  #define HOTSPOT_TARGET_CLASSLIB 17
+#endif
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  #define CLASSLIB8_ONLY(code) code
+  #define CLASSLIB17_ONLY(code)
+  #define CLASSLIB8_EARLY_RETURN(ret) return ret
+  #define CLASSLIB8_EARLY_RETURN_() return
+  #ifndef PRODUCT
+    #define CLASSLIB8_DEBUG_ONLY(code) code
+  #else
+    #define CLASSLIB8_DEBUG_ONLY(code)
+  #endif
+#else
+  #if HOTSPOT_TARGET_CLASSLIB == 17
+    #define CLASSLIB8_ONLY(code)
+    #define CLASSLIB17_ONLY(code) code
+    #define CLASSLIB8_EARLY_RETURN(ret)
+    #define CLASSLIB8_EARLY_RETURN_()
+    #define CLASSLIB8_DEBUG_ONLY(code)
+  #else
+    #error("Unsupported class library version: " HOTSPOT_TARGET_CLASSLIB)
+  #endif
+#endif
+
 #endif // SHARE_UTILITIES_MACROS_HPP

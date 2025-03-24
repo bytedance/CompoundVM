@@ -2229,6 +2229,41 @@ void ConstantPool::set_on_stack(const bool value) {
   }
 }
 
+// JSR 292 support for patching constant pool oops after the class is linked and
+// the oop array for resolved references are created.
+// We can't do this during classfile parsing, which is how the other indexes are
+// patched.  The other patches are applied early for some error checking
+// so only defer the pseudo_strings.
+#if HOTSPOT_TARGET_CLASSLIB == 8
+void ConstantPool::patch_resolved_references(
+                                            GrowableArray<Handle>* cp_patches) {
+  for (int index = 1; index < cp_patches->length(); index++) { // Index 0 is unused
+    Handle patch = cp_patches->at(index);
+    if (patch.not_null()) {
+      assert (tag_at(index).is_string(), "should only be string left");
+      // Patching a string means pre-resolving it.
+      // The spelling in the constant pool is ignored.
+      // The constant reference may be any object whatever.
+      // If it is not a real interned string, the constant is referred
+      // to as a "pseudo-string", and must be presented to the CP
+      // explicitly, because it may require scavenging.
+      int obj_index = cp_to_object_index(index);
+      pseudo_string_at_put(index, obj_index, patch());
+      DEBUG_ONLY(cp_patches->at_put(index, Handle());)
+    }
+  }
+#ifdef ASSERT
+  // Ensure that all the patches have been used.
+  for (int index = 0; index < cp_patches->length(); index++) {
+    assert(cp_patches->at(index).is_null(),
+           "Unused constant pool patch at %d in class file %s",
+                   index,
+                   pool_holder()->external_name());
+  }
+#endif // ASSERT
+}
+#endif
+
 // Printing
 
 void ConstantPool::print_on(outputStream* st) const {

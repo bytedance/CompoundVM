@@ -135,6 +135,27 @@ class SystemDictionary : AllStatic {
                                                   TRAPS);
 
  public:
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // Parse new stream. This won't update the system dictionary or
+  // class hierarchy, simply parse the stream. Used by JVMTI RedefineClasses.
+  static Klass* parse_stream(Symbol* class_name,
+                               Handle class_loader,
+                               Handle protection_domain,
+                               ClassFileStream* st,
+                               TRAPS) {
+    return parse_stream(class_name, class_loader, protection_domain, st, NULL, NULL, THREAD);
+  }
+
+  static Klass* parse_stream(Symbol* class_name,
+                               Handle class_loader,
+                               Handle protection_domain,
+                               ClassFileStream* st,
+                               Klass* host_klass,
+                               GrowableArray<Handle>* cp_patches,
+                               TRAPS);
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
+
   // Resolve either a hidden or normal class from a stream of bytes, based on ClassLoadInfo
   static InstanceKlass* resolve_from_stream(ClassFileStream* st,
                                             Symbol* class_name,
@@ -389,6 +410,9 @@ public:
            is_platform_class_loader(class_loader)  ||
            is_system_class_loader(class_loader);
   }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static bool is_ext_class_loader(Handle class_loader);
+#endif
   // Returns TRUE if the method is a non-public member of class java.lang.Object.
   static bool is_nonpublic_Object_method(Method* m);
 

@@ -31,6 +31,14 @@
 // Defines all globals flags used by the garbage-first compiler.
 //
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define G1PeriodicGCSystemLoadThreshold_ATTR
+#elif HOTSPOT_TARGET_CLASSLIB == 17
+#define G1PeriodicGCSystemLoadThreshold_ATTR MANAGEABLE,
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
+
 #define GC_G1_FLAGS(develop,                                                \
                     develop_pd,                                             \
                     product,                                                \
@@ -302,7 +310,7 @@
           "perform a concurrent GC as periodic GC, otherwise use a STW "    \
           "Full GC.")                                                       \
                                                                             \
-  product(double, G1PeriodicGCSystemLoadThreshold, 0.0, MANAGEABLE,         \
+  product(double, G1PeriodicGCSystemLoadThreshold, 0.0, G1PeriodicGCSystemLoadThreshold_ATTR         \
           "Maximum recent system wide load as returned by the 1m value "    \
           "of getloadavg() at which G1 triggers a periodic GC. A load "     \
           "above this value cancels a given periodic GC. A value of zero "  \

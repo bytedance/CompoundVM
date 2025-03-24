@@ -84,11 +84,13 @@ instanceOop MemoryManager::get_memory_manager_instance(TRAPS) {
     Symbol* method_name = NULL;
     Symbol* signature = NULL;
     if (is_gc_memory_manager()) {
+#if HOTSPOT_TARGET_CLASSLIB == 17
       Klass* extKlass = Management::com_sun_management_internal_GarbageCollectorExtImpl_klass(CHECK_NULL);
       // com.sun.management.GarbageCollectorMXBean is in jdk.management module which may not be present.
       if (extKlass != NULL) {
         k = extKlass;
       }
+#endif
 
       method_name = vmSymbols::createGarbageCollector_name();
 

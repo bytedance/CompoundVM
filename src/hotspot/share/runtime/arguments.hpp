@@ -63,6 +63,9 @@ class PathString : public CHeapObj<mtArguments> {
 
   bool set_value(const char *value);
   void append_value(const char *value);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  void prepend_value(const char *value);
+#endif
 
   PathString(const char* value);
   ~PathString();
@@ -278,12 +281,19 @@ class Arguments : AllStatic {
   static SystemProperty* _system_properties;
 
   // Quick accessor to System properties in the list:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static SystemProperty *_java_ext_dirs;
+  static SystemProperty *_java_endorsed_dirs;
+#endif
   static SystemProperty *_sun_boot_library_path;
   static SystemProperty *_java_library_path;
   static SystemProperty *_java_home;
   static SystemProperty *_java_class_path;
   static SystemProperty *_jdk_boot_class_path_append;
   static SystemProperty *_vm_info;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static SystemProperty *_sun_boot_class_path;
+#endif
 
   // --patch-module=module=<file>(<pathsep><file>)*
   // Each element contains the associated module name, path
@@ -585,7 +595,12 @@ class Arguments : AllStatic {
   static void set_dll_dir(const char *value) { _sun_boot_library_path->set_value(value); }
   static void set_java_home(const char *value) { _java_home->set_value(value); }
   static void set_library_path(const char *value) { _java_library_path->set_value(value); }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static void set_ext_dirs(char *value) { _java_ext_dirs->set_value(value); }
+  static void set_endorsed_dirs(char *value) { _java_endorsed_dirs->set_value(value); }
+#else
   static void set_ext_dirs(char *value)     { _ext_dirs = os::strdup_check_oom(value); }
+#endif
 
   // Set up the underlying pieces of the system boot class path
   static void add_patch_mod_prefix(const char *module_name, const char *path, bool* patch_mod_javabase);
@@ -594,20 +609,46 @@ class Arguments : AllStatic {
     assert(get_sysclasspath() == NULL, "System boot class path previously set");
     _system_boot_class_path->set_value(value);
     _has_jimage = has_jimage;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    _sun_boot_class_path->set_value(value);
+#endif
   }
   static void append_sysclasspath(const char *value) {
     _system_boot_class_path->append_value(value);
     _jdk_boot_class_path_append->append_value(value);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    _sun_boot_class_path->append_value(value);
+#endif
   }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static void prepend_sysclasspath(const char *value) {
+    _system_boot_class_path->prepend_value(value);
+    _sun_boot_class_path->prepend_value(value);
+  }
+
+  static void reset_sysclasspath(const char *value) {
+    _system_boot_class_path->set_value(value);
+    _sun_boot_class_path->set_value(value);
+  }
+#endif
   static GrowableArray<ModulePatchPath*>* get_patch_mod_prefix() { return _patch_mod_prefix; }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static char* get_sysclasspath() { return _sun_boot_class_path->value(); }
+#else
   static char* get_sysclasspath() { return _system_boot_class_path->value(); }
+#endif
   static char* get_jdk_boot_class_path_append() { return _jdk_boot_class_path_append->value(); }
   static bool has_jimage() { return _has_jimage; }
 
   static char* get_java_home()    { return _java_home->value(); }
   static char* get_dll_dir()      { return _sun_boot_library_path->value(); }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static char* get_ext_dirs()     { return _java_ext_dirs->value(); }
+  static char* get_endorsed_dir() { return _java_endorsed_dirs->value(); }
+#else
   static char* get_ext_dirs()     { return _ext_dirs;  }
+#endif
   static char* get_appclasspath() { return _java_class_path->value(); }
   static void  fix_appclasspath();
 

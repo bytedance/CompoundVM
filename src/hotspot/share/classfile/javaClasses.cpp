@@ -158,6 +158,7 @@ static void compute_offset(int &dest_offset,
   }
 
   if (!ik->find_local_field(name_symbol, signature_symbol, &fd) || fd.is_static() != is_static) {
+    CLASSLIB8_EARLY_RETURN_();
     ResourceMark rm;
     log_error(class)("Invalid layout of %s field: %s type: %s", ik->external_name(),
                      name_symbol->as_C_string(), signature_symbol->as_C_string());
@@ -178,6 +179,7 @@ static void compute_offset(int& dest_offset, InstanceKlass* ik,
                            bool is_static = false) {
   TempNewSymbol name = SymbolTable::probe(name_string, (int)strlen(name_string));
   if (name == NULL) {
+    CLASSLIB8_EARLY_RETURN_();
     ResourceMark rm;
     log_error(class)("Name %s should be in the SymbolTable since its class is loaded", name_string);
     vm_exit_during_initialization("Invalid layout of well-known class", ik->external_name());
@@ -194,6 +196,10 @@ static void compute_offset(int& dest_offset, InstanceKlass* ik,
 #define FIELD_COMPUTE_OFFSET(offset, klass, name, signature, is_static) \
   compute_offset(offset, klass, name, vmSymbols::signature(), is_static)
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define FIELD_ZERO_OFFSET(offset, klass, name, signature, is_static) \
+  offset = 0;
+#endif
 
 // java_lang_String
 
@@ -221,11 +227,19 @@ bool java_lang_String::test_and_set_flag(oop java_string, uint8_t flag_mask) {
   return true;                  // Flag bit is already 1.
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  #define STRING_FIELDS_DO(macro) \
+    macro(_value_offset, k, vmSymbols::value_name(), char_array_signature, false); \
+    macro(_hash_offset,  k, "hash",                  int_signature,        false); \
+    macro(_hashIsZero_offset, k, "hashIsZero",       bool_signature,       false); \
+    macro(_coder_offset, k, "coder",                 byte_signature,       false);
+#else
 #define STRING_FIELDS_DO(macro) \
   macro(_value_offset, k, vmSymbols::value_name(), byte_array_signature, false); \
   macro(_hash_offset,  k, "hash",                  int_signature,        false); \
   macro(_hashIsZero_offset, k, "hashIsZero",       bool_signature,       false); \
   macro(_coder_offset, k, "coder",                 byte_signature,       false);
+#endif
 
 void java_lang_String::compute_offsets() {
   if (_initialized) {
@@ -271,7 +285,11 @@ void java_lang_String::set_compact_strings(bool value) {
 
 Handle java_lang_String::basic_create(int length, bool is_latin1, TRAPS) {
   assert(_initialized, "Must be initialized");
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings && !is_latin1, "Must be UTF16 and no CompactStrings");
+#else
   assert(CompactStrings || !is_latin1, "Must be UTF16 without CompactStrings");
+#endif
 
   // Create the String object first, so there's a chance that the String
   // and the char array it points to end up in the same cache line.
@@ -281,18 +299,35 @@ Handle java_lang_String::basic_create(int length, bool is_latin1, TRAPS) {
   // Create the char array.  The String object must be handlized here
   // because GC can happen as a result of the allocation attempt.
   Handle h_obj(THREAD, obj);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  typeArrayOop buffer = oopFactory::new_charArray(length, CHECK_NH);;
+#else
   int arr_length = is_latin1 ? length : length << 1; // 2 bytes per UTF16.
   typeArrayOop buffer = oopFactory::new_byteArray(arr_length, CHECK_NH);;
+#endif
 
   // Point the String at the char array
   obj = h_obj();
   set_value(obj, buffer);
   // No need to zero the offset, allocation zero'ed the entire String object
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  set_coder(obj, CODER_UTF16);
+#else
   set_coder(obj, is_latin1 ? CODER_LATIN1 : CODER_UTF16);
+#endif
   return h_obj;
 }
 
 Handle java_lang_String::create_from_unicode(const jchar* unicode, int length, TRAPS) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  Handle h_obj = basic_create(length, false, CHECK_NH);
+  typeArrayOop buffer = value(h_obj());
+  assert(TypeArrayKlass::cast(buffer->klass())->element_type() == T_CHAR, "classlib8 has only char[]");
+  for (int index = 0; index < length; index++) {
+    buffer->char_at_put(index, unicode[index]);
+  }
+#else
   bool is_latin1 = CompactStrings && UNICODE::is_latin1(unicode, length);
   Handle h_obj = basic_create(length, is_latin1, CHECK_NH);
   typeArrayOop buffer = value(h_obj());
@@ -306,6 +341,7 @@ Handle java_lang_String::create_from_unicode(const jchar* unicode, int length, T
       buffer->char_at_put(index, unicode[index]);
     }
   }
+#endif
 
 #ifdef ASSERT
   {
@@ -330,6 +366,17 @@ Handle java_lang_String::create_from_str(const char* utf8_str, TRAPS) {
   if (utf8_str == NULL) {
     return Handle();
   }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  bool has_multibyte, is_latin1;
+  int length = UTF8::unicode_length(utf8_str, is_latin1, has_multibyte);
+  has_multibyte = true;
+  is_latin1 = false;
+  Handle h_obj = basic_create(length, is_latin1, CHECK_NH);
+  if (length > 0) {
+    UTF8::convert_to_unicode(utf8_str, value(h_obj())->char_at_addr(0), length);
+  }
+#else
   bool has_multibyte, is_latin1;
   int length = UTF8::unicode_length(utf8_str, is_latin1, has_multibyte);
   if (!CompactStrings) {
@@ -348,6 +395,7 @@ Handle java_lang_String::create_from_str(const char* utf8_str, TRAPS) {
       UTF8::convert_to_unicode(utf8_str, value(h_obj())->char_at_addr(0), length);
     }
   }
+#endif
 
 #ifdef ASSERT
   // This check is too strict when the input string is not a valid UTF8.
@@ -374,6 +422,17 @@ Handle java_lang_String::create_from_symbol(Symbol* symbol, TRAPS) {
   const char* utf8_str = (char*)symbol->bytes();
   int utf8_len = symbol->utf8_length();
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  bool has_multibyte, is_latin1;
+  int length = UTF8::unicode_length(utf8_str, utf8_len, is_latin1, has_multibyte);
+  has_multibyte = true;
+  is_latin1 = false;
+  Handle h_obj = basic_create(length, false, CHECK_NH);
+  if (length > 0) {
+    UTF8::convert_to_unicode(utf8_str, value(h_obj())->char_at_addr(0), length);
+  }
+#else
   bool has_multibyte, is_latin1;
   int length = UTF8::unicode_length(utf8_str, utf8_len, is_latin1, has_multibyte);
   if (!CompactStrings) {
@@ -392,6 +451,7 @@ Handle java_lang_String::create_from_symbol(Symbol* symbol, TRAPS) {
       UTF8::convert_to_unicode(utf8_str, value(h_obj())->char_at_addr(0), length);
     }
   }
+#endif
 
 #ifdef ASSERT
   {
@@ -579,6 +639,10 @@ unsigned int java_lang_String::hash_code(oop java_string) {
 
   typeArrayOop value = java_lang_String::value(java_string);
   int         length = java_lang_String::length(java_string, value);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  unsigned int hash = java_lang_String::hash_code(value->char_at_addr(0), length);
+#else
   bool     is_latin1 = java_lang_String::is_latin1(java_string);
 
   unsigned int hash = 0;
@@ -589,6 +653,7 @@ unsigned int java_lang_String::hash_code(oop java_string) {
       hash = java_lang_String::hash_code(value->char_at_addr(0), length);
     }
   }
+#endif
 
   if (hash != 0) {
     java_string->int_field_put(_hash_offset, hash);
@@ -601,6 +666,13 @@ unsigned int java_lang_String::hash_code(oop java_string) {
 char* java_lang_String::as_quoted_ascii(oop java_string) {
   typeArrayOop value  = java_lang_String::value(java_string);
   int          length = java_lang_String::length(java_string, value);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  jchar* base = value->char_at_addr(0);
+  int result_length = UNICODE::quoted_ascii_length(base, length) + 1;
+  char *result = NEW_RESOURCE_ARRAY(char, result_length);
+  UNICODE::as_quoted_ascii(base, length, result, result_length);
+#else
   bool      is_latin1 = java_lang_String::is_latin1(java_string);
 
   if (length == 0) return NULL;
@@ -618,6 +690,7 @@ char* java_lang_String::as_quoted_ascii(oop java_string) {
     result = NEW_RESOURCE_ARRAY(char, result_length);
     UNICODE::as_quoted_ascii(base, length, result, result_length);
   }
+#endif
   assert(result_length >= length + 1, "must not be shorter");
   assert(result_length == (int)strlen(result) + 1, "must match");
   return result;
@@ -626,6 +699,12 @@ char* java_lang_String::as_quoted_ascii(oop java_string) {
 Symbol* java_lang_String::as_symbol(oop java_string) {
   typeArrayOop value  = java_lang_String::value(java_string);
   int          length = java_lang_String::length(java_string, value);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  jchar* base = (length == 0) ? NULL : value->char_at_addr(0);
+  Symbol* sym = SymbolTable::new_symbol(base, length);
+  return sym;
+#else
   bool      is_latin1 = java_lang_String::is_latin1(java_string);
   if (!is_latin1) {
     jchar* base = (length == 0) ? NULL : value->char_at_addr(0);
@@ -638,11 +717,17 @@ Symbol* java_lang_String::as_symbol(oop java_string) {
     Symbol* sym = SymbolTable::new_symbol(base, length);
     return sym;
   }
+#endif
 }
 
 Symbol* java_lang_String::as_symbol_or_null(oop java_string) {
   typeArrayOop value  = java_lang_String::value(java_string);
   int          length = java_lang_String::length(java_string, value);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  jchar* base = (length == 0) ? NULL : value->char_at_addr(0);
+  return SymbolTable::probe_unicode(base, length);
+#else
   bool      is_latin1 = java_lang_String::is_latin1(java_string);
   if (!is_latin1) {
     jchar* base = (length == 0) ? NULL : value->char_at_addr(0);
@@ -653,6 +738,7 @@ Symbol* java_lang_String::as_symbol_or_null(oop java_string) {
     const char* base = UNICODE::as_utf8(position, length);
     return SymbolTable::probe(base, length);
   }
+#endif
 }
 
 int java_lang_String::utf8_length(oop java_string, typeArrayOop value) {
@@ -682,6 +768,11 @@ char* java_lang_String::as_utf8_string(oop java_string) {
 char* java_lang_String::as_utf8_string(oop java_string, int& length) {
   typeArrayOop value = java_lang_String::value(java_string);
   length             = java_lang_String::length(java_string, value);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  jchar* position = (length == 0) ? NULL : value->char_at_addr(0);
+  return UNICODE::as_utf8(position, length);
+#else
   bool     is_latin1 = java_lang_String::is_latin1(java_string);
   if (!is_latin1) {
     jchar* position = (length == 0) ? NULL : value->char_at_addr(0);
@@ -690,6 +781,7 @@ char* java_lang_String::as_utf8_string(oop java_string, int& length) {
     jbyte* position = (length == 0) ? NULL : value->byte_at_addr(0);
     return UNICODE::as_utf8(position, length);
   }
+#endif
 }
 
 // Uses a provided buffer if it's sufficiently large, otherwise allocates
@@ -697,6 +789,15 @@ char* java_lang_String::as_utf8_string(oop java_string, int& length) {
 char* java_lang_String::as_utf8_string_full(oop java_string, char* buf, int buflen, int& utf8_len) {
   typeArrayOop value = java_lang_String::value(java_string);
   int            len = java_lang_String::length(java_string, value);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  jchar *position = (len == 0) ? NULL : value->char_at_addr(0);
+  utf8_len = UNICODE::utf8_length(position, len);
+  if (utf8_len >= buflen) {
+    buf = NEW_RESOURCE_ARRAY(char, utf8_len + 1);
+  }
+  return UNICODE::as_utf8(position, len, buf, utf8_len + 1);
+#else
   bool     is_latin1 = java_lang_String::is_latin1(java_string);
   if (!is_latin1) {
     jchar *position = (len == 0) ? NULL : value->char_at_addr(0);
@@ -713,12 +814,18 @@ char* java_lang_String::as_utf8_string_full(oop java_string, char* buf, int bufl
     }
     return UNICODE::as_utf8(position, len, buf, utf8_len + 1);
   }
+#endif
 }
 
 char* java_lang_String::as_utf8_string(oop java_string, typeArrayOop value, char* buf, int buflen) {
   assert(value_equals(value, java_lang_String::value(java_string)),
          "value must be same as java_lang_String::value(java_string)");
   int     length = java_lang_String::length(java_string, value);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  jchar* position = (length == 0) ? NULL : value->char_at_addr(0);
+  return UNICODE::as_utf8(position, length, buf, buflen);
+#else
   bool is_latin1 = java_lang_String::is_latin1(java_string);
   if (!is_latin1) {
     jchar* position = (length == 0) ? NULL : value->char_at_addr(0);
@@ -727,6 +834,7 @@ char* java_lang_String::as_utf8_string(oop java_string, typeArrayOop value, char
     jbyte* position = (length == 0) ? NULL : value->byte_at_addr(0);
     return UNICODE::as_utf8(position, length, buf, buflen);
   }
+#endif
 }
 
 char* java_lang_String::as_utf8_string(oop java_string, char* buf, int buflen) {
@@ -736,6 +844,12 @@ char* java_lang_String::as_utf8_string(oop java_string, char* buf, int buflen) {
 
 char* java_lang_String::as_utf8_string(oop java_string, int start, int len) {
   typeArrayOop value  = java_lang_String::value(java_string);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  assert(start + len <= java_lang_String::length(java_string), "just checking");
+  jchar* position = value->char_at_addr(start);
+  return UNICODE::as_utf8(position, len);
+#else
   bool      is_latin1 = java_lang_String::is_latin1(java_string);
   assert(start + len <= java_lang_String::length(java_string), "just checking");
   if (!is_latin1) {
@@ -745,12 +859,18 @@ char* java_lang_String::as_utf8_string(oop java_string, int start, int len) {
     jbyte* position = value->byte_at_addr(start);
     return UNICODE::as_utf8(position, len);
   }
+#endif
 }
 
 char* java_lang_String::as_utf8_string(oop java_string, typeArrayOop value, int start, int len, char* buf, int buflen) {
   assert(value_equals(value, java_lang_String::value(java_string)),
          "value must be same as java_lang_String::value(java_string)");
   assert(start + len <= java_lang_String::length(java_string), "just checking");
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  jchar* position = value->char_at_addr(start);
+  return UNICODE::as_utf8(position, len, buf, buflen);
+#else
   bool is_latin1 = java_lang_String::is_latin1(java_string);
   if (!is_latin1) {
     jchar* position = value->char_at_addr(start);
@@ -759,6 +879,7 @@ char* java_lang_String::as_utf8_string(oop java_string, typeArrayOop value, int 
     jbyte* position = value->byte_at_addr(start);
     return UNICODE::as_utf8(position, len, buf, buflen);
   }
+#endif
 }
 
 bool java_lang_String::equals(oop java_string, const jchar* chars, int len) {
@@ -769,6 +890,14 @@ bool java_lang_String::equals(oop java_string, const jchar* chars, int len) {
   if (length != len) {
     return false;
   }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  for (int i = 0; i < len; i++) {
+    if (value->char_at(i) != chars[i]) {
+      return false;
+    }
+  }
+#else
   bool is_latin1 = java_lang_String::is_latin1(java_string);
   if (!is_latin1) {
     for (int i = 0; i < len; i++) {
@@ -783,6 +912,7 @@ bool java_lang_String::equals(oop java_string, const jchar* chars, int len) {
       }
     }
   }
+#endif
   return true;
 }
 
@@ -1428,6 +1558,7 @@ bool java_lang_Class::restore_archived_mirror(Klass *k,
 #endif // INCLUDE_CDS_JAVA_HEAP
 
 void java_lang_Class::fixup_module_field(Klass* k, Handle module) {
+  CLASSLIB8_EARLY_RETURN_();
   assert(_module_offset != 0, "must have been computed already");
   java_lang_Class::set_module(k->java_mirror(), module());
 }
@@ -1517,11 +1648,13 @@ oop java_lang_Class::class_loader(oop java_class) {
 }
 
 oop java_lang_Class::module(oop java_class) {
+  CLASSLIB8_EARLY_RETURN(NULL);
   assert(_module_offset != 0, "must be set");
   return java_class->obj_field(_module_offset);
 }
 
 void java_lang_Class::set_module(oop java_class, oop module) {
+  CLASSLIB8_EARLY_RETURN_();
   assert(_module_offset != 0, "must be set");
   java_class->obj_field_put(_module_offset, module);
 }
@@ -2118,6 +2251,9 @@ static inline bool version_matches(Method* method, int version) {
 // in expand().
 class BacktraceBuilder: public StackObj {
  friend class BacktraceIterator;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+ friend class java_lang_Throwable;
+#endif
  private:
   Handle          _backtrace;
   objArrayOop     _head;
@@ -2413,6 +2549,27 @@ void java_lang_Throwable::print_stack_element(outputStream *st, Method* method, 
   int version = method->constants()->version();
   print_stack_element_to_stream(st, mirror, method_id, version, bci, method->name());
 }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+oop java_lang_Throwable::get_stack_trace_element(Handle throwable, int index, TRAPS) {
+  if (throwable.is_null()) {
+    THROW_0(vmSymbols::java_lang_NullPointerException());
+  }
+  if (index < 0) {
+    THROW_(vmSymbols::java_lang_IndexOutOfBoundsException(), NULL);
+  }
+  int n = depth(throwable());
+  if (n <= 0 || n <= index) {
+    THROW_(vmSymbols::java_lang_IndexOutOfBoundsException(), NULL);
+  }
+  // just to avoid introducing j.l.StackFrameInfo to kernel class set.
+  // this should work as long as JVM does not embed an object into another.
+  ObjArrayKlass* arrayKlass = ObjArrayKlass::cast(vmClasses::Object_klass()->array_klass(n, THREAD));
+  objArrayHandle arrh(THREAD, arrayKlass->allocate(n, THREAD));
+  get_stack_trace_elements(throwable, arrh, THREAD);
+  return arrh->obj_at(index);
+}
+#endif
 
 /**
  * Print the throwable message and its stack trace plus all causes by walking the
@@ -2833,16 +2990,19 @@ void java_lang_StackTraceElement::fill_in(Handle element,
   java_lang_StackTraceElement::set_declaringClassObject(element(), java_class());
 
   oop loader = holder->class_loader();
+#if HOTSPOT_TARGET_CLASSLIB == 17
   if (loader != NULL) {
     oop loader_name = java_lang_ClassLoader::name(loader);
     if (loader_name != NULL)
       java_lang_StackTraceElement::set_classLoaderName(element(), loader_name);
   }
+#endif
 
   // Fill in method name
   oop methodname = StringTable::intern(name, CHECK);
   java_lang_StackTraceElement::set_methodName(element(), methodname);
 
+#if HOTSPOT_TARGET_CLASSLIB == 17
   // Fill in module name and version
   ModuleEntry* module = holder->module();
   if (module->is_named()) {
@@ -2856,6 +3016,7 @@ void java_lang_StackTraceElement::fill_in(Handle element,
     }
     java_lang_StackTraceElement::set_moduleVersion(element(), module_version);
   }
+#endif // HOTSPOT_TARGET_CLASSLIB == 17
 
   if (method() == NULL || !version_matches(method(), version)) {
     // The method was redefined, accurate line number information isn't available
@@ -3336,6 +3497,7 @@ void java_lang_reflect_Field::set_annotations(oop field, oop value) {
   field->obj_field_put(_annotations_offset, value);
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 17
 oop java_lang_reflect_RecordComponent::create(InstanceKlass* holder, RecordComponent* component, TRAPS) {
   // Allocate java.lang.reflect.RecordComponent instance
   HandleMark hm(THREAD);
@@ -3393,6 +3555,8 @@ oop java_lang_reflect_RecordComponent::create(InstanceKlass* holder, RecordCompo
 
   return element();
 }
+
+#endif // HOTSPOT_TARGET_CLASSLIB == 17
 
 int reflect_ConstantPool::_oop_offset;
 
@@ -3869,7 +4033,12 @@ int java_lang_invoke_MemberName::_clazz_offset;
 int java_lang_invoke_MemberName::_name_offset;
 int java_lang_invoke_MemberName::_type_offset;
 int java_lang_invoke_MemberName::_flags_offset;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+int java_lang_invoke_MemberName::_vmtarget_offset;
+int java_lang_invoke_MemberName::_vmloader_offset;
+#else
 int java_lang_invoke_MemberName::_method_offset;
+#endif
 int java_lang_invoke_MemberName::_vmindex_offset;
 
 int java_lang_invoke_ResolvedMethodName::_vmtarget_offset;
@@ -3892,12 +4061,20 @@ void java_lang_invoke_MethodHandle::serialize_offsets(SerializeClosure* f) {
 }
 #endif
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define MEMBERNAME_FIELDS_DO(macro) \
+  macro(_clazz_offset,   k, vmSymbols::clazz_name(),   class_signature,  false); \
+  macro(_name_offset,    k, vmSymbols::name_name(),    string_signature, false); \
+  macro(_type_offset,    k, vmSymbols::type_name(),    object_signature, false); \
+  macro(_flags_offset,   k, vmSymbols::flags_name(),   int_signature,    false);
+#else
 #define MEMBERNAME_FIELDS_DO(macro) \
   macro(_clazz_offset,   k, vmSymbols::clazz_name(),   class_signature,  false); \
   macro(_name_offset,    k, vmSymbols::name_name(),    string_signature, false); \
   macro(_type_offset,    k, vmSymbols::type_name(),    object_signature, false); \
   macro(_flags_offset,   k, vmSymbols::flags_name(),   int_signature,    false); \
   macro(_method_offset,  k, vmSymbols::method_name(),  java_lang_invoke_ResolvedMethodName_signature, false)
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
 
 void java_lang_invoke_MemberName::compute_offsets() {
   InstanceKlass* k = vmClasses::MemberName_klass();
@@ -4061,8 +4238,12 @@ void java_lang_invoke_MemberName::set_flags(oop mname, int flags) {
 // Return vmtarget from ResolvedMethodName method field through indirection
 Method* java_lang_invoke_MemberName::vmtarget(oop mname) {
   assert(is_instance(mname), "wrong type");
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  return (Method*)mname->address_field(_vmtarget_offset);
+#else
   oop method = mname->obj_field(_method_offset);
   return method == NULL ? NULL : java_lang_invoke_ResolvedMethodName::vmtarget(method);
+#endif
 }
 
 bool java_lang_invoke_MemberName::is_method(oop mname) {
@@ -4070,10 +4251,40 @@ bool java_lang_invoke_MemberName::is_method(oop mname) {
   return (flags(mname) & (MN_IS_METHOD | MN_IS_CONSTRUCTOR)) > 0;
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+void java_lang_invoke_MemberName::set_vmtarget(oop mname, Method* ref) {
+  assert(is_instance(mname), "wrong type");
+  // check the type of the vmtarget
+  oop dependency = NULL;
+  if (ref != NULL) {
+    switch (flags(mname) & (MN_IS_METHOD |
+                            MN_IS_CONSTRUCTOR |
+                            MN_IS_FIELD)) {
+    case MN_IS_METHOD:
+    case MN_IS_CONSTRUCTOR:
+      assert(ref->is_method(), "should be a method");
+      dependency = ((Method*)ref)->method_holder()->java_mirror();
+      break;
+    case MN_IS_FIELD:
+      assert(ref->is_klass(), "should be a class");
+      dependency = ((Klass*)ref)->java_mirror();
+      break;
+    default:
+      ShouldNotReachHere();
+    }
+  }
+  mname->address_field_put(_vmtarget_offset, (address)ref);
+  // Add a reference to the loader (actually mirror because anonymous classes will not have
+  // distinct loaders) to ensure the metadata is kept alive
+  // This mirror may be different than the one in clazz field.
+  mname->obj_field_put(_vmloader_offset, dependency);
+}
+#else
 void java_lang_invoke_MemberName::set_method(oop mname, oop resolved_method) {
   assert(is_instance(mname), "wrong type");
   mname->obj_field_put(_method_offset, resolved_method);
 }
+#endif // HOTSPOT_TARGET_CLASSLIB == 17
 
 intptr_t java_lang_invoke_MemberName::vmindex(oop mname) {
   assert(is_instance(mname), "wrong type");
@@ -4084,7 +4295,6 @@ void java_lang_invoke_MemberName::set_vmindex(oop mname, intptr_t index) {
   assert(is_instance(mname), "wrong type");
   mname->address_field_put(_vmindex_offset, (address) index);
 }
-
 
 Method* java_lang_invoke_ResolvedMethodName::vmtarget(oop resolved_method) {
   assert(is_instance(resolved_method), "wrong type");
@@ -4389,14 +4599,33 @@ void java_lang_ClassLoader::release_set_loader_data(oop loader, ClassLoaderData*
   HeapAccess<MO_RELEASE>::store_at(loader, _loader_data_offset, new_data);
 }
 
-#define CLASSLOADER_FIELDS_DO(macro) \
+#define CLASSLOADER_FIELDS_DO_8(macro) \
+  macro(_parallelCapable_offset, k1, "parallelLockMap",      concurrenthashmap_signature, false); \
+  macro(_parent_offset,          k1, "parent",               classloader_signature, false)
+
+#define CLASSLOADER_FIELDS_DO_17(macro) \
   macro(_parallelCapable_offset, k1, "parallelLockMap",      concurrenthashmap_signature, false); \
   macro(_name_offset,            k1, vmSymbols::name_name(), string_signature, false); \
   macro(_nameAndId_offset,       k1, "nameAndId",            string_signature, false); \
   macro(_unnamedModule_offset,   k1, "unnamedModule",        module_signature, false); \
   macro(_parent_offset,          k1, "parent",               classloader_signature, false)
 
+#define CLASSLOADER_ALL_FIELDS_DO(macro) \
+  CLASSLOADER_FIELDS_DO_8(macro) \
+  CLASSLOADER_FIELDS_DO_17(macro)
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  #define CLASSLOADER_FIELDS_DO(macro) \
+    CLASSLOADER_FIELDS_DO_8(macro)
+#else
+  #define CLASSLOADER_FIELDS_DO(macro) \
+    CLASSLOADER_FIELDS_DO_8(macro) \
+    CLASSLOADER_FIELDS_DO_17(macro)
+#endif
+
 void java_lang_ClassLoader::compute_offsets() {
+  CLASSLOADER_ALL_FIELDS_DO(FIELD_ZERO_OFFSET);
+
   InstanceKlass* k1 = vmClasses::ClassLoader_klass();
   CLASSLOADER_FIELDS_DO(FIELD_COMPUTE_OFFSET);
 
@@ -4418,6 +4647,7 @@ oop java_lang_ClassLoader::parent(oop loader) {
 // Returns the name field of this class loader.  If the name field has not
 // been set, null will be returned.
 oop java_lang_ClassLoader::name(oop loader) {
+  CLASSLIB8_ONLY(Unimplemented());
   assert(is_instance(loader), "loader must be oop");
   return loader->obj_field(_name_offset);
 }
@@ -4429,6 +4659,7 @@ oop java_lang_ClassLoader::name(oop loader) {
 //   If built-in loader, then omit '@<id>' as there is only one instance.
 // Use ClassLoader::loader_name_id() to obtain this String as a char*.
 oop java_lang_ClassLoader::nameAndId(oop loader) {
+  CLASSLIB8_ONLY(Unimplemented());
   assert(is_instance(loader), "loader must be oop");
   return loader->obj_field(_nameAndId_offset);
 }
@@ -4973,6 +5204,7 @@ jboolean java_lang_Boolean::value(oop obj) {
 
 // java_lang_reflect_RecordComponent
 
+#if HOTSPOT_TARGET_CLASSLIB == 17
 int java_lang_reflect_RecordComponent::_clazz_offset;
 int java_lang_reflect_RecordComponent::_name_offset;
 int java_lang_reflect_RecordComponent::_type_offset;
@@ -5029,6 +5261,7 @@ void java_lang_reflect_RecordComponent::set_annotations(oop element, oop value) 
 void java_lang_reflect_RecordComponent::set_typeAnnotations(oop element, oop value) {
   element->obj_field_put(_typeAnnotations_offset, value);
 }
+#endif // HOTSPOT_TARGET_CLASSLIB == 17
 
 // java_lang_InternalError
 int java_lang_InternalError::_during_unsafe_access_offset;

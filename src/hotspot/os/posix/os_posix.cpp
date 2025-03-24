@@ -228,7 +228,13 @@ int os::create_file_for_heap(const char* dir) {
       return -1;
     } else {
       // delete the name from the filesystem. When 'fd' is closed, the file (and space) will be deleted.
+#if HOTSPOT_TARGET_CLASSLIB == 8
+      int ret = ::unlink(fullname);
+#elif HOTSPOT_TARGET_CLASSLIB == 17
       int ret = unlink(fullname);
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
       assert_with_errno(ret == 0, "unlink returned error");
     }
 

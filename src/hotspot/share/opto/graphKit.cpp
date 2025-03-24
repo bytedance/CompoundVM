@@ -4155,10 +4155,14 @@ void GraphKit::final_sync(IdealKit& ideal) {
 }
 
 Node* GraphKit::load_String_length(Node* str, bool set_ctrl) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  return load_array_length(load_String_value(str, set_ctrl));
+#else
   Node* len = load_array_length(load_String_value(str, set_ctrl));
   Node* coder = load_String_coder(str, set_ctrl);
   // Divide length by 2 if coder is UTF16
   return _gvn.transform(new RShiftINode(len, coder));
+#endif
 }
 
 Node* GraphKit::load_String_value(Node* str, bool set_ctrl) {
@@ -4166,9 +4170,15 @@ Node* GraphKit::load_String_value(Node* str, bool set_ctrl) {
   const TypeInstPtr* string_type = TypeInstPtr::make(TypePtr::NotNull, C->env()->String_klass(),
                                                      false, NULL, 0);
   const TypePtr* value_field_type = string_type->add_offset(value_offset);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  const TypeAryPtr* value_type = TypeAryPtr::make(TypePtr::NotNull,
+                                                  TypeAry::make(TypeInt::CHAR, TypeInt::POS),
+                                                  ciTypeArrayKlass::make(T_CHAR), true, 0);
+#else
   const TypeAryPtr* value_type = TypeAryPtr::make(TypePtr::NotNull,
                                                   TypeAry::make(TypeInt::BYTE, TypeInt::POS),
                                                   ciTypeArrayKlass::make(T_BYTE), true, 0);
+#endif
   Node* p = basic_plus_adr(str, str, value_offset);
   Node* load = access_load_at(str, p, value_field_type, value_type, T_OBJECT,
                               IN_HEAP | (set_ctrl ? C2_CONTROL_DEPENDENT_LOAD : 0) | MO_UNORDERED);

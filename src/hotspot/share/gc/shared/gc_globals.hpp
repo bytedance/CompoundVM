@@ -349,6 +349,9 @@
   product(bool, UseAdaptiveSizePolicy, true,                                \
           "Use adaptive generation sizing policies")                        \
                                                                             \
+  product(bool, DisableAdaptiveSizePolicy, true,                            \
+          "Disable adaptive generation sizing policies")                    \
+                                                                            \
   product(bool, UsePSAdaptiveSurvivorSizePolicy, true,                      \
           "Use adaptive survivor sizing policies")                          \
                                                                             \

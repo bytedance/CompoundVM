@@ -172,6 +172,20 @@ void MethodHandles::jump_to_lambda_form(MacroAssembler* _masm,
   assert(recv != noreg, "required register");
   assert(method_temp == rbx, "required register for loading method");
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // Load the invoker, as MH -> MH.form -> LF.vmentry
+  __ verify_oop(recv);
+  __ load_heap_oop(method_temp, Address(recv, NONZERO(java_lang_invoke_MethodHandle::form_offset())));
+  __ verify_oop(method_temp);
+  __ load_heap_oop(method_temp, Address(method_temp, NONZERO(java_lang_invoke_LambdaForm::vmentry_offset())));
+  __ verify_oop(method_temp);
+  // the following assumes that a Method* is normally compressed in the vmtarget field:
+  //__ movptr(method_temp, Address(method_temp, NONZERO(java_lang_invoke_MemberName::vmtarget_offset())));
+  __ access_load_at(T_ADDRESS, IN_HEAP, method_temp,
+                    Address(method_temp, NONZERO(java_lang_invoke_MemberName::vmtarget_offset())),
+                    noreg, noreg);
+
+#elif HOTSPOT_TARGET_CLASSLIB == 17
   // Load the invoker, as MH -> MH.form -> LF.vmentry
   __ verify_oop(recv);
   __ load_heap_oop(method_temp, Address(recv, NONZERO(java_lang_invoke_MethodHandle::form_offset())), temp2);
@@ -183,6 +197,9 @@ void MethodHandles::jump_to_lambda_form(MacroAssembler* _masm,
   __ access_load_at(T_ADDRESS, IN_HEAP, method_temp,
                     Address(method_temp, NONZERO(java_lang_invoke_ResolvedMethodName::vmtarget_offset())),
                     noreg, noreg);
+#else
+  #error("Unsupported classlib version")
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
 
   if (VerifyMethodHandles && !for_compiler_entry) {
     // make sure recv is already on stack
@@ -353,8 +370,14 @@ void MethodHandles::generate_method_handle_dispatch(MacroAssembler* _masm,
 
     Address member_clazz(    member_reg, NONZERO(java_lang_invoke_MemberName::clazz_offset()));
     Address member_vmindex(  member_reg, NONZERO(java_lang_invoke_MemberName::vmindex_offset()));
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    Address member_vmtarget( member_reg, NONZERO(java_lang_invoke_MemberName::vmtarget_offset()));
+#elif HOTSPOT_TARGET_CLASSLIB == 17
     Address member_vmtarget( member_reg, NONZERO(java_lang_invoke_MemberName::method_offset()));
     Address vmtarget_method( rbx_method, NONZERO(java_lang_invoke_ResolvedMethodName::vmtarget_offset()));
+#else
+  #error("Unsupported CLASSLIB version")
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
 
     Register temp1_recv_klass = temp1;
     if (iid != vmIntrinsics::_linkToStatic) {
@@ -406,16 +429,30 @@ void MethodHandles::generate_method_handle_dispatch(MacroAssembler* _masm,
       if (VerifyMethodHandles) {
         verify_ref_kind(_masm, JVM_REF_invokeSpecial, member_reg, temp3);
       }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+      //__ movptr(rbx_method, member_vmtarget);
+      __ access_load_at(T_ADDRESS, IN_HEAP, rbx_method, member_vmtarget, noreg, noreg);
+#elif HOTSPOT_TARGET_CLASSLIB == 17
       __ load_heap_oop(rbx_method, member_vmtarget);
       __ access_load_at(T_ADDRESS, IN_HEAP, rbx_method, vmtarget_method, noreg, noreg);
+#else
+  #error("unsupported")
+#endif
       break;
 
     case vmIntrinsics::_linkToStatic:
       if (VerifyMethodHandles) {
         verify_ref_kind(_masm, JVM_REF_invokeStatic, member_reg, temp3);
       }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+      // __ movptr(rbx_method, member_vmtarget);
+      __ access_load_at(T_ADDRESS, IN_HEAP, rbx_method, member_vmtarget, noreg, noreg);
+#elif HOTSPOT_TARGET_CLASSLIB == 17
       __ load_heap_oop(rbx_method, member_vmtarget);
       __ access_load_at(T_ADDRESS, IN_HEAP, rbx_method, vmtarget_method, noreg, noreg);
+#else
+  #error("unsupported")
+#endif
       break;
 
     case vmIntrinsics::_linkToVirtual:

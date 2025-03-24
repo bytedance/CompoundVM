@@ -779,6 +779,9 @@ void SystemDictionaryShared::define_shared_package(Symbol*  class_name,
                                                    Handle manifest,
                                                    Handle url,
                                                    TRAPS) {
+#if defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
+  Unimplemented();
+#else
   assert(SystemDictionary::is_system_class_loader(class_loader()), "unexpected class loader");
   // get_package_name() returns a NULL handle if the class is in unnamed package
   Handle pkgname_string = get_package_name(class_name, CHECK);
@@ -796,6 +799,7 @@ void SystemDictionaryShared::define_shared_package(Symbol*  class_name,
                             &args,
                             CHECK);
   }
+#endif // defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
 }
 
 // Get the ProtectionDomain associated with the CodeSource from the classloader.

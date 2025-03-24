@@ -48,6 +48,53 @@
 #define VM_SYMBOL_IGNORE(id, name)                       /*ignored*/
 #define VM_ALIAS_IGNORE(id, id2)                         /*ignored*/
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  #define VM_SYMBOLS_DO_BY_CLASSLIB(template, do_alias)                                                 \
+    template(jdk_internal_reflect,                      "sun/reflect")                         \
+    template(reflect_ConstantPool,                      "sun/reflect/ConstantPool")        \
+    template(reflect_MagicAccessorImpl,                 "sun/reflect/MagicAccessorImpl")                \
+    template(reflect_MethodAccessorImpl,                "sun/reflect/MethodAccessorImpl")               \
+    template(reflect_ConstructorAccessorImpl,           "sun/reflect/ConstructorAccessorImpl")          \
+    template(reflect_DelegatingClassLoader,             "sun/reflect/DelegatingClassLoader")   \
+    template(reflect_Reflection,                        "sun/reflect/Reflection")                       \
+    template(reflect_CallerSensitive,                   "sun/reflect/CallerSensitive")                  \
+    template(reflect_CallerSensitive_signature,         "Lsun/reflect/CallerSensitive;")                \
+    template(reflect_NativeConstructorAccessorImpl,     "sun/reflect/NativeConstructorAccessorImpl")    \
+    template(reflect_UnsafeStaticFieldAccessorImpl,     "sun/reflect/UnsafeStaticFieldAccessorImpl")    \
+    template(vmloader_name,                             "vmloader")                                 \
+    template(linkCallSite_signature, "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/invoke/MemberName;") \
+    template(sun_misc_Signal,                           "sun/misc/Signal")                 \
+    template(sun_misc_Launcher_AppClassLoader,          "sun/misc/Launcher$AppClassLoader")         \
+    template(sun_misc_Launcher_ExtClassLoader,          "sun/misc/Launcher$ExtClassLoader")         \
+    template(java_lang_ClassLoader_NativeLibrary,       "java/lang/ClassLoader\x024NativeLibrary")  \
+    template(sun_management_GarbageCollectorImpl,        "sun/management/GarbageCollectorImpl")         \
+    template(getGcInfoBuilder_signature,                 "()Lsun/management/GcInfoBuilder;")            \
+    template(com_sun_management_GcInfo_constructor_signature, "(Lsun/management/GcInfoBuilder;JJJ[Ljava/lang/management/MemoryUsage;[Ljava/lang/management/MemoryUsage;[Ljava/lang/Object;)V") \
+    template(sun_misc_VMSupport,                        "sun/misc/VMSupport")                           \
+    template(sun_management_Agent,                      "sun/management/Agent")                         \
+    template(sun_misc_PostVMInitHook,                   "sun/misc/PostVMInitHook")                      \
+    template(java_util_concurrent_ConcurrentHashMap_ForwardingNode, "java/util/concurrent/ConcurrentHashMap$ForwardingNode")                      \
+
+#else
+  #define VM_SYMBOLS_DO_BY_CLASSLIB(template, do_alias)                                                 \
+    template(jdk_internal_reflect,                      "jdk/internal/reflect")                         \
+    template(reflect_ConstantPool,                      "jdk/internal/reflect/ConstantPool")        \
+    template(reflect_MagicAccessorImpl,                 "jdk/internal/reflect/MagicAccessorImpl")       \
+    template(reflect_MethodAccessorImpl,                "jdk/internal/reflect/MethodAccessorImpl")      \
+    template(reflect_ConstructorAccessorImpl,           "jdk/internal/reflect/ConstructorAccessorImpl") \
+    template(reflect_DelegatingClassLoader,             "jdk/internal/reflect/DelegatingClassLoader")   \
+    template(reflect_Reflection,                        "jdk/internal/reflect/Reflection")              \
+    template(reflect_CallerSensitive,                   "jdk/internal/reflect/CallerSensitive")         \
+    template(reflect_CallerSensitive_signature,         "Ljdk/internal/reflect/CallerSensitive;")       \
+    template(reflect_NativeConstructorAccessorImpl,     "jdk/internal/reflect/NativeConstructorAccessorImpl")\
+    template(reflect_UnsafeStaticFieldAccessorImpl,     "jdk/internal/reflect/UnsafeStaticFieldAccessorImpl")\
+    template(java_lang_invoke_VarHandle,                "java/lang/invoke/VarHandle")               \
+    template(linkCallSite_signature, "(Ljava/lang/Object;ILjava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/invoke/MemberName;") \
+    template(getGcInfoBuilder_signature,                 "()Lcom/sun/management/internal/GcInfoBuilder;")    \
+    template(com_sun_management_GcInfo_constructor_signature, "(Lcom/sun/management/internal/GcInfoBuilder;JJJ[Ljava/lang/management/MemoryUsage;[Ljava/lang/management/MemoryUsage;[Ljava/lang/Object;)V") \
+
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
+
 // Mapping function names to values. New entries should be added below.
 
 #define VM_SYMBOLS_DO(template, do_alias)                                                         \
@@ -250,21 +297,18 @@
   template(jdk_internal_vm_annotation_Contended_signature,                   "Ljdk/internal/vm/annotation/Contended;")    \
   template(jdk_internal_vm_annotation_ReservedStackAccess_signature,         "Ljdk/internal/vm/annotation/ReservedStackAccess;") \
   template(jdk_internal_ValueBased_signature,                                "Ljdk/internal/ValueBased;") \
+  template(sun_misc_Contended_signature,                                     "Lsun/misc/Contended;")    \
+  template(java_lang_invoke_ForceInline_signature,    "Ljava/lang/invoke/ForceInline;")           \
+  template(java_lang_invoke_DontInline_signature,     "Ljava/lang/invoke/DontInline;")            \
+  template(java_lang_invoke_LambdaForm_Hidden_signature, "Ljava/lang/invoke/LambdaForm$Hidden;")  \
+  template(java_lang_invoke_Stable_signature,         "Ljava/lang/invoke/Stable;")                \
                                                                                                   \
   /* class symbols needed by intrinsics */                                                        \
   VM_INTRINSICS_DO(VM_INTRINSIC_IGNORE, template, VM_SYMBOL_IGNORE, VM_SYMBOL_IGNORE, VM_ALIAS_IGNORE) \
                                                                                                   \
   /* Support for reflection based on dynamic bytecode generation (JDK 1.4 and above) */           \
                                                                                                   \
-  template(jdk_internal_reflect,                      "jdk/internal/reflect")                     \
-  template(reflect_MagicAccessorImpl,                 "jdk/internal/reflect/MagicAccessorImpl")       \
-  template(reflect_MethodAccessorImpl,                "jdk/internal/reflect/MethodAccessorImpl")      \
-  template(reflect_ConstructorAccessorImpl,           "jdk/internal/reflect/ConstructorAccessorImpl") \
-  template(reflect_DelegatingClassLoader,             "jdk/internal/reflect/DelegatingClassLoader")   \
-  template(reflect_Reflection,                        "jdk/internal/reflect/Reflection")              \
-  template(reflect_CallerSensitive,                   "jdk/internal/reflect/CallerSensitive")         \
-  template(reflect_CallerSensitive_signature,         "Ljdk/internal/reflect/CallerSensitive;")       \
-  template(reflect_NativeConstructorAccessorImpl,     "jdk/internal/reflect/NativeConstructorAccessorImpl")\
+  VM_SYMBOLS_DO_BY_CLASSLIB(template, do_alias) \
   template(checkedExceptions_name,                    "checkedExceptions")                        \
   template(clazz_name,                                "clazz")                                    \
   template(exceptionTypes_name,                       "exceptionTypes")                           \
@@ -292,8 +336,6 @@
   template(executable_name,                           "executable")                               \
   template(parameter_annotations_name,                "parameterAnnotations")                     \
   template(annotation_default_name,                   "annotationDefault")                        \
-  template(reflect_ConstantPool,                      "jdk/internal/reflect/ConstantPool")        \
-  template(reflect_UnsafeStaticFieldAccessorImpl,     "jdk/internal/reflect/UnsafeStaticFieldAccessorImpl")\
   template(base_name,                                 "base")                                     \
   /* Type Annotations (JDK 8 and above) */                                                        \
   template(type_annotations_name,                     "typeAnnotations")                          \
@@ -312,7 +354,6 @@
   template(java_lang_invoke_MutableCallSite,          "java/lang/invoke/MutableCallSite")         \
   template(java_lang_invoke_VolatileCallSite,         "java/lang/invoke/VolatileCallSite")        \
   template(java_lang_invoke_MethodHandle,             "java/lang/invoke/MethodHandle")            \
-  template(java_lang_invoke_VarHandle,                "java/lang/invoke/VarHandle")               \
   template(java_lang_invoke_MethodType,               "java/lang/invoke/MethodType")              \
   template(java_lang_invoke_MethodType_signature,     "Ljava/lang/invoke/MethodType;")            \
   template(java_lang_invoke_ResolvedMethodName_signature, "Ljava/lang/invoke/ResolvedMethodName;")\
@@ -339,7 +380,6 @@
   template(linkDynamicConstant_name,                  "linkDynamicConstant")                      \
   template(linkDynamicConstant_signature, "(Ljava/lang/Object;ILjava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;") \
   template(linkCallSite_name,                         "linkCallSite")                             \
-  template(linkCallSite_signature, "(Ljava/lang/Object;ILjava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/invoke/MemberName;") \
   template(setTargetNormal_name,                      "setTargetNormal")                          \
   template(setTargetVolatile_name,                    "setTargetVolatile")                        \
   template(setTarget_signature,                       "(Ljava/lang/invoke/MethodHandle;)V")       \
@@ -616,15 +656,13 @@
   template(java_lang_management_ThreadInfo,            "java/lang/management/ThreadInfo")                         \
   template(jdk_internal_agent_Agent,                   "jdk/internal/agent/Agent")                                \
   template(sun_management_Sensor,                      "sun/management/Sensor")                                   \
-  template(sun_management_ManagementFactoryHelper,     "sun/management/ManagementFactoryHelper")                  \
+  template(sun_management_ManagementFactoryHelper,     "sun/management/ManagementFactory")                  \
   template(com_sun_management_internal_DiagnosticCommandImpl,  "com/sun/management/internal/DiagnosticCommandImpl")     \
   template(com_sun_management_internal_GarbageCollectorExtImpl,"com/sun/management/internal/GarbageCollectorExtImpl")   \
   template(getDiagnosticCommandMBean_name,             "getDiagnosticCommandMBean")                               \
   template(getDiagnosticCommandMBean_signature,        "()Lcom/sun/management/DiagnosticCommandMBean;")           \
   template(getGcInfoBuilder_name,                      "getGcInfoBuilder")                                        \
-  template(getGcInfoBuilder_signature,                 "()Lcom/sun/management/internal/GcInfoBuilder;")           \
   template(com_sun_management_GcInfo,                  "com/sun/management/GcInfo")                               \
-  template(com_sun_management_GcInfo_constructor_signature, "(Lcom/sun/management/internal/GcInfoBuilder;JJJ[Ljava/lang/management/MemoryUsage;[Ljava/lang/management/MemoryUsage;[Ljava/lang/Object;)V") \
   template(createGCNotification_name,                  "createGCNotification")                                    \
   template(createGCNotification_signature,             "(JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/sun/management/GcInfo;)V") \
   template(createDiagnosticFrameworkNotification_name, "createDiagnosticFrameworkNotification")                   \

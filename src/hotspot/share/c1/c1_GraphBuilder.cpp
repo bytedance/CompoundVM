@@ -3504,6 +3504,61 @@ void GraphBuilder::build_graph_for_intrinsic(ciMethod* callee, bool ignore_retur
   case vmIntrinsics::_putLong            : append_unsafe_put_obj(callee, T_LONG,    false); return;
   case vmIntrinsics::_putFloat           : append_unsafe_put_obj(callee, T_FLOAT,   false); return;
   case vmIntrinsics::_putDouble          : append_unsafe_put_obj(callee, T_DOUBLE,  false); return;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_putOrderedObject   : append_unsafe_put_obj(callee, T_OBJECT,  false); return;
+  case vmIntrinsics::_putOrderedInt      : append_unsafe_put_obj(callee, T_INT,     false); return;
+  case vmIntrinsics::_putOrderedLong     : append_unsafe_put_obj(callee, T_LONG,    false); return;
+  case vmIntrinsics::_getObject2         : append_unsafe_get_obj(callee, T_OBJECT,  false); return;
+  case vmIntrinsics::_getBoolean2        : append_unsafe_get_obj(callee, T_BOOLEAN, false); return;
+  case vmIntrinsics::_getByte2           : append_unsafe_get_obj(callee, T_BYTE,    false); return;
+  case vmIntrinsics::_getShort2          : append_unsafe_get_obj(callee, T_SHORT,   false); return;
+  case vmIntrinsics::_getChar2           : append_unsafe_get_obj(callee, T_CHAR,    false); return;
+  case vmIntrinsics::_getInt2            : append_unsafe_get_obj(callee, T_INT,     false); return;
+  case vmIntrinsics::_getLong2           : append_unsafe_get_obj(callee, T_LONG,    false); return;
+  case vmIntrinsics::_getFloat2          : append_unsafe_get_obj(callee, T_FLOAT,   false); return;
+  case vmIntrinsics::_getDouble2         : append_unsafe_get_obj(callee, T_DOUBLE,  false); return;
+  case vmIntrinsics::_putObject2      : append_unsafe_put_obj(callee, T_OBJECT,  false); return;
+  case vmIntrinsics::_putBoolean2        : append_unsafe_put_obj(callee, T_BOOLEAN, false); return;
+  case vmIntrinsics::_putByte2           : append_unsafe_put_obj(callee, T_BYTE,    false); return;
+  case vmIntrinsics::_putShort2          : append_unsafe_put_obj(callee, T_SHORT,   false); return;
+  case vmIntrinsics::_putChar2           : append_unsafe_put_obj(callee, T_CHAR,    false); return;
+  case vmIntrinsics::_putInt2            : append_unsafe_put_obj(callee, T_INT,     false); return;
+  case vmIntrinsics::_putLong2           : append_unsafe_put_obj(callee, T_LONG,    false); return;
+  case vmIntrinsics::_putFloat2          : append_unsafe_put_obj(callee, T_FLOAT,   false); return;
+  case vmIntrinsics::_putDouble2         : append_unsafe_put_obj(callee, T_DOUBLE,  false); return;
+  case vmIntrinsics::_getObjectVolatile2 : append_unsafe_get_obj(callee, T_OBJECT,  true); return;
+  case vmIntrinsics::_getBooleanVolatile2: append_unsafe_get_obj(callee, T_BOOLEAN, true); return;
+  case vmIntrinsics::_getByteVolatile2   : append_unsafe_get_obj(callee, T_BYTE,    true); return;
+  case vmIntrinsics::_getShortVolatile2  : append_unsafe_get_obj(callee, T_SHORT,   true); return;
+  case vmIntrinsics::_getCharVolatile2   : append_unsafe_get_obj(callee, T_CHAR,    true); return;
+  case vmIntrinsics::_getIntVolatile2    : append_unsafe_get_obj(callee, T_INT,     true); return;
+  case vmIntrinsics::_getLongVolatile2   : append_unsafe_get_obj(callee, T_LONG,    true); return;
+  case vmIntrinsics::_getFloatVolatile2  : append_unsafe_get_obj(callee, T_FLOAT,   true); return;
+  case vmIntrinsics::_getDoubleVolatile2 : append_unsafe_get_obj(callee, T_DOUBLE,  true); return;
+  case vmIntrinsics::_putObjectVolatile2 : append_unsafe_put_obj(callee, T_OBJECT,  true); return;
+  case vmIntrinsics::_putBooleanVolatile2: append_unsafe_put_obj(callee, T_BOOLEAN, true); return;
+  case vmIntrinsics::_putByteVolatile2   : append_unsafe_put_obj(callee, T_BYTE,    true); return;
+  case vmIntrinsics::_putShortVolatile2  : append_unsafe_put_obj(callee, T_SHORT,   true); return;
+  case vmIntrinsics::_putCharVolatile2   : append_unsafe_put_obj(callee, T_CHAR,    true); return;
+  case vmIntrinsics::_putIntVolatile2    : append_unsafe_put_obj(callee, T_INT,     true); return;
+  case vmIntrinsics::_putLongVolatile2   : append_unsafe_put_obj(callee, T_LONG,    true); return;
+  case vmIntrinsics::_putFloatVolatile2  : append_unsafe_put_obj(callee, T_FLOAT,   true); return;
+  case vmIntrinsics::_putDoubleVolatile2 : append_unsafe_put_obj(callee, T_DOUBLE,  true); return;
+  case vmIntrinsics::_getByte_raw        : append_unsafe_get_raw(callee, T_BYTE);return;
+  case vmIntrinsics::_getShort_raw       : append_unsafe_get_raw(callee, T_SHORT);return;
+  case vmIntrinsics::_getChar_raw        : append_unsafe_get_raw(callee, T_CHAR);return;
+  case vmIntrinsics::_getInt_raw         : append_unsafe_get_raw(callee, T_INT);return;
+  case vmIntrinsics::_getLong_raw        : append_unsafe_get_raw(callee, T_LONG);return;
+  case vmIntrinsics::_getFloat_raw       : append_unsafe_get_raw(callee, T_FLOAT);return;
+  case vmIntrinsics::_getDouble_raw      : append_unsafe_get_raw(callee, T_DOUBLE);return;
+  case vmIntrinsics::_putByte_raw        : append_unsafe_put_raw(callee, T_BYTE);return;
+  case vmIntrinsics::_putShort_raw       : append_unsafe_put_raw(callee, T_SHORT);return;
+  case vmIntrinsics::_putChar_raw        : append_unsafe_put_raw(callee, T_CHAR);return;
+  case vmIntrinsics::_putInt_raw         : append_unsafe_put_raw(callee, T_INT);return;
+  case vmIntrinsics::_putLong_raw        : append_unsafe_put_raw(callee, T_LONG);return;
+  case vmIntrinsics::_putFloat_raw       : append_unsafe_put_raw(callee, T_FLOAT);return;
+  case vmIntrinsics::_putDouble_raw      : append_unsafe_put_raw(callee, T_DOUBLE);return;
+#endif
   case vmIntrinsics::_getShortUnaligned  : append_unsafe_get_obj(callee, T_SHORT,   false); return;
   case vmIntrinsics::_getCharUnaligned   : append_unsafe_get_obj(callee, T_CHAR,    false); return;
   case vmIntrinsics::_getIntUnaligned    : append_unsafe_get_obj(callee, T_INT,     false); return;
@@ -3530,11 +3585,25 @@ void GraphBuilder::build_graph_for_intrinsic(ciMethod* callee, bool ignore_retur
   case vmIntrinsics::_putLongVolatile    : append_unsafe_put_obj(callee, T_LONG,    true); return;
   case vmIntrinsics::_putFloatVolatile   : append_unsafe_put_obj(callee, T_FLOAT,   true); return;
   case vmIntrinsics::_putDoubleVolatile  : append_unsafe_put_obj(callee, T_DOUBLE,  true); return;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_compareAndSwapInt:
+  case vmIntrinsics::_compareAndSwapLong:
+  case vmIntrinsics::_compareAndSwapObject:
+#endif
   case vmIntrinsics::_compareAndSetLong:
   case vmIntrinsics::_compareAndSetInt:
   case vmIntrinsics::_compareAndSetReference : append_unsafe_CAS(callee); return;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_getAndAddInt2:
+  case vmIntrinsics::_getAndAddLong2:
+#endif
   case vmIntrinsics::_getAndAddInt:
   case vmIntrinsics::_getAndAddLong      : append_unsafe_get_and_set_obj(callee, true); return;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_getAndSetInt2       :
+  case vmIntrinsics::_getAndSetLong2      :
+  case vmIntrinsics::_getAndSetObject      :
+#endif
   case vmIntrinsics::_getAndSetInt       :
   case vmIntrinsics::_getAndSetLong      :
   case vmIntrinsics::_getAndSetReference : append_unsafe_get_and_set_obj(callee, false); return;

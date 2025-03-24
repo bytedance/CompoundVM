@@ -156,7 +156,9 @@ class ConstantPool : public Metadata {
 
   void slot_at_put(int which, CPSlot s) const {
     assert(is_within_bounds(which), "index out of bounds");
+#if HOTSPOT_TARGET_CLASSLIB == 17
     assert(s.value() != 0, "Caught something");
+#endif
     *(intptr_t*)&base()[which] = s.value();
   }
   intptr_t* obj_at_addr(int which) const {
@@ -483,6 +485,14 @@ class ConstantPool : public Metadata {
 
   // Version that can be used before string oop array is created.
   oop uncached_string_at(int which, TRAPS);
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  void pseudo_string_at_put(int which, int obj_index, oop x) {
+    assert(tag_at(which).is_string(), "Corrupted constant pool");
+    unresolved_string_at_put(which, NULL); // indicates patched string
+    string_at_put(which, obj_index, x);    // this works just fine
+  }
+#endif
 
   // only called when we are sure a string entry is already resolved (via an
   // earlier string_at call.
@@ -832,6 +842,11 @@ class ConstantPool : public Metadata {
   void set_resolved_references(OopHandle s) { _cache->set_resolved_references(s); }
   Array<u2>* reference_map() const        {  return (_cache == NULL) ? NULL :  _cache->reference_map(); }
   void set_reference_map(Array<u2>* o)    { _cache->set_reference_map(o); }
+
+  // patch JSR 292 resolved references after the class is linked.
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  void patch_resolved_references(GrowableArray<Handle>* cp_patches);
+#endif
 
   Symbol* impl_name_ref_at(int which, bool uncached);
   Symbol* impl_signature_ref_at(int which, bool uncached);
