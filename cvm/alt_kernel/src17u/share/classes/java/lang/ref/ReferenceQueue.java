@@ -26,7 +26,7 @@
 package java.lang.ref;
 
 import java.util.function.Consumer;
-import jdk.internal.misc.VM;
+import sun.misc.VM;
 
 /**
  * Reference queues, to which registered reference objects are appended by the

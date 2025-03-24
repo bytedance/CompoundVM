@@ -923,7 +923,7 @@ public class Throwable implements Serializable {
         if (candidateSuppressedExceptions != null) {
             int suppressedSize = validateSuppressedExceptionsList(candidateSuppressedExceptions);
             if (suppressedSize > 0) { // Copy valid Throwables to new list
-                var suppList  = new ArrayList<Throwable>(Math.min(100, suppressedSize));
+                ArrayList<Throwable> suppList  = new ArrayList<>(Math.min(100, suppressedSize));
 
                 for (Throwable t : candidateSuppressedExceptions) {
                     // Enforce constraints on suppressed exceptions in
@@ -976,16 +976,16 @@ public class Throwable implements Serializable {
 
     private int validateSuppressedExceptionsList(List<Throwable> deserSuppressedExceptions)
         throws IOException {
-        if (!Object.class.getModule().
-            equals(deserSuppressedExceptions.getClass().getModule())) {
-            throw new StreamCorruptedException("List implementation not in base module.");
-        } else {
+        //if (!Object.class.getModule().
+        //    equals(deserSuppressedExceptions.getClass().getModule())) {
+        //    throw new StreamCorruptedException("List implementation not in base module.");
+        //} else {
             int size = deserSuppressedExceptions.size();
             if (size < 0) {
                 throw new StreamCorruptedException("Negative list size reported.");
             }
             return size;
-        }
+        //}
     }
 
     /**
@@ -1105,5 +1105,30 @@ public class Throwable implements Serializable {
             return EMPTY_THROWABLE_ARRAY;
         else
             return suppressedExceptions.toArray(EMPTY_THROWABLE_ARRAY);
+    }
+
+    /**
+     * Returns the number of elements in the stack trace (or 0 if the stack
+     * trace is unavailable).
+     *
+     * package-protection for use by SharedSecrets.
+     */
+    native int getStackTraceDepth();
+
+    /**
+     * Returns the specified element of the stack trace.
+     *
+     * package-protection for use by SharedSecrets.
+     *
+     * @param index index of the element to return.
+     * @throws IndexOutOfBoundsException if {@code index < 0 ||
+     *         index >= getStackTraceDepth() }
+     */
+    StackTraceElement getStackTraceElement(int index) {
+        // TODO: the performance here may not be optimal
+        if (index < 0 || index >= depth) {
+            throw new IndexOutOfBoundsException();
+        }
+        return StackTraceElement.of(this, depth)[index];
     }
 }

@@ -96,7 +96,7 @@ public class TerminatingThreadLocal<T> extends ThreadLocal<T> {
      * but later not unregistered in a particular thread.
      */
     public static final ThreadLocal<Collection<TerminatingThreadLocal<?>>> REGISTRY =
-        new ThreadLocal<>() {
+        new ThreadLocal<Collection<TerminatingThreadLocal<?>>>() {
             @Override
             protected Collection<TerminatingThreadLocal<?>> initialValue() {
                 return Collections.newSetFromMap(new IdentityHashMap<>(4));

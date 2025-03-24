@@ -24,11 +24,9 @@
  */
 package java.lang.constant;
 
-import java.lang.Enum.EnumDesc;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.lang.invoke.VarHandle.VarHandleDesc;
 
 /**
  * A <a href="package-summary.html#nominal">nominal descriptor</a> for a loadable
@@ -75,16 +73,7 @@ import java.lang.invoke.VarHandle.VarHandleDesc;
  *
  * @since 12
  */
-public sealed interface ConstantDesc
-        permits ClassDesc,
-                MethodHandleDesc,
-                MethodTypeDesc,
-                Double,
-                DynamicConstantDesc,
-                Float,
-                Integer,
-                Long,
-                String {
+public interface ConstantDesc {
     /**
      * Resolves this descriptor reflectively, emulating the resolution behavior
      * of JVMS 5.4.3 and the access control behavior of JVMS 5.4.4.  The resolution

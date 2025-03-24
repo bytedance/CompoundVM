@@ -25,18 +25,7 @@
 
 package java.lang;
 
-import jdk.internal.loader.BuiltinClassLoader;
-import jdk.internal.misc.VM;
-import jdk.internal.module.ModuleHashes;
-import jdk.internal.module.ModuleReferenceImpl;
-
-import java.lang.module.ModuleDescriptor.Version;
-import java.lang.module.ModuleReference;
-import java.lang.module.ResolvedModule;
-import java.util.HashSet;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
 
 /**
  * An element in a stack trace, as returned by {@link
@@ -64,14 +53,6 @@ public final class StackTraceElement implements java.io.Serializable {
      * The name of the class loader.
      */
     private String classLoaderName;
-    /**
-     * The module name.
-     */
-    private String moduleName;
-    /**
-     * The module version.
-     */
-    private String moduleVersion;
     /**
      * The declaring class.
      */
@@ -157,8 +138,6 @@ public final class StackTraceElement implements java.io.Serializable {
                              String declaringClass, String methodName,
                              String fileName, int lineNumber) {
         this.classLoaderName = classLoaderName;
-        this.moduleName      = moduleName;
-        this.moduleVersion   = moduleVersion;
         this.declaringClass  = Objects.requireNonNull(declaringClass, "Declaring class is null");
         this.methodName      = Objects.requireNonNull(methodName, "Method name is null");
         this.fileName        = fileName;
@@ -200,34 +179,6 @@ public final class StackTraceElement implements java.io.Serializable {
      */
     public int getLineNumber() {
         return lineNumber;
-    }
-
-    /**
-     * Returns the module name of the module containing the execution point
-     * represented by this stack trace element.
-     *
-     * @return the module name of the {@code Module} containing the execution
-     *         point represented by this stack trace element; {@code null}
-     *         if the module name is not available.
-     * @since 9
-     * @see Module#getName()
-     */
-    public String getModuleName() {
-        return moduleName;
-    }
-
-    /**
-     * Returns the module version of the module containing the execution point
-     * represented by this stack trace element.
-     *
-     * @return the module version of the {@code Module} containing the execution
-     *         point represented by this stack trace element; {@code null}
-     *         if the module version is not available.
-     * @since 9
-     * @see java.lang.module.ModuleDescriptor.Version
-     */
-    public String getModuleVersion() {
-        return moduleVersion;
     }
 
     /**
@@ -361,14 +312,6 @@ public final class StackTraceElement implements java.io.Serializable {
                 !classLoaderName.isEmpty()) {
             s += classLoaderName + "/";
         }
-        if (moduleName != null && !moduleName.isEmpty()) {
-            s += moduleName;
-
-            if (!dropModuleVersion() && moduleVersion != null &&
-                    !moduleVersion.isEmpty()) {
-                s += "@" + moduleVersion;
-            }
-        }
         s = s.isEmpty() ? declaringClass : s + "/" + declaringClass;
 
         return s + "." + methodName + "(" +
@@ -406,14 +349,15 @@ public final class StackTraceElement implements java.io.Serializable {
     public boolean equals(Object obj) {
         if (obj==this)
             return true;
-        return (obj instanceof StackTraceElement e)
-                && e.lineNumber == lineNumber
+        if (obj instanceof StackTraceElement) {
+            StackTraceElement e = (StackTraceElement)obj;
+            return e.lineNumber == lineNumber
                 && e.declaringClass.equals(declaringClass)
                 && Objects.equals(classLoaderName, e.classLoaderName)
-                && Objects.equals(moduleName, e.moduleName)
-                && Objects.equals(moduleVersion, e.moduleVersion)
                 && Objects.equals(methodName, e.methodName)
                 && Objects.equals(fileName, e.fileName);
+        }
+        return false;
     }
 
     /**
@@ -422,8 +366,6 @@ public final class StackTraceElement implements java.io.Serializable {
     public int hashCode() {
         int result = 31*declaringClass.hashCode() + methodName.hashCode();
         result = 31*result + Objects.hashCode(classLoaderName);
-        result = 31*result + Objects.hashCode(moduleName);
-        result = 31*result + Objects.hashCode(moduleVersion);
         result = 31*result + Objects.hashCode(fileName);
         result = 31*result + lineNumber;
         return result;
@@ -445,13 +387,13 @@ public final class StackTraceElement implements java.io.Serializable {
         try {
             Class<?> cls = (Class<?>) declaringClassObject;
             ClassLoader loader = cls.getClassLoader0();
-            Module m = cls.getModule();
+            //Module m = cls.getModule();
             byte bits = 0;
 
             // First element - class loader name
             // Call package-private ClassLoader::name method
 
-            if (loader instanceof BuiltinClassLoader) {
+            if (loader == null) {
                 bits |= BUILTIN_CLASS_LOADER;
             }
 
@@ -459,9 +401,12 @@ public final class StackTraceElement implements java.io.Serializable {
 
             // Omit if is a JDK non-upgradeable module (recorded in the hashes
             // in java.base)
+            /*
+             * TODO: check launcher version
             if (isHashedInJavaBase(m)) {
                 bits |= JDK_NON_UPGRADEABLE_MODULE;
             }
+            */
             format = bits;
         } finally {
             // Class reference no longer needed, clear it
@@ -479,53 +424,6 @@ public final class StackTraceElement implements java.io.Serializable {
     private boolean dropModuleVersion() {
         return (format & JDK_NON_UPGRADEABLE_MODULE) == JDK_NON_UPGRADEABLE_MODULE;
     }
-
-    /**
-     * Returns true if the module is hashed with java.base.
-     * <p>
-     * This method returns false when running on the exploded image
-     * since JDK modules are not hashed. They have no Version attribute
-     * and so "@<version>" part will be omitted anyway.
-     */
-    private static boolean isHashedInJavaBase(Module m) {
-        // return true if module system is not initialized as the code
-        // must be in java.base
-        if (!VM.isModuleSystemInited())
-            return true;
-
-        return ModuleLayer.boot() == m.getLayer() && HashedModules.contains(m);
-    }
-
-    /*
-     * Finds JDK non-upgradeable modules, i.e. the modules that are
-     * included in the hashes in java.base.
-     */
-    private static class HashedModules {
-        static Set<String> HASHED_MODULES = hashedModules();
-
-        static Set<String> hashedModules() {
-
-            Optional<ResolvedModule> resolvedModule = ModuleLayer.boot()
-                    .configuration()
-                    .findModule("java.base");
-            assert resolvedModule.isPresent();
-            ModuleReference mref = resolvedModule.get().reference();
-            assert mref instanceof ModuleReferenceImpl;
-            ModuleHashes hashes = ((ModuleReferenceImpl)mref).recordedHashes();
-            if (hashes != null) {
-                Set<String> names = new HashSet<>(hashes.names());
-                names.add("java.base");
-                return names;
-            }
-
-            return Set.of();
-        }
-
-        static boolean contains(Module m) {
-            return HASHED_MODULES.contains(m.getName());
-        }
-    }
-
 
     /*
      * Returns an array of StackTraceElements of the given depth
@@ -550,13 +448,13 @@ public final class StackTraceElement implements java.io.Serializable {
     /*
      * Returns a StackTraceElement from a given StackFrameInfo.
      */
-    static StackTraceElement of(StackFrameInfo sfi) {
-        StackTraceElement ste = new StackTraceElement();
-        initStackTraceElement(ste, sfi);
+    //static StackTraceElement of(StackFrameInfo sfi) {
+    //    StackTraceElement ste = new StackTraceElement();
+    //    initStackTraceElement(ste, sfi);
 
-        ste.computeFormat();
-        return ste;
-    }
+    //    ste.computeFormat();
+    //    return ste;
+    //}
 
     /*
      * Sets the given stack trace elements with the backtrace
@@ -567,8 +465,8 @@ public final class StackTraceElement implements java.io.Serializable {
     /*
      * Sets the given stack trace element with the given StackFrameInfo
      */
-    private static native void initStackTraceElement(StackTraceElement element,
-                                                     StackFrameInfo sfi);
+    //private static native void initStackTraceElement(StackTraceElement element,
+    //                                                 StackFrameInfo sfi);
 
     @java.io.Serial
     private static final long serialVersionUID = 6992337162326171013L;

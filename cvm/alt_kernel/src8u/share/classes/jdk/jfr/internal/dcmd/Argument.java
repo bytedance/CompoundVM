@@ -24,11 +24,19 @@
  */
 package jdk.jfr.internal.dcmd;
 
-record Argument(
-    String name,
-    String description,
-    String type,
-    boolean mandatory,
-    String defaultValue,
-    boolean allowMultiple
-) { }
+class Argument {
+    String name;
+    String description;
+    String type;
+    boolean mandatory;
+    String defaultValue;
+    boolean allowMultiple;
+    public Argument(String name, String description, String type, boolean mandatory, String defaultValue, boolean allowMultiple) {
+        this.name = name;
+        this.description = description;
+        this.type = type;
+        this.mandatory = mandatory;
+        this.defaultValue = defaultValue;
+        this.allowMultiple = allowMultiple;
+    }
+}

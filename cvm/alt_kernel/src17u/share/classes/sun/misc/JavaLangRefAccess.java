@@ -23,10 +23,9 @@
  * questions.
  */
 
-package jdk.internal.access;
+package sun.misc;
 
 public interface JavaLangRefAccess {
-
     /**
      * Wait for progress in {@link java.lang.ref.Reference}
      * processing.  If there aren't any pending {@link

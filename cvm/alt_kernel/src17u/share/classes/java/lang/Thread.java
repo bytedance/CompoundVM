@@ -39,8 +39,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
 import jdk.internal.misc.TerminatingThreadLocal;
-import jdk.internal.reflect.CallerSensitive;
-import jdk.internal.reflect.Reflection;
+import sun.reflect.CallerSensitive;
+import sun.reflect.Reflection;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 import sun.nio.ch.Interruptible;
 import sun.security.util.SecurityConstants;
@@ -230,10 +230,9 @@ public class Thread implements Runnable {
     /* Set the blocker field; invoked via jdk.internal.access.SharedSecrets
      * from java.nio code
      */
-    static void blockedOn(Interruptible b) {
-        Thread me = Thread.currentThread();
-        synchronized (me.blockerLock) {
-            me.blocker = b;
+    void blockedOn(Interruptible b) {
+        synchronized (blockerLock) {
+            blocker = b;
         }
     }
 
@@ -426,8 +425,7 @@ public class Thread implements Runnable {
          */
         if (security != null) {
             if (isCCLOverridden(getClass())) {
-                security.checkPermission(
-                        SecurityConstants.SUBCLASS_IMPLEMENTATION_PERMISSION);
+                security.checkPermission(SUBCLASS_IMPLEMENTATION_PERMISSION);
             }
         }
 
@@ -1713,7 +1711,7 @@ public class Thread implements Runnable {
     private static boolean auditSubclass(final Class<?> subcl) {
         @SuppressWarnings("removal")
         Boolean result = AccessController.doPrivileged(
-            new PrivilegedAction<>() {
+            new PrivilegedAction<Boolean>() {
                 public Boolean run() {
                     for (Class<?> cl = subcl;
                          cl != Thread.class;
@@ -2078,15 +2076,15 @@ public class Thread implements Runnable {
     // Hence, the fields are isolated with @Contended.
 
     /** The current seed for a ThreadLocalRandom */
-    @jdk.internal.vm.annotation.Contended("tlr")
+    @sun.misc.Contended("tlr")
     long threadLocalRandomSeed;
 
     /** Probe hash value; nonzero if threadLocalRandomSeed initialized */
-    @jdk.internal.vm.annotation.Contended("tlr")
+    @sun.misc.Contended("tlr")
     int threadLocalRandomProbe;
 
     /** Secondary seed isolated from public ThreadLocalRandom sequence */
-    @jdk.internal.vm.annotation.Contended("tlr")
+    @sun.misc.Contended("tlr")
     int threadLocalRandomSecondarySeed;
 
     /* Some private helper methods */
@@ -2097,4 +2095,29 @@ public class Thread implements Runnable {
     private native void interrupt0();
     private static native void clearInterruptEvent();
     private native void setNativeName(String name);
+
+    //--------- classlib-8 support (kernel classes) --------
+
+    // to fix java/lang/Thread/StopThrowable.java
+    /**
+     * Throws {@code UnsupportedOperationException}.
+     *
+     * @param obj ignored
+     *
+     * @deprecated This method was originally designed to force a thread to stop
+     *        and throw a given {@code Throwable} as an exception. It was
+     *        inherently unsafe (see {@link #stop()} for details), and furthermore
+     *        could be used to generate exceptions that the target thread was
+     *        not prepared to handle.
+     *        For more information, see
+     *        <a href="{@docRoot}/../technotes/guides/concurrency/threadPrimitiveDeprecation.html">Why
+     *        are Thread.stop, Thread.suspend and Thread.resume Deprecated?</a>.
+     */
+    @Deprecated
+    public final synchronized void stop(Throwable obj) {
+        throw new UnsupportedOperationException();
+    }
+
+    private static final RuntimePermission SUBCLASS_IMPLEMENTATION_PERMISSION =
+            new RuntimePermission("enableContextClassLoaderOverride");
 }
