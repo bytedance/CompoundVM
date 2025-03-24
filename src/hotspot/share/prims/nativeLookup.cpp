@@ -230,6 +230,9 @@ extern "C" {
   jobject  JNICALL JVM_GetJVMCIRuntime(JNIEnv *env, jclass c);
   void     JNICALL JVM_RegisterJVMCINatives(JNIEnv *env, jclass compilerToVMClass);
 #endif
+#if defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
+  void     JNICALL JVM_RegisterSunMiscUnsafeMethods(JNIEnv *env, jclass unsafeclass);
+#endif
 }
 
 #define CC (char*)  /* cast a literal from (const char*) */
@@ -254,6 +257,11 @@ static JNINativeMethod lookup_special_native_methods[] = {
   { CC"Java_jdk_jfr_internal_JVM_registerNatives",                 NULL, FN_PTR(jfr_register_natives)            },
 #endif
   { CC"Java_jdk_internal_misc_ScopedMemoryAccess_registerNatives", NULL, FN_PTR(JVM_RegisterJDKInternalMiscScopedMemoryAccessMethods) },
+  // to make JDK8 classlib to work
+#if defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
+  { CC"Java_sun_misc_Perf_registerNatives",                        NULL, FN_PTR(JVM_RegisterPerfMethods)         },
+  { CC"Java_sun_misc_Unsafe_registerNatives",                      NULL, FN_PTR(JVM_RegisterSunMiscUnsafeMethods)       },
+#endif
 };
 
 static address lookup_special_native(const char* jni_name) {
@@ -266,6 +274,27 @@ static address lookup_special_native(const char* jni_name) {
   }
   return NULL;
 }
+
+#include "classfile/packageEntry.hpp"
+#include "classfile/classLoader.hpp"
+#include "classfile/classLoader.inline.hpp"
+
+// return the correct native library for bootstrap classes' methods
+static void* bootclass_lookup_lib(const methodHandle& method) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  {
+    ResourceMark rm;
+    const char* cp = ClassLoader::classpath_entry(method->method_holder()->classpath_index())->name();
+    if (strstr(cp, "/rt17.jar") != NULL) {
+      log_debug(library)("library17 %s for %s", cp, method->external_name());
+      return os::native_java_library17();
+    }
+    log_debug(library)("library8 %s for %s", cp, method->external_name());
+  }
+#endif
+  return os::native_java_library();
+}
+
 
 address NativeLookup::lookup_style(const methodHandle& method, char* pure_name, const char* long_name, int args_size, bool os_style, TRAPS) {
   address entry;
@@ -281,7 +310,11 @@ address NativeLookup::lookup_style(const methodHandle& method, char* pure_name, 
   if (loader.is_null()) {
     entry = lookup_special_native(jni_name);
     if (entry == NULL) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+       entry = (address) os::dll_lookup(bootclass_lookup_lib(method), jni_name);
+#else
        entry = (address) os::dll_lookup(os::native_java_library(), jni_name);
+#endif
     }
     if (entry != NULL) {
       return entry;

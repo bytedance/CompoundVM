@@ -1486,7 +1486,11 @@ Method* JVMCIRuntime::get_method_by_index_impl(const constantPoolHandle& cpool,
   Symbol* sig_sym  = cpool->signature_ref_at(index);
 
   if (cpool->has_preresolution()
-      || ((holder == vmClasses::MethodHandle_klass() || holder == vmClasses::VarHandle_klass()) &&
+      || ((holder == vmClasses::MethodHandle_klass()
+#if HOTSPOT_TARGET_CLASSLIB == 17
+       || holder == vmClasses::VarHandle_klass()
+#endif
+       ) &&
           MethodHandles::is_signature_polymorphic_name(holder, name_sym))) {
     // Short-circuit lookups for JSR 292-related call sites.
     // That is, do not rely only on name-based lookups, because they may fail

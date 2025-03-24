@@ -79,7 +79,38 @@ bool vmClasses::contain(Klass* k) {
 }
 #endif
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+// For classlib-8, determine if we should skip resolving certain classes
+// to skip some non-exsting kernel classes while make the HotSpot code
+// to compile
+static bool should_resolve(vmClassID id) {
+  static vmClassID classes_to_skip[] = {
+    VM_CLASS_ID(Module_klass),
+    VM_CLASS_ID(module_Modules_klass),
+    VM_CLASS_ID(StackWalker_klass),
+    VM_CLASS_ID(AbstractStackWalker_klass),
+    VM_CLASS_ID(StackFrameInfo_klass),
+    VM_CLASS_ID(LiveStackFrameInfo_klass),
+    VM_CLASS_ID(jdk_internal_loader_BuiltinClassLoader_klass),
+    VM_CLASS_ID(jdk_internal_loader_ClassLoaders_klass),
+    //VM_CLASS_ID(jdk_internal_loader_ClassLoaders_AppClassLoader_klass),
+    //VM_CLASS_ID(jdk_internal_loader_ClassLoaders_PlatformClassLoader_klass),
+  };
+  for (size_t i = 0; i < (sizeof(classes_to_skip)/sizeof(classes_to_skip[0])); i++) {
+    if (id == classes_to_skip[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+#endif
+
 bool vmClasses::resolve(vmClassID id, TRAPS) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  if (!should_resolve(id)) {
+    return true;
+  }
+#endif
   InstanceKlass** klassp = &_klasses[as_int(id)];
 
 #if INCLUDE_CDS
@@ -189,7 +220,13 @@ void vmClasses::resolve_all(TRAPS) {
   vmClassID jsr292_group_end   = VM_CLASS_ID(VolatileCallSite_klass);
   resolve_until(jsr292_group_start, scan, CHECK);
   resolve_through(jsr292_group_end, scan, CHECK);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // with CVM8, we will not resolve vector classes at bootstrap
+  vmClassID vector_start = VM_CLASS_ID(vector_VectorSupport_klass);
+  resolve_until(vector_start, scan, CHECK);
+#else
   resolve_until(vmClassID::LIMIT, scan, CHECK);
+#endif
 
   _box_klasses[T_BOOLEAN] = vmClasses::Boolean_klass();
   _box_klasses[T_CHAR]    = vmClasses::Character_klass();

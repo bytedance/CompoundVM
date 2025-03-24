@@ -62,8 +62,11 @@ void Rewriter::compute_index_maps() {
         add_resolved_references_entry(i);
         break;
       case JVM_CONSTANT_Utf8:
-        if (_pool->symbol_at(i) == vmSymbols::java_lang_invoke_MethodHandle() ||
-            _pool->symbol_at(i) == vmSymbols::java_lang_invoke_VarHandle()) {
+        if (_pool->symbol_at(i) == vmSymbols::java_lang_invoke_MethodHandle()
+#if HOTSPOT_TARGET_CLASSLIB == 17
+            || _pool->symbol_at(i) == vmSymbols::java_lang_invoke_VarHandle()
+#endif
+            ) {
           saw_mh_symbol = true;
         }
         break;
@@ -226,13 +229,17 @@ void Rewriter::maybe_rewrite_invokehandle(address opc, int cp_index, int cache_i
           // we may need a resolved_refs entry for the appendix
           add_invokedynamic_resolved_references_entry(cp_index, cache_index);
           status = +1;
-        } else if (_pool->klass_ref_at_noresolve(cp_index) == vmSymbols::java_lang_invoke_VarHandle() &&
+        }
+#if HOTSPOT_TARGET_CLASSLIB == 17
+        else if (_pool->klass_ref_at_noresolve(cp_index) == vmSymbols::java_lang_invoke_VarHandle() &&
                    MethodHandles::is_signature_polymorphic_name(vmClasses::VarHandle_klass(),
                                                                 _pool->name_ref_at(cp_index))) {
           // we may need a resolved_refs entry for the appendix
           add_invokedynamic_resolved_references_entry(cp_index, cache_index);
           status = +1;
-        } else {
+        }
+#endif
+         else {
           status = -1;
         }
         _method_handle_invokers.at(cp_index) = status;

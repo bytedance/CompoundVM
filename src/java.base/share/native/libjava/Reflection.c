@@ -30,7 +30,7 @@
 JNIEXPORT jclass JNICALL
 Java_jdk_internal_reflect_Reflection_getCallerClass(JNIEnv *env, jclass unused)
 {
-    return JVM_GetCallerClass(env);
+    return JVM_GetCallerClass17(env);
 }
 
 JNIEXPORT jint JNICALL

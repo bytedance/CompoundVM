@@ -419,4 +419,16 @@ NOT_PRODUCT(size_t Symbol::_total_count = 0;)
 bool Symbol::is_valid_id(vmSymbolID vm_symbol_id) {
   return vmSymbols::is_valid_id(vm_symbol_id);
 }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+void Symbol::assert_all_latin1() {
+  for (int i = 0; i < (int)_length; i++) {
+    if (_body[i] > (u1)0x7f) {
+      tty->print_cr("symbol_not_all_latin1: \"%s\"", this->as_C_string());
+      tty->flush();
+    }
+    assert(_body[i] <= (u1)0x7F, "Should not be UTF-16");
+  }
+}
+#endif
 #endif

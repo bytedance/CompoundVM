@@ -81,7 +81,13 @@ bool GCNotifier::has_event() {
 
 static Handle getGcInfoBuilder(GCMemoryManager *gcManager,TRAPS) {
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  Klass* gcMBeanKlass = Management::sun_management_GarbageCollectorImpl_klass(CHECK_NH);
+#elif HOTSPOT_TARGET_CLASSLIB == 17
   Klass* gcMBeanKlass = Management::com_sun_management_internal_GarbageCollectorExtImpl_klass(CHECK_NH);
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
 
   instanceOop i = gcManager->get_memory_manager_instance(THREAD);
   instanceHandle ih(THREAD, i);
@@ -199,7 +205,13 @@ void GCNotifier::sendNotificationInternal(TRAPS) {
     Handle objName = java_lang_String::create_from_str(request->gcManager->name(), CHECK);
     Handle objAction = java_lang_String::create_from_str(request->gcAction, CHECK);
     Handle objCause = java_lang_String::create_from_str(request->gcCause, CHECK);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    InstanceKlass* gc_mbean_klass = Management::sun_management_GarbageCollectorImpl_klass(CHECK);
+#elif HOTSPOT_TARGET_CLASSLIB == 17
     InstanceKlass* gc_mbean_klass = Management::com_sun_management_internal_GarbageCollectorExtImpl_klass(CHECK);
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
 
     instanceOop gc_mbean = request->gcManager->get_memory_manager_instance(THREAD);
     instanceHandle gc_mbean_h(THREAD, gc_mbean);

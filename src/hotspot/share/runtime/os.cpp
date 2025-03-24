@@ -411,7 +411,11 @@ static void signal_thread_entry(JavaThread* thread, TRAPS) {
       default: {
         // Dispatch the signal to java
         HandleMark hm(THREAD);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+        Klass* klass = SystemDictionary::resolve_or_null(vmSymbols::sun_misc_Signal(), THREAD);
+#else
         Klass* klass = SystemDictionary::resolve_or_null(vmSymbols::jdk_internal_misc_Signal(), THREAD);
+#endif
         if (klass != NULL) {
           JavaValue result(T_VOID);
           JavaCallArguments args;
@@ -547,6 +551,30 @@ void* os::native_java_library() {
   }
   return _native_java_library;
 }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+static void* _native_java_library17 = NULL;
+
+void* os::native_java_library17() {
+  if (_native_java_library17 == NULL) {
+    char buffer[JVM_MAXPATHLEN];
+    char ebuf[1024];
+
+    // Ensure libjava loaded before libjava17
+    os::native_java_library();
+
+    // Load java dll
+    if (dll_locate_lib(buffer, sizeof(buffer), Arguments::get_dll_dir(),
+                       "java17")) {
+      _native_java_library17 = dll_load(buffer, ebuf, sizeof(ebuf));
+    }
+    if (_native_java_library17 == NULL) {
+      vm_exit_during_initialization("Unable to load native library", ebuf);
+    }
+  }
+  return _native_java_library17;
+}
+#endif
 
 /*
  * Support for finding Agent_On(Un)Load/Attach<_lib_name> if it exists.
@@ -1340,7 +1368,47 @@ ssize_t os::read(int fd, void *buf, unsigned int nBytes) {
   return ::read(fd, buf, nBytes);
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+bool os::set_boot_path8(char fileSep, char pathSep) {
+    const char* home = Arguments::get_java_home();
+    int home_len = (int)strlen(home);
+
+    /*
+    static const char* meta_index_dir_format = "%/lib/";
+    static const char* meta_index_format = "%/lib/meta-index";
+    char* meta_index = format_boot_path(meta_index_format, home, home_len, fileSep, pathSep);
+    if (meta_index == NULL) return false;
+    char* meta_index_dir = format_boot_path(meta_index_dir_format, home, home_len, fileSep, pathSep);
+    if (meta_index_dir == NULL) return false;
+    Arguments::set_meta_index_path(meta_index, meta_index_dir);
+    */
+
+    // Any modification to the JAR-file list, for the boot classpath must be
+    // aligned with install/install/make/common/Pack.gmk. Note: boot class
+    // path class JARs, are stripped for StackMapTable to reduce download size.
+    static const char classpath_format[] =
+        "%/lib/rt17.jar:"
+        "%/lib/rt8.jar:"
+        "%/lib/resources.jar:"
+        "%/lib/rt.jar:"
+        //"%/lib/sunrsasign.jar:"
+        "%/lib/jsse.jar:"
+        "%/lib/jce.jar:"
+        "%/lib/charsets.jar:"
+        "%/lib/jfr.jar";
+    char* sysclasspath = format_boot_path(classpath_format, home, home_len, fileSep, pathSep);
+    if (sysclasspath == NULL) return false;
+    Arguments::set_sysclasspath(sysclasspath, false);
+
+    return true;
+}
+#endif
+
 bool os::set_boot_path(char fileSep, char pathSep) {
+#if defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
+  return set_boot_path8(fileSep, pathSep);
+#endif
+
   const char* home = Arguments::get_java_home();
   int home_len = (int)strlen(home);
 

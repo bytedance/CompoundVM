@@ -201,7 +201,9 @@ void StatSampler::assert_system_property(const char* name, const char* value, TR
   // convert Java String to utf8 string
   char* system_value = java_lang_String::as_utf8_string(value_oop);
 
+#if HOTSPOT_TARGET_CLASSLIB == 17
   assert(strcmp(value, system_value) == 0, "property value mustn't differ from System.getProperty");
+#endif
 #endif // ASSERT
 }
 

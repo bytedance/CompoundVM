@@ -491,7 +491,19 @@ bool Method::register_native(Klass* k, Symbol* name, Symbol* signature, address 
       st.print("Method '");
       print_external_name(&st, k, name, signature);
       st.print("' is not declared as native");
+#if HOTSPOT_TARGET_CLASSLIB == 8
+      // We allow inconsistent definition of methods in alternative kernel classes;
+      // typical problem is java/lang/Class, which contains method 'getComponentType'
+      // from jdk17's pure Java impl, but this class will be initialized by
+      // libjava.so from original jdk8.
+      // below check ensures no exception from java8's registerNatives in libjava.so,
+      // and allow JDK17 to further optimize the method after <clinit>.
+      if (k->is_alt_kernel()) {
+        return true;
+      }
+#else
       THROW_MSG_(vmSymbols::java_lang_NoSuchMethodError(), st.as_string(), false);
+#endif
     }
   }
 
@@ -1609,13 +1621,17 @@ void Method::init_intrinsic_id(vmSymbolID klass_id) {
   // ditto for method and signature:
   vmSymbolID name_id = vmSymbols::find_sid(name());
   if (klass_id != VM_SYMBOL_ENUM_NAME(java_lang_invoke_MethodHandle)
+#if HOTSPOT_TARGET_CLASSLIB == 17
       && klass_id != VM_SYMBOL_ENUM_NAME(java_lang_invoke_VarHandle)
+#endif
       && name_id == vmSymbolID::NO_SID) {
     return;
   }
   vmSymbolID sig_id = vmSymbols::find_sid(signature());
   if (klass_id != VM_SYMBOL_ENUM_NAME(java_lang_invoke_MethodHandle)
+#if HOTSPOT_TARGET_CLASSLIB == 17
       && klass_id != VM_SYMBOL_ENUM_NAME(java_lang_invoke_VarHandle)
+#endif
       && sig_id == vmSymbolID::NO_SID) {
     return;
   }
@@ -1650,7 +1666,9 @@ void Method::init_intrinsic_id(vmSymbolID klass_id) {
 
   // Signature-polymorphic methods: MethodHandle.invoke*, InvokeDynamic.*., VarHandle
   case VM_SYMBOL_ENUM_NAME(java_lang_invoke_MethodHandle):
+#if HOTSPOT_TARGET_CLASSLIB == 17
   case VM_SYMBOL_ENUM_NAME(java_lang_invoke_VarHandle):
+#endif
     if (!is_native())  break;
     id = MethodHandles::signature_polymorphic_name_id(method_holder(), name());
     if (is_static() != MethodHandles::is_signature_polymorphic_static(id))

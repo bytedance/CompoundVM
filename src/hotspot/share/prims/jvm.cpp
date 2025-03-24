@@ -691,7 +691,16 @@ JVM_END
 // Misc. class handling ///////////////////////////////////////////////////////////
 
 
-JVM_ENTRY(jclass, JVM_GetCallerClass(JNIEnv* env))
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(jclass, JVM_GetCallerClass(JNIEnv* env, int depth))
+  // Pre-JDK 8 and early builds of JDK 8 don't have a CallerSensitive annotation; or
+  // sun.reflect.Reflection.getCallerClass with a depth parameter is provided
+  // temporarily for existing code to use until a replacement API is defined.
+  if (vmClasses::reflect_CallerSensitive_klass() == NULL || depth != JVM_CALLER_DEPTH) {
+    Klass* k = thread->security_get_caller_class(depth);
+    return (k == NULL) ? NULL : (jclass) JNIHandles::make_local(THREAD, k->java_mirror());
+  }
+
   // Getting the class of the caller frame.
   //
   // The call stack at this point looks something like this:
@@ -708,12 +717,58 @@ JVM_ENTRY(jclass, JVM_GetCallerClass(JNIEnv* env))
     switch (n) {
     case 0:
       // This must only be called from Reflection.getCallerClass
+      // TODO: this check is for jdk/internal/reflect/Reflection; but may also be sun/reflect/Reflection
       if (m->intrinsic_id() != vmIntrinsics::_getCallerClass) {
         THROW_MSG_NULL(vmSymbols::java_lang_InternalError(), "JVM_GetCallerClass must only be called from Reflection.getCallerClass");
       }
       // fall-through
     case 1:
       // Frame 0 and 1 must be caller sensitive.
+      // TODO: this check is for jdk/internal/reflect/Reflection; but may also be sun/reflect/Reflection
+      if (!m->caller_sensitive()) {
+        THROW_MSG_NULL(vmSymbols::java_lang_InternalError(), err_msg("CallerSensitive annotation expected at frame %d", n));
+      }
+      break;
+    default:
+      if (!m->is_ignored_by_security_stack_walk()) {
+        // We have reached the desired frame; return the holder class.
+        return (jclass) JNIHandles::make_local(THREAD, m->method_holder()->java_mirror());
+      }
+      break;
+    }
+  }
+  return NULL;
+JVM_END
+
+JVM_ENTRY(jclass, JVM_GetCallerClass17(JNIEnv* env))
+#else // HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(jclass, JVM_GetCallerClass(JNIEnv* env))
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
+
+  // Getting the class of the caller frame.
+  //
+  // The call stack at this point looks something like this:
+  //
+  // [0] [ @CallerSensitive public sun.reflect.Reflection.getCallerClass ]
+  // [1] [ @CallerSensitive API.method                                   ]
+  // [.] [ (skipped intermediate frames)                                 ]
+  // [n] [ caller                                                        ]
+  vframeStream vfst(thread);
+  // Cf. LibraryCallKit::inline_native_Reflection_getCallerClass
+  for (int n = 0; !vfst.at_end(); vfst.security_next(), n++) {
+    Method* m = vfst.method();
+    assert(m != NULL, "sanity");
+    switch (n) {
+    case 0:
+      // This must only be called from Reflection.getCallerClass
+      // TODO: this check is for jdk/internal/reflect/Reflection; but may also be sun/reflect/Reflection
+      if (m->intrinsic_id() != vmIntrinsics::_getCallerClass) {
+        THROW_MSG_NULL(vmSymbols::java_lang_InternalError(), "JVM_GetCallerClass must only be called from Reflection.getCallerClass");
+      }
+      // fall-through
+    case 1:
+      // Frame 0 and 1 must be caller sensitive.
+      // TODO: this check is for jdk/internal/reflect/Reflection; but may also be sun/reflect/Reflection
       if (!m->caller_sensitive()) {
         THROW_MSG_NULL(vmSymbols::java_lang_InternalError(), err_msg("CallerSensitive annotation expected at frame %d", n));
       }
@@ -1733,7 +1788,7 @@ JVM_END
 // Note that this function returns the components of the Record attribute
 // even if the class is not a record.
 JVM_ENTRY(jobjectArray, JVM_GetRecordComponents(JNIEnv* env, jclass ofClass))
-{
+CLASSLIB17_ONLY({
   Klass* c = java_lang_Class::as_Klass(JNIHandles::resolve_non_null(ofClass));
   assert(c->is_instance_klass(), "must be");
   InstanceKlass* ik = InstanceKlass::cast(c);
@@ -1756,9 +1811,8 @@ JVM_ENTRY(jobjectArray, JVM_GetRecordComponents(JNIEnv* env, jclass ofClass))
     }
     return (jobjectArray)JNIHandles::make_local(THREAD, components_h());
   }
-
+})
   return NULL;
-}
 JVM_END
 
 static bool select_method(const methodHandle& method, bool want_constructor) {
@@ -3221,7 +3275,9 @@ JVM_END
 JVM_ENTRY(void, JVM_ReferenceClear(JNIEnv* env, jobject ref))
   oop ref_oop = JNIHandles::resolve_non_null(ref);
   // FinalReference has it's own implementation of clear().
+#if HOTSPOT_TARGET_CLASSLIB == 17
   assert(!java_lang_ref_Reference::is_final(ref_oop), "precondition");
+#endif
   if (java_lang_ref_Reference::unknown_referent_no_keepalive(ref_oop) == NULL) {
     // If the referent has already been cleared then done.
     // However, if the referent is dead but has not yet been cleared by
@@ -3254,6 +3310,14 @@ JVM_END
 
 JVM_ENTRY(jobject, JVM_LatestUserDefinedLoader(JNIEnv *env))
   for (vframeStream vfst(thread); !vfst.at_end(); vfst.next()) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    // UseNewReflection
+    vfst.skip_reflection_related_frames(); // Only needed for 1.4 reflection
+    oop loader = vfst.method()->method_holder()->class_loader();
+    if (loader != NULL && !SystemDictionary::is_ext_class_loader(Handle(THREAD, loader))) {
+      return JNIHandles::make_local(THREAD, loader);
+    }
+#else
     InstanceKlass* ik = vfst.method()->method_holder();
     oop loader = ik->class_loader();
     if (loader != NULL && !SystemDictionary::is_platform_class_loader(loader)) {
@@ -3263,6 +3327,7 @@ JVM_ENTRY(jobject, JVM_LatestUserDefinedLoader(JNIEnv *env))
         return JNIHandles::make_local(THREAD, loader);
       }
     }
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
   }
   return NULL;
 JVM_END

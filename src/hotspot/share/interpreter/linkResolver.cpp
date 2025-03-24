@@ -59,6 +59,9 @@
 #include "runtime/signature.hpp"
 #include "runtime/thread.inline.hpp"
 #include "runtime/vmThread.hpp"
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#include "runtime/arguments.hpp"
+#endif
 
 //------------------------------------------------------------------------------------------------------------------------
 // Implementation of CallInfo
@@ -273,6 +276,9 @@ void LinkInfo::print() {
 // Klass resolution
 
 void LinkResolver::check_klass_accessibility(Klass* ref_klass, Klass* sel_klass, TRAPS) {
+#if defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
+  return;
+#endif
   Klass* base_klass = sel_klass;
   if (sel_klass->is_objArray_klass()) {
     base_klass = ObjArrayKlass::cast(sel_klass)->bottom_klass();
@@ -290,6 +296,15 @@ void LinkResolver::check_klass_accessibility(Klass* ref_klass, Klass* sel_klass,
     char* msg = Reflection::verify_class_access_msg(ref_klass,
                                                     InstanceKlass::cast(base_klass),
                                                     vca_result);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    if (msg == NULL) {
+      Exceptions::fthrow(
+        THREAD_AND_LOCATION,
+        vmSymbols::java_lang_IllegalAccessError(),
+        "failed to access class %s from class %s",
+        base_klass->external_name(),
+        ref_klass->external_name());
+#else
     bool same_module = (base_klass->module() == ref_klass->module());
     if (msg == NULL) {
       Exceptions::fthrow(
@@ -301,6 +316,7 @@ void LinkResolver::check_klass_accessibility(Klass* ref_klass, Klass* sel_klass,
         (same_module) ? base_klass->joint_in_module_of_loader(ref_klass) : base_klass->class_in_module_of_loader(),
         (same_module) ? "" : "; ",
         (same_module) ? "" : ref_klass->class_in_module_of_loader());
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
     } else {
       // Use module specific message returned by verify_class_access_msg().
       Exceptions::fthrow(
@@ -426,8 +442,11 @@ Method* LinkResolver::lookup_polymorphic_method(const LinkInfo& link_info,
   log_info(methodhandles)("lookup_polymorphic_method iid=%s %s.%s%s",
                           vmIntrinsics::name_at(iid), klass->external_name(),
                           name->as_C_string(), full_signature->as_C_string());
-  if ((klass == vmClasses::MethodHandle_klass() ||
-       klass == vmClasses::VarHandle_klass()) &&
+  if ((klass == vmClasses::MethodHandle_klass()
+#if HOTSPOT_TARGET_CLASSLIB == 17
+      || klass == vmClasses::VarHandle_klass()
+#endif
+      ) &&
       iid != vmIntrinsics::_none) {
     if (MethodHandles::is_signature_polymorphic_intrinsic(iid)) {
       // Most of these do not need an up-call to Java to resolve, so can be done anywhere.
@@ -565,6 +584,15 @@ void LinkResolver::check_method_accessability(Klass* ref_klass,
   if (!can_access) {
     ResourceMark rm(THREAD);
     stringStream ss;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    ss.print("class %s tried to access %s%s%smethod '%s'",
+             ref_klass->external_name(),
+             sel_method->is_abstract()  ? "abstract "  : "",
+             sel_method->is_protected() ? "protected " : "",
+             sel_method->is_private()   ? "private "   : "",
+             sel_method->external_name()
+             );
+#else
     bool same_module = (sel_klass->module() == ref_klass->module());
     ss.print("class %s tried to access %s%s%smethod '%s' (%s%s%s)",
              ref_klass->external_name(),
@@ -576,6 +604,7 @@ void LinkResolver::check_method_accessability(Klass* ref_klass,
              (same_module) ? "" : "; ",
              (same_module) ? "" : sel_klass->class_in_module_of_loader()
              );
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
 
     // For private access see if there was a problem with nest host
     // resolution, and if so report that as part of the message.
@@ -614,7 +643,11 @@ Method* LinkResolver::resolve_method_statically(Bytecodes::Code code,
   Klass* resolved_klass = link_info.resolved_klass();
 
   if (pool->has_preresolution()
-      || ((resolved_klass == vmClasses::MethodHandle_klass() || resolved_klass == vmClasses::VarHandle_klass()) &&
+      || ((resolved_klass == vmClasses::MethodHandle_klass()
+#if HOTSPOT_TARGET_CLASSLIB == 17
+       || resolved_klass == vmClasses::VarHandle_klass()
+#endif
+       ) &&
           MethodHandles::is_signature_polymorphic_name(resolved_klass, link_info.name()))) {
     Method* result = ConstantPool::method_at_if_loaded(pool, index);
     if (result != NULL) {
@@ -908,9 +941,18 @@ void LinkResolver::check_field_accessability(Klass* ref_klass,
   // Any existing exceptions that may have been thrown, for example LinkageErrors
   // from nest-host resolution, have been allowed to propagate.
   if (!can_access) {
-    bool same_module = (sel_klass->module() == ref_klass->module());
     ResourceMark rm(THREAD);
     stringStream ss;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    ss.print("class %s tried to access %s%sfield %s.%s",
+             ref_klass->external_name(),
+             fd.is_protected() ? "protected " : "",
+             fd.is_private()   ? "private "   : "",
+             sel_klass->external_name(),
+             fd.name()->as_C_string()
+             );
+#else
+    bool same_module = (sel_klass->module() == ref_klass->module());
     ss.print("class %s tried to access %s%sfield %s.%s (%s%s%s)",
              ref_klass->external_name(),
              fd.is_protected() ? "protected " : "",
@@ -921,6 +963,8 @@ void LinkResolver::check_field_accessability(Klass* ref_klass,
              (same_module) ? "" : "; ",
              (same_module) ? "" : sel_klass->class_in_module_of_loader()
              );
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
+
     // For private access see if there was a problem with nest host
     // resolution, and if so report that as part of the message.
     if (fd.is_private()) {
@@ -1056,14 +1100,25 @@ void LinkResolver::resolve_static_call(CallInfo& result,
                                        const LinkInfo& link_info,
                                        bool initialize_class, TRAPS) {
   Method* resolved_method = linktime_resolve_static_method(link_info, CHECK);
+    CLASSLIB8_DEBUG_ONLY(
+      if (VerifyLatin1NamesOnly) {
+        resolved_method->name()->assert_all_latin1();
+        resolved_method->signature()->assert_all_latin1();
+      })
 
   // The resolved class can change as a result of this resolution.
   Klass* resolved_klass = resolved_method->method_holder();
+  CLASSLIB8_DEBUG_ONLY(if (VerifyLatin1NamesOnly) { resolved_klass->name()->assert_all_latin1(); });
 
   // Initialize klass (this should only happen if everything is ok)
   if (initialize_class && resolved_klass->should_be_initialized()) {
     resolved_klass->initialize(CHECK);
     // Use updated LinkInfo to reresolve with resolved method holder
+    CLASSLIB8_DEBUG_ONLY(
+      if (VerifyLatin1NamesOnly) {
+        link_info.name()->assert_all_latin1();
+        link_info.signature()->assert_all_latin1();
+      });
     LinkInfo new_info(resolved_klass, link_info.name(), link_info.signature(),
                       link_info.current_klass(),
                       link_info.check_access() ? LinkInfo::AccessCheck::required : LinkInfo::AccessCheck::skip,
@@ -1080,6 +1135,7 @@ Method* LinkResolver::linktime_resolve_static_method(const LinkInfo& link_info, 
 
   Klass* resolved_klass = link_info.resolved_klass();
   Method* resolved_method;
+  CLASSLIB8_DEBUG_ONLY(if (VerifyLatin1NamesOnly) { resolved_klass->name()->assert_all_latin1(); });
   if (!resolved_klass->is_interface()) {
     resolved_method = resolve_method(link_info, Bytecodes::_invokestatic, CHECK_NULL);
   } else {
@@ -1148,6 +1204,11 @@ Method* LinkResolver::linktime_resolve_special_method(const LinkInfo& link_info,
   Klass* current_klass = link_info.current_klass();
   if (current_klass != NULL && resolved_klass->is_interface()) {
     InstanceKlass* klass_to_check = InstanceKlass::cast(current_klass);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    if (klass_to_check->is_hidden()) {
+      klass_to_check = klass_to_check->nest_host(THREAD);
+    }
+#endif
     // Disable verification for the dynamically-generated reflection bytecodes.
     bool is_reflect = klass_to_check->is_subclass_of(
                         vmClasses::reflect_MagicAccessorImpl_klass());
@@ -1705,8 +1766,11 @@ void LinkResolver::resolve_handle_call(CallInfo& result,
                                        TRAPS) {
   // JSR 292:  this must be an implicitly generated method MethodHandle.invokeExact(*...) or similar
   Klass* resolved_klass = link_info.resolved_klass();
-  assert(resolved_klass == vmClasses::MethodHandle_klass() ||
-         resolved_klass == vmClasses::VarHandle_klass(), "");
+  assert(resolved_klass == vmClasses::MethodHandle_klass()
+#if HOTSPOT_TARGET_CLASSLIB == 17
+          || resolved_klass == vmClasses::VarHandle_klass()
+#endif
+          , "");
   assert(MethodHandles::is_signature_polymorphic_name(link_info.name()), "");
   Handle resolved_appendix;
   Method* m = lookup_polymorphic_method(link_info, &resolved_appendix, CHECK);

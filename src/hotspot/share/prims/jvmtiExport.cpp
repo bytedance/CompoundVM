@@ -2726,7 +2726,11 @@ jint JvmtiExport::load_agent_library(const char *agent, const char *absParam,
       }
 
       // Agent_OnAttach executed so completion status is JNI_OK
+#if defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
+      st->print_cr("%d", result);
+#else
       st->print_cr("return code: %d", result);
+#endif
       result = JNI_OK;
     }
   } else {

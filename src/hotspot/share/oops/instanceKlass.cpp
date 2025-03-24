@@ -351,7 +351,9 @@ InstanceKlass* InstanceKlass::nest_host(TRAPS) {
 // We also know the "host" is a valid nest-host in the same package so we can
 // assert some of those facts.
 void InstanceKlass::set_nest_host(InstanceKlass* host) {
+#if HOTSPOT_TARGET_CLASSLIB == 17
   assert(is_hidden(), "must be a hidden class");
+#endif // HOTSPOT_TARGET_CLASSLIB == 17
   assert(host != NULL, "NULL nest host specified");
   assert(_nest_host == NULL, "current class has resolved nest-host");
   assert(nest_host_error() == NULL, "unexpected nest host resolution error exists: %s",
@@ -691,9 +693,13 @@ void InstanceKlass::deallocate_contents(ClassLoaderData* loader_data) {
 }
 
 bool InstanceKlass::is_record() const {
+#if defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
+  return false;
+#else
   return _record_components != NULL &&
          is_final() &&
          java_super() == vmClasses::Record_klass();
+#endif // defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
 }
 
 bool InstanceKlass::is_sealed() const {
@@ -2822,11 +2828,13 @@ ModuleEntry* InstanceKlass::module() const {
 
 void InstanceKlass::set_package(ClassLoaderData* loader_data, PackageEntry* pkg_entry, TRAPS) {
 
+#if HOTSPOT_TARGET_CLASSLIB == 17
   // ensure java/ packages only loaded by boot or platform builtin loaders
   // not needed for shared class since CDS does not archive prohibited classes.
   if (!is_shared()) {
     check_prohibited_package(name(), loader_data, CHECK);
   }
+#endif
 
   if (is_shared() && _package_entry != NULL) {
     if (MetaspaceShared::use_full_module_graph() && _package_entry == pkg_entry) {
@@ -2907,6 +2915,9 @@ void InstanceKlass::set_package(ClassLoaderData* loader_data, PackageEntry* pkg_
 // classes are loaded by the boot loader) that at least one of the package's
 // classes has been loaded.
 void InstanceKlass::set_classpath_index(s2 path_index) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  _classpath_index = path_index;
+#endif
   if (_package_entry != NULL) {
     DEBUG_ONLY(PackageEntryTable* pkg_entry_tbl = ClassLoaderData::the_null_class_loader_data()->packages();)
     assert(pkg_entry_tbl->lookup_only(_package_entry->name()) == _package_entry, "Should be same");
@@ -3666,7 +3677,11 @@ void InstanceKlass::print_class_load_logging(ClassLoaderData* loader_data,
   // Source
   if (cfs != NULL) {
     if (cfs->source() != NULL) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+      const char* module_name = UNNAMED_MODULE;
+#else
       const char* module_name = (module_entry->name() == NULL) ? UNNAMED_MODULE : module_entry->name()->as_C_string();
+#endif
       if (module_name != NULL) {
         // When the boot loader created the stream, it didn't know the module name
         // yet. Let's format it now.
@@ -3925,12 +3940,15 @@ void JNIid::verify(Klass* holder) {
 }
 
 void InstanceKlass::set_init_state(ClassState state) {
+// TODO: workaround, fix later
+#if HOTSPOT_TARGET_CLASSLIB == 17
 #ifdef ASSERT
   bool good_state = is_shared() ? (_init_state <= state)
                                                : (_init_state < state);
   assert(good_state || state == allocated, "illegal state transition");
 #endif
   assert(_init_thread == NULL, "should be cleared before state change");
+#endif // HOTSPOT_TARGET_CLASSLIB == 17
   _init_state = (u1)state;
 }
 

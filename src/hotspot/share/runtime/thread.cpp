@@ -772,7 +772,7 @@ static void create_initial_thread(Handle thread_group, JavaThread* thread,
 // java.lang.VersionProps fields.
 // Returned char* is allocated in the thread's resource area
 // so must be copied for permanency.
-static const char* get_java_version_info(InstanceKlass* ik,
+CLASSLIB17_ONLY(static const char* get_java_version_info(InstanceKlass* ik,
                                          Symbol* field_name) {
   fieldDescriptor fd;
   bool found = ik != NULL &&
@@ -788,12 +788,18 @@ static const char* get_java_version_info(InstanceKlass* ik,
   } else {
     return NULL;
   }
-}
+})
 
 // General purpose hook into Java code, run once when the VM is initialized.
 // The Java library method itself may be changed independently from the VM.
 static void call_postVMInitHook(TRAPS) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  Klass* klass = SystemDictionary::resolve_or_null(vmSymbols::sun_misc_PostVMInitHook(), THREAD);
+#elif HOTSPOT_TARGET_CLASSLIB == 17
   Klass* klass = SystemDictionary::resolve_or_null(vmSymbols::jdk_internal_vm_PostVMInitHook(), THREAD);
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
   if (klass != NULL) {
     JavaValue result(T_VOID);
     JavaCalls::call_static(&result, klass, vmSymbols::run_method_name(),
@@ -2687,8 +2693,10 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
   initialize_class(vmSymbols::java_lang_Thread(), CHECK);
   create_initial_thread(thread_group, main_thread, CHECK);
 
+#if HOTSPOT_TARGET_CLASSLIB == 17
   // The VM creates objects of this class.
   initialize_class(vmSymbols::java_lang_Module(), CHECK);
+#endif
 
 #ifdef ASSERT
   InstanceKlass *k = vmClasses::UnsafeConstants_klass();
@@ -2706,6 +2714,17 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
   // Phase 1 of the system initialization in the library, java.lang.System class initialization
   call_initPhase1(CHECK);
 
+#if defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
+  // for classlib 8, versions are not stored in class j.l.VersionProps, but in raw properties
+  {
+    ResourceMark rm(main_thread);
+    JDK_Version::set_java_version("1.8.0");
+    JDK_Version::set_runtime_name("OpenJDK Runtime Environment");
+    JDK_Version::set_runtime_version("17.0.7+7");
+    JDK_Version::set_runtime_vendor_version("ByteDance Testing");
+    JDK_Version::set_runtime_vendor_vm_bug_url("https://bytedance.com/java/cvm/bugs");
+  }
+#else
   // Get the Java runtime name, version, and vendor info after java.lang.System is initialized.
   // Some values are actually configure-time constants but some can be set via the jlink tool and
   // so must be read dynamically. We treat them all the same.
@@ -2723,6 +2742,7 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
 
     JDK_Version::set_runtime_vendor_vm_bug_url(get_java_version_info(ik, vmSymbols::java_runtime_vendor_vm_bug_url_name()));
   }
+#endif // defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
 
   // an instance of OutOfMemory exception has been allocated earlier
   initialize_class(vmSymbols::java_lang_OutOfMemoryError(), CHECK);
@@ -2739,7 +2759,9 @@ void Threads::initialize_jsr292_core_classes(TRAPS) {
   TraceTime timer("Initialize java.lang.invoke classes", TRACETIME_LOG(Info, startuptime));
 
   initialize_class(vmSymbols::java_lang_invoke_MethodHandle(), CHECK);
+#if HOTSPOT_TARGET_CLASSLIB != 8
   initialize_class(vmSymbols::java_lang_invoke_ResolvedMethodName(), CHECK);
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
   initialize_class(vmSymbols::java_lang_invoke_MemberName(), CHECK);
   initialize_class(vmSymbols::java_lang_invoke_MethodHandleNatives(), CHECK);
 }

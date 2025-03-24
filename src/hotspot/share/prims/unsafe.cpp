@@ -59,12 +59,15 @@
 #include "utilities/copy.hpp"
 #include "utilities/dtrace.hpp"
 #include "utilities/macros.hpp"
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#include "prims/unsafe.inline.hpp"
+#endif
 
 /**
  * Implementation of the jdk.internal.misc.Unsafe class
  */
 
-
+#if HOTSPOT_TARGET_CLASSLIB == 17
 #define MAX_OBJECT_SIZE \
   ( arrayOopDesc::header_size(T_DOUBLE) * HeapWordSize \
     + ((julong)max_jint * sizeof(double)) )
@@ -138,6 +141,7 @@ static inline void* index_oop_from_field_offset_long(oop p, jlong field_offset) 
     return cast_from_oop<address>(p) +        byte_offset;
   }
 }
+#endif // HOTSPOT_TARGET_CLASSLIB
 
 // Externally callable versions:
 // (Use these in compiler intrinsics which emulate unsafe primitives.)
@@ -150,7 +154,7 @@ jlong Unsafe_field_offset_from_byte_offset(jlong byte_offset) {
 
 
 ///// Data read/writes on the Java heap and in native (off-heap) memory
-
+#if HOTSPOT_TARGET_CLASSLIB == 17
 /**
  * Helper class to wrap memory accesses in JavaThread::doing_unsafe_access()
  */
@@ -258,32 +262,49 @@ public:
     }
   }
 };
+#endif // HOTSPOT_TARGET_CLASSLIB
 
 // These functions allow a null base pointer with an arbitrary address.
 // But if the base pointer is non-null, the offset should make some sense.
 // That is, it should be in the range [0, MAX_OBJECT_SIZE].
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(jobject, Unsafe_GetReference(JNIEnv *env, jobject unsafe, jobject obj, jlong offset)) {
+#else
 UNSAFE_ENTRY(jobject, Unsafe_GetReference(JNIEnv *env, jobject unsafe, jobject obj, jlong offset)) {
+#endif
   oop p = JNIHandles::resolve(obj);
   assert_field_offset_sane(p, offset);
   oop v = HeapAccess<ON_UNKNOWN_OOP_REF>::oop_load_at(p, offset);
   return JNIHandles::make_local(THREAD, v);
 } UNSAFE_END
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(void, Unsafe_PutReference(JNIEnv *env, jobject unsafe, jobject obj, jlong offset, jobject x_h)) {
+#else
 UNSAFE_ENTRY(void, Unsafe_PutReference(JNIEnv *env, jobject unsafe, jobject obj, jlong offset, jobject x_h)) {
+#endif
   oop x = JNIHandles::resolve(x_h);
   oop p = JNIHandles::resolve(obj);
   assert_field_offset_sane(p, offset);
   HeapAccess<ON_UNKNOWN_OOP_REF>::oop_store_at(p, offset, x);
 } UNSAFE_END
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(jobject, Unsafe_GetReferenceVolatile(JNIEnv *env, jobject unsafe, jobject obj, jlong offset)) {
+#else
 UNSAFE_ENTRY(jobject, Unsafe_GetReferenceVolatile(JNIEnv *env, jobject unsafe, jobject obj, jlong offset)) {
+#endif
   oop p = JNIHandles::resolve(obj);
   assert_field_offset_sane(p, offset);
   oop v = HeapAccess<MO_SEQ_CST | ON_UNKNOWN_OOP_REF>::oop_load_at(p, offset);
   return JNIHandles::make_local(THREAD, v);
 } UNSAFE_END
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(void, Unsafe_PutReferenceVolatile(JNIEnv *env, jobject unsafe, jobject obj, jlong offset, jobject x_h)) {
+#else
 UNSAFE_ENTRY(void, Unsafe_PutReferenceVolatile(JNIEnv *env, jobject unsafe, jobject obj, jlong offset, jobject x_h)) {
+#endif
   oop x = JNIHandles::resolve(x_h);
   oop p = JNIHandles::resolve(obj);
   assert_field_offset_sane(p, offset);
@@ -297,11 +318,11 @@ UNSAFE_ENTRY(jobject, Unsafe_GetUncompressedObject(JNIEnv *env, jobject unsafe, 
 
 #define DEFINE_GETSETOOP(java_type, Type) \
  \
-UNSAFE_ENTRY(java_type, Unsafe_Get##Type(JNIEnv *env, jobject unsafe, jobject obj, jlong offset)) { \
+JVM_ENTRY(java_type, Unsafe_Get##Type(JNIEnv *env, jobject unsafe, jobject obj, jlong offset)) { \
   return MemoryAccess<java_type>(thread, obj, offset).get(); \
 } UNSAFE_END \
  \
-UNSAFE_ENTRY(void, Unsafe_Put##Type(JNIEnv *env, jobject unsafe, jobject obj, jlong offset, java_type x)) { \
+JVM_ENTRY(void, Unsafe_Put##Type(JNIEnv *env, jobject unsafe, jobject obj, jlong offset, java_type x)) { \
   MemoryAccess<java_type>(thread, obj, offset).put(x); \
 } UNSAFE_END \
  \
@@ -320,11 +341,11 @@ DEFINE_GETSETOOP(jdouble, Double);
 
 #define DEFINE_GETSETOOP_VOLATILE(java_type, Type) \
  \
-UNSAFE_ENTRY(java_type, Unsafe_Get##Type##Volatile(JNIEnv *env, jobject unsafe, jobject obj, jlong offset)) { \
+JVM_ENTRY(java_type, Unsafe_Get##Type##Volatile(JNIEnv *env, jobject unsafe, jobject obj, jlong offset)) { \
   return MemoryAccess<java_type>(thread, obj, offset).get_volatile(); \
 } UNSAFE_END \
  \
-UNSAFE_ENTRY(void, Unsafe_Put##Type##Volatile(JNIEnv *env, jobject unsafe, jobject obj, jlong offset, java_type x)) { \
+JVM_ENTRY(void, Unsafe_Put##Type##Volatile(JNIEnv *env, jobject unsafe, jobject obj, jlong offset, java_type x)) { \
   MemoryAccess<java_type>(thread, obj, offset).put_volatile(x); \
 } UNSAFE_END \
  \
@@ -355,13 +376,28 @@ UNSAFE_LEAF(void, Unsafe_FullFence(JNIEnv *env, jobject unsafe)) {
 
 ////// Allocation requests
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(jobject, Unsafe_AllocateInstance(JNIEnv *env, jobject unsafe, jclass cls)) {
+#else
 UNSAFE_ENTRY(jobject, Unsafe_AllocateInstance(JNIEnv *env, jobject unsafe, jclass cls)) {
+#endif
   instanceOop i = InstanceKlass::allocate_instance(JNIHandles::resolve_non_null(cls), CHECK_NULL);
   return JNIHandles::make_local(THREAD, i);
 } UNSAFE_END
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(jlong, Unsafe_AllocateMemory0(JNIEnv *env, jobject unsafe, jlong size)) {
+#else
 UNSAFE_ENTRY(jlong, Unsafe_AllocateMemory0(JNIEnv *env, jobject unsafe, jlong size)) {
+#endif
   size_t sz = (size_t)size;
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // classlib8 needs alignment here
+  if (!is_aligned(sz, HeapWordSize)) {
+    sz = align_up(sz, HeapWordSize);
+  }
+#endif
 
   assert(is_aligned(sz, HeapWordSize), "sz not aligned");
 
@@ -370,7 +406,11 @@ UNSAFE_ENTRY(jlong, Unsafe_AllocateMemory0(JNIEnv *env, jobject unsafe, jlong si
   return addr_to_java(x);
 } UNSAFE_END
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(jlong, Unsafe_ReallocateMemory0(JNIEnv *env, jobject unsafe, jlong addr, jlong size)) {
+#else
 UNSAFE_ENTRY(jlong, Unsafe_ReallocateMemory0(JNIEnv *env, jobject unsafe, jlong addr, jlong size)) {
+#endif
   void* p = addr_from_java(addr);
   size_t sz = (size_t)size;
 
@@ -381,13 +421,21 @@ UNSAFE_ENTRY(jlong, Unsafe_ReallocateMemory0(JNIEnv *env, jobject unsafe, jlong 
   return addr_to_java(x);
 } UNSAFE_END
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(void, Unsafe_FreeMemory0(JNIEnv *env, jobject unsafe, jlong addr)) {
+#else
 UNSAFE_ENTRY(void, Unsafe_FreeMemory0(JNIEnv *env, jobject unsafe, jlong addr)) {
+#endif
   void* p = addr_from_java(addr);
 
   os::free(p);
 } UNSAFE_END
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(void, Unsafe_SetMemory0(JNIEnv *env, jobject unsafe, jobject obj, jlong offset, jlong size, jbyte value)) {
+#else
 UNSAFE_ENTRY(void, Unsafe_SetMemory0(JNIEnv *env, jobject unsafe, jobject obj, jlong offset, jlong size, jbyte value)) {
+#endif
   size_t sz = (size_t)size;
 
   oop base = JNIHandles::resolve(obj);
@@ -396,7 +444,11 @@ UNSAFE_ENTRY(void, Unsafe_SetMemory0(JNIEnv *env, jobject unsafe, jobject obj, j
   Copy::fill_to_memory_atomic(p, sz, value);
 } UNSAFE_END
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(void, Unsafe_CopyMemory0(JNIEnv *env, jobject unsafe, jobject srcObj, jlong srcOffset, jobject dstObj, jlong dstOffset, jlong size)) {
+#else
 UNSAFE_ENTRY(void, Unsafe_CopyMemory0(JNIEnv *env, jobject unsafe, jobject srcObj, jlong srcOffset, jobject dstObj, jlong dstOffset, jlong size)) {
+#endif
   size_t sz = (size_t)size;
 
   oop srcp = JNIHandles::resolve(srcObj);
@@ -719,15 +771,21 @@ static jclass Unsafe_DefineClass_impl(JNIEnv *env, jstring name, jbyteArray data
   return result;
 }
 
-
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(jclass, Unsafe_DefineClass0(JNIEnv *env, jobject unsafe, jstring name, jbyteArray data, int offset, int length, jobject loader, jobject pd)) {
+#else
 UNSAFE_ENTRY(jclass, Unsafe_DefineClass0(JNIEnv *env, jobject unsafe, jstring name, jbyteArray data, int offset, int length, jobject loader, jobject pd)) {
+#endif
   ThreadToNativeFromVM ttnfv(thread);
 
   return Unsafe_DefineClass_impl(env, name, data, offset, length, loader, pd);
 } UNSAFE_END
 
-
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(void, Unsafe_ThrowException(JNIEnv *env, jobject unsafe, jthrowable thr)) {
+#else
 UNSAFE_ENTRY(void, Unsafe_ThrowException(JNIEnv *env, jobject unsafe, jthrowable thr)) {
+#endif
   ThreadToNativeFromVM ttnfv(thread);
   env->Throw(thr);
 } UNSAFE_END
@@ -765,7 +823,11 @@ UNSAFE_ENTRY(jlong, Unsafe_CompareAndExchangeLong(JNIEnv *env, jobject unsafe, j
   }
 } UNSAFE_END
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(jboolean, Unsafe_CompareAndSetReference(JNIEnv *env, jobject unsafe, jobject obj, jlong offset, jobject e_h, jobject x_h)) {
+#else
 UNSAFE_ENTRY(jboolean, Unsafe_CompareAndSetReference(JNIEnv *env, jobject unsafe, jobject obj, jlong offset, jobject e_h, jobject x_h)) {
+#endif
   oop x = JNIHandles::resolve(x_h);
   oop e = JNIHandles::resolve(e_h);
   oop p = JNIHandles::resolve(obj);
@@ -774,7 +836,11 @@ UNSAFE_ENTRY(jboolean, Unsafe_CompareAndSetReference(JNIEnv *env, jobject unsafe
   return ret == e;
 } UNSAFE_END
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(jboolean, Unsafe_CompareAndSetInt(JNIEnv *env, jobject unsafe, jobject obj, jlong offset, jint e, jint x)) {
+#else
 UNSAFE_ENTRY(jboolean, Unsafe_CompareAndSetInt(JNIEnv *env, jobject unsafe, jobject obj, jlong offset, jint e, jint x)) {
+#endif
   oop p = JNIHandles::resolve(obj);
   if (p == NULL) {
     volatile jint* addr = (volatile jint*)index_oop_from_field_offset_long(p, offset);
@@ -785,7 +851,11 @@ UNSAFE_ENTRY(jboolean, Unsafe_CompareAndSetInt(JNIEnv *env, jobject unsafe, jobj
   }
 } UNSAFE_END
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(jboolean, Unsafe_CompareAndSetLong(JNIEnv *env, jobject unsafe, jobject obj, jlong offset, jlong e, jlong x)) {
+#else
 UNSAFE_ENTRY(jboolean, Unsafe_CompareAndSetLong(JNIEnv *env, jobject unsafe, jobject obj, jlong offset, jlong e, jlong x)) {
+#endif
   oop p = JNIHandles::resolve(obj);
   if (p == NULL) {
     volatile jlong* addr = (volatile jlong*)index_oop_from_field_offset_long(p, offset);
@@ -806,7 +876,11 @@ static void post_thread_park_event(EventThreadPark* event, const oop obj, jlong 
   event->commit();
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(void, Unsafe_Park(JNIEnv *env, jobject unsafe, jboolean isAbsolute, jlong time)) {
+#else
 UNSAFE_ENTRY(void, Unsafe_Park(JNIEnv *env, jobject unsafe, jboolean isAbsolute, jlong time)) {
+#endif
   HOTSPOT_THREAD_PARK_BEGIN((uintptr_t) thread->parker(), (int) isAbsolute, time);
   EventThreadPark event;
 
@@ -827,7 +901,11 @@ UNSAFE_ENTRY(void, Unsafe_Park(JNIEnv *env, jobject unsafe, jboolean isAbsolute,
   HOTSPOT_THREAD_PARK_END((uintptr_t) thread->parker());
 } UNSAFE_END
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(void, Unsafe_Unpark(JNIEnv *env, jobject unsafe, jobject jthread)) {
+#else
 UNSAFE_ENTRY(void, Unsafe_Unpark(JNIEnv *env, jobject unsafe, jobject jthread)) {
+#endif
   if (jthread != NULL) {
     ThreadsListHandle tlh;
     JavaThread* thr = NULL;
@@ -846,7 +924,11 @@ UNSAFE_ENTRY(void, Unsafe_Unpark(JNIEnv *env, jobject unsafe, jobject jthread)) 
 
 } UNSAFE_END
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(jint, Unsafe_GetLoadAverage0(JNIEnv *env, jobject unsafe, jdoubleArray loadavg, jint nelem)) {
+#else
 UNSAFE_ENTRY(jint, Unsafe_GetLoadAverage0(JNIEnv *env, jobject unsafe, jdoubleArray loadavg, jint nelem)) {
+#endif
   const int max_nelem = 3;
   double la[max_nelem];
   jint ret;

@@ -75,7 +75,12 @@ bool VerificationType::resolve_and_check_assignability(InstanceKlass* klass, Sym
       this_class == vmClasses::Serializable_klass();
   } else if (from_is_object) {
     Klass* from_class;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    // for JDK8 is_hidden will always be false, thus should not check
+    if (klass->name() == from_name) {
+#else
     if (klass->is_hidden() && klass->name() == from_name) {
+#endif
       from_class = klass;
     } else {
       from_class = SystemDictionary::resolve_or_fail(

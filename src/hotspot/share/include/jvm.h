@@ -33,6 +33,14 @@
 #include "jvm_constants.h"
 #include "jvm_io.h"
 
+#ifndef HOTSPOT_TARGET_CLASSLIB
+#define HOTSPOT_TARGET_CLASSLIB 17
+#endif
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#include "jvm8.h"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -377,8 +385,15 @@ JVM_NewMultiArray(JNIEnv *env, jclass eltClass, jintArray dim);
  * jdk.internal.reflect.CallerSensitive. The JVM will throw an
  * error if it is not marked properly.
  */
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JNIEXPORT jclass JNICALL
+JVM_GetCallerClass(JNIEnv *env, int depth);
+JNIEXPORT jclass JNICALL
+JVM_GetCallerClass17(JNIEnv *env);
+#else
 JNIEXPORT jclass JNICALL
 JVM_GetCallerClass(JNIEnv *env);
+#endif
 
 
 /*

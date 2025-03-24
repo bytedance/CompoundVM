@@ -75,6 +75,9 @@ PerfVariable* Management::_end_vm_creation_time = NULL;
 PerfVariable* Management::_vm_init_done_time = NULL;
 
 InstanceKlass* Management::_diagnosticCommandImpl_klass = NULL;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+InstanceKlass* Management::_garbageCollectorImpl_klass = NULL;
+#endif
 InstanceKlass* Management::_garbageCollectorExtImpl_klass = NULL;
 InstanceKlass* Management::_garbageCollectorMXBean_klass = NULL;
 InstanceKlass* Management::_gcInfo_klass = NULL;
@@ -86,6 +89,9 @@ InstanceKlass* Management::_sensor_klass = NULL;
 InstanceKlass* Management::_threadInfo_klass = NULL;
 
 jmmOptionalSupport Management::_optional_support = {0};
+#if HOTSPOT_TARGET_CLASSLIB == 8
+jmmOptionalSupport_jdk8 Management::_optional_support_jdk8 = {0};
+#endif
 TimeStamp Management::_stamp;
 
 void management_init() {
@@ -141,6 +147,31 @@ void Management::init() {
   _optional_support.isThreadAllocatedMemorySupported = 1;
   _optional_support.isRemoteDiagnosticCommandsSupported = 1;
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // Initialize optional support for JDK8
+  _optional_support_jdk8.isLowMemoryDetectionSupported = 1;
+  _optional_support_jdk8.isCompilationTimeMonitoringSupported = 1;
+  _optional_support_jdk8.isThreadContentionMonitoringSupported = 1;
+
+  if (os::is_thread_cpu_time_supported()) {
+    _optional_support_jdk8.isCurrentThreadCpuTimeSupported = 1;
+    _optional_support_jdk8.isOtherThreadCpuTimeSupported = 1;
+  } else {
+    _optional_support_jdk8.isCurrentThreadCpuTimeSupported = 0;
+    _optional_support_jdk8.isOtherThreadCpuTimeSupported = 0;
+  }
+
+  _optional_support_jdk8.isObjectMonitorUsageSupported = 1;
+#if INCLUDE_SERVICES
+  // This depends on the heap inspector
+  _optional_support_jdk8.isSynchronizerUsageSupported = 1;
+#endif // INCLUDE_SERVICES
+  _optional_support_jdk8.isThreadAllocatedMemorySupported = 1;
+  _optional_support_jdk8.isRemoteDiagnosticCommandsSupported = 1;
+
+  _optional_support_jdk8.isBootClassPathSupported = 0;
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
+
   // Registration of the diagnostic commands
   DCmdRegistrant::register_dcmds();
   DCmdRegistrant::register_dcmds_ext();
@@ -160,10 +191,19 @@ void Management::initialize(TRAPS) {
     // Load and initialize the jdk.internal.agent.Agent class
     // invoke startAgent method to start the management server
     Handle loader = Handle(THREAD, SystemDictionary::java_system_loader());
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    Klass* k = SystemDictionary::resolve_or_null(vmSymbols::sun_management_Agent(),
+                                                   loader,
+                                                   Handle(),
+                                                   THREAD);
+#elif HOTSPOT_TARGET_CLASSLIB == 17
     Klass* k = SystemDictionary::resolve_or_null(vmSymbols::jdk_internal_agent_Agent(),
                                                    loader,
                                                    Handle(),
                                                    THREAD);
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
     if (k == NULL) {
       vm_exit_during_initialization("Management agent initialization failure: "
           "class jdk.internal.agent.Agent not found.");
@@ -181,6 +221,12 @@ void Management::initialize(TRAPS) {
 void Management::get_optional_support(jmmOptionalSupport* support) {
   memcpy(support, &_optional_support, sizeof(jmmOptionalSupport));
 }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+void Management::get_optional_support_jdk8(jmmOptionalSupport_jdk8* support) {
+  memcpy(support, &_optional_support_jdk8, sizeof(jmmOptionalSupport_jdk8));
+}
+#endif
 
 InstanceKlass* Management::load_and_initialize_klass(Symbol* sh, TRAPS) {
   Klass* k = SystemDictionary::resolve_or_fail(sh, true, CHECK_NULL);
@@ -270,6 +316,15 @@ InstanceKlass* Management::sun_management_ManagementFactoryHelper_klass(TRAPS) {
   }
   return _managementFactoryHelper_klass;
 }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+InstanceKlass* Management::sun_management_GarbageCollectorImpl_klass(TRAPS) {
+  if (_garbageCollectorImpl_klass == NULL) {
+    _garbageCollectorImpl_klass = load_and_initialize_klass(vmSymbols::sun_management_GarbageCollectorImpl(), CHECK_NULL);
+  }
+  return _garbageCollectorImpl_klass;
+}
+#endif
 
 InstanceKlass* Management::com_sun_management_internal_GarbageCollectorExtImpl_klass(TRAPS) {
   if (_garbageCollectorExtImpl_klass == NULL) {
@@ -461,6 +516,13 @@ JVM_LEAF(jint, jmm_GetVersion(JNIEnv *env))
   return JMM_VERSION;
 JVM_END
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_LEAF(jint, jmm_GetVersion_JDK8(JNIEnv *env))
+  // Return full version, according to jdk8
+  return JMM_VERSION_CVM8;
+JVM_END
+#endif
+
 // Gets the list of VM monitoring and management optional supports
 // Returns 0 if succeeded; otherwise returns non-zero.
 JVM_LEAF(jint, jmm_GetOptionalSupport(JNIEnv *env, jmmOptionalSupport* support))
@@ -470,6 +532,101 @@ JVM_LEAF(jint, jmm_GetOptionalSupport(JNIEnv *env, jmmOptionalSupport* support))
   Management::get_optional_support(support);
   return 0;
 JVM_END
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_LEAF(jint, jmm_GetOptionalSupport_JDK8(JNIEnv *env, jmmOptionalSupport_jdk8* support))
+  if (support == NULL) {
+    return -1;
+  }
+  Management::get_optional_support_jdk8(support);
+  return 0;
+JVM_END
+
+// Returns a java.lang.String object containing the input arguments to the VM.
+JVM_ENTRY(jobject, jmm_GetInputArguments(JNIEnv *env))
+  ResourceMark rm(THREAD);
+
+  if (Arguments::num_jvm_args() == 0 && Arguments::num_jvm_flags() == 0) {
+    return NULL;
+  }
+
+  char** vm_flags = Arguments::jvm_flags_array();
+  char** vm_args  = Arguments::jvm_args_array();
+  int num_flags   = Arguments::num_jvm_flags();
+  int num_args    = Arguments::num_jvm_args();
+
+  size_t length = 1; // null terminator
+  int i;
+  for (i = 0; i < num_flags; i++) {
+    length += strlen(vm_flags[i]);
+  }
+  for (i = 0; i < num_args; i++) {
+    length += strlen(vm_args[i]);
+  }
+  // add a space between each argument
+  length += num_flags + num_args - 1;
+
+  // Return the list of input arguments passed to the VM
+  // and preserve the order that the VM processes.
+  char* args = NEW_RESOURCE_ARRAY(char, length);
+  args[0] = '\0';
+  // concatenate all jvm_flags
+  if (num_flags > 0) {
+    strcat(args, vm_flags[0]);
+    for (i = 1; i < num_flags; i++) {
+      strcat(args, " ");
+      strcat(args, vm_flags[i]);
+    }
+  }
+
+  if (num_args > 0 && num_flags > 0) {
+    // append a space if args already contains one or more jvm_flags
+    strcat(args, " ");
+  }
+
+  // concatenate all jvm_args
+  if (num_args > 0) {
+    strcat(args, vm_args[0]);
+    for (i = 1; i < num_args; i++) {
+      strcat(args, " ");
+      strcat(args, vm_args[i]);
+    }
+  }
+
+  Handle hargs = java_lang_String::create_from_platform_dependent_str(args, CHECK_NULL);
+  return JNIHandles::make_local(THREAD, hargs());
+JVM_END
+
+// Returns an array of java.lang.String object containing the input arguments to the VM.
+JVM_ENTRY(jobjectArray, jmm_GetInputArgumentArray(JNIEnv *env))
+  ResourceMark rm(THREAD);
+
+  if (Arguments::num_jvm_args() == 0 && Arguments::num_jvm_flags() == 0) {
+    return NULL;
+  }
+
+  char** vm_flags = Arguments::jvm_flags_array();
+  char** vm_args = Arguments::jvm_args_array();
+  int num_flags = Arguments::num_jvm_flags();
+  int num_args = Arguments::num_jvm_args();
+
+  InstanceKlass* ik = vmClasses::String_klass();
+  objArrayOop r = oopFactory::new_objArray(ik, num_args + num_flags, CHECK_NULL);
+  objArrayHandle result_h(THREAD, r);
+
+  int index = 0;
+  for (int j = 0; j < num_flags; j++, index++) {
+    Handle h = java_lang_String::create_from_platform_dependent_str(vm_flags[j], CHECK_NULL);
+    result_h->obj_at_put(index, h());
+  }
+  for (int i = 0; i < num_args; i++, index++) {
+    Handle h = java_lang_String::create_from_platform_dependent_str(vm_args[i], CHECK_NULL);
+    result_h->obj_at_put(index, h());
+  }
+  return (jobjectArray) JNIHandles::make_local(THREAD, result_h());
+JVM_END
+
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
 
 // Returns an array of java/lang/management/MemoryPoolMXBean object
 // one for each memory pool if obj == null; otherwise returns
@@ -1149,8 +1306,9 @@ JVM_END
 //    locked_monitors - if true, dump locked object monitors
 //    locked_synchronizers - if true, dump locked JSR-166 synchronizers
 //
-JVM_ENTRY(jobjectArray, jmm_DumpThreads(JNIEnv *env, jlongArray thread_ids, jboolean locked_monitors,
-                                        jboolean locked_synchronizers, jint maxDepth))
+// common code for jmm_DumpThreadsXXX
+static jobjectArray dump_threads_common(JNIEnv *env, jlongArray thread_ids, jboolean locked_monitors,
+                                        jboolean locked_synchronizers, jint maxDepth, TRAPS) {
   ResourceMark rm(THREAD);
 
   typeArrayOop ta = typeArrayOop(JNIHandles::resolve(thread_ids));
@@ -1279,7 +1437,24 @@ JVM_ENTRY(jobjectArray, jmm_DumpThreads(JNIEnv *env, jlongArray thread_ids, jboo
   }
 
   return (jobjectArray) JNIHandles::make_local(THREAD, result_h());
+}
+
+JVM_ENTRY(jobjectArray, jmm_DumpThreads(JNIEnv *env, jlongArray thread_ids, jboolean locked_monitors,
+                                        jboolean locked_synchronizers, jint maxDepth))
+  return dump_threads_common(env, thread_ids, locked_monitors, locked_synchronizers, maxDepth, THREAD);
 JVM_END
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(jobjectArray, jmm_DumpThreads_JDK8(JNIEnv *env, jlongArray thread_ids, jboolean locked_monitors,
+                                             jboolean locked_synchronizers))
+  return dump_threads_common(env, thread_ids, locked_monitors, locked_synchronizers, INT_MAX, THREAD);
+JVM_END
+
+JVM_ENTRY(jobjectArray, jmm_DumpThreadsMaxDepth_JDK8(JNIEnv *env, jlongArray thread_ids, jboolean locked_monitors,
+                                                     jboolean locked_synchronizers, jint maxDepth))
+  return dump_threads_common(env, thread_ids, locked_monitors, locked_synchronizers, maxDepth, THREAD);
+JVM_END
+#endif
 
 // Reset statistic.  Return true if the requested statistic is reset.
 // Otherwise, return false.
@@ -2038,6 +2213,50 @@ JVM_ENTRY(void, jmm_GetDiagnosticCommandArgumentsInfo(JNIEnv *env,
   return;
 JVM_END
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(void, jmm_GetDiagnosticCommandArgumentsInfo_JDK8(JNIEnv *env,
+          jstring command, dcmdArgInfo* infoArray))
+  ResourceMark rm(THREAD);
+  oop cmd = JNIHandles::resolve_external_guard(command);
+  if (cmd == NULL) {
+    THROW_MSG(vmSymbols::java_lang_NullPointerException(),
+              "Command line cannot be null.");
+  }
+  char* cmd_name = java_lang_String::as_utf8_string(cmd);
+  if (cmd_name == NULL) {
+    THROW_MSG(vmSymbols::java_lang_NullPointerException(),
+              "Command line content cannot be null.");
+  }
+  DCmd* dcmd = NULL;
+  DCmdFactory*factory = DCmdFactory::factory(DCmd_Source_MBean, cmd_name,
+                                             strlen(cmd_name));
+  if (factory != NULL) {
+    dcmd = factory->create_resource_instance(NULL);
+  }
+  if (dcmd == NULL) {
+    THROW_MSG(vmSymbols::java_lang_IllegalArgumentException(),
+              "Unknown diagnostic command");
+  }
+  DCmdMark mark(dcmd);
+  GrowableArray<DCmdArgumentInfo*>* array = dcmd->argument_info_array();
+  const int num_args = array->length();
+  if (num_args == 0) {
+    return;
+  }
+  for (int i = 0; i < num_args; i++) {
+    infoArray[i].name = array->at(i)->name();
+    infoArray[i].description = array->at(i)->description();
+    infoArray[i].type = array->at(i)->type();
+    infoArray[i].default_string = array->at(i)->default_string();
+    infoArray[i].mandatory = array->at(i)->is_mandatory();
+    infoArray[i].option = array->at(i)->is_option();
+    infoArray[i].multiple = array->at(i)->is_multiple();
+    infoArray[i].position = array->at(i)->position();
+  }
+  return;
+JVM_END
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
+
 JVM_ENTRY(jstring, jmm_ExecuteDiagnosticCommand(JNIEnv *env, jstring commandline))
   ResourceMark rm(THREAD);
   oop cmd = JNIHandles::resolve_external_guard(commandline);
@@ -2075,8 +2294,12 @@ JVM_ENTRY(jlong, jmm_GetOneThreadAllocatedMemory(JNIEnv *env, jlong thread_id))
                "Invalid thread ID", -1);
   }
 
-  if (thread_id == 0) { // current thread
-    return thread->cooked_allocated_bytes();
+  if (thread_id == 0) {
+    // current thread
+    if (THREAD->is_Java_thread()) {
+      return ((JavaThread*)THREAD)->cooked_allocated_bytes();
+    }
+    return -1;
   }
 
   ThreadsListHandle tlh;
@@ -2244,6 +2467,52 @@ const struct jmmInterface_1_ jmm_interface = {
   jmm_ExecuteDiagnosticCommand,
   jmm_SetDiagnosticFrameworkNotificationEnabled
 };
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+const struct jmmInterface_jdk8_ jmm_interface_jdk8 = {
+  NULL,
+  jmm_GetOneThreadAllocatedMemory,
+  jmm_GetVersion_JDK8,
+  jmm_GetOptionalSupport_JDK8,
+  jmm_GetInputArguments,
+  jmm_GetThreadInfo,
+  jmm_GetInputArgumentArray,
+  jmm_GetMemoryPools,
+  jmm_GetMemoryManagers,
+  jmm_GetMemoryPoolUsage,
+  jmm_GetPeakMemoryPoolUsage,
+  jmm_GetThreadAllocatedMemory,
+  jmm_GetMemoryUsage,
+  jmm_GetLongAttribute,
+  jmm_GetBoolAttribute,
+  jmm_SetBoolAttribute,
+  jmm_GetLongAttributes,
+  jmm_FindMonitorDeadlockedThreads,
+  jmm_GetThreadCpuTime,
+  jmm_GetVMGlobalNames,
+  jmm_GetVMGlobals,
+  jmm_GetInternalThreadTimes,
+  jmm_ResetStatistic,
+  jmm_SetPoolSensor,
+  jmm_SetPoolThreshold,
+  jmm_GetPoolCollectionUsage,
+  jmm_GetGCExtAttributeInfo,
+  jmm_GetLastGCStat,
+  jmm_GetThreadCpuTimeWithKind,
+  jmm_GetThreadCpuTimesWithKind,
+  jmm_DumpHeap0,
+  jmm_FindDeadlockedThreads,
+  jmm_SetVMGlobal,
+  jmm_DumpThreadsMaxDepth_JDK8,
+  jmm_DumpThreads_JDK8,
+  jmm_SetGCNotificationEnabled,
+  jmm_GetDiagnosticCommands,
+  jmm_GetDiagnosticCommandInfo,
+  jmm_GetDiagnosticCommandArgumentsInfo_JDK8,
+  jmm_ExecuteDiagnosticCommand,
+  jmm_SetDiagnosticFrameworkNotificationEnabled
+};
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
 #endif // INCLUDE_MANAGEMENT
 
 void* Management::get_jmm_interface(int version) {
@@ -2251,6 +2520,12 @@ void* Management::get_jmm_interface(int version) {
   if (version == JMM_VERSION) {
     return (void*) &jmm_interface;
   }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // Only check major version, according to jdk8
+  if (version == JMM_VERSION_1_0) {
+    return (void*) &jmm_interface_jdk8;
+  }
+#endif
 #endif // INCLUDE_MANAGEMENT
   return NULL;
 }

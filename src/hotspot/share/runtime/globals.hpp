@@ -1850,7 +1850,7 @@ const intx ObjectAlignmentInBytes = 8;
                                                                             \
   /* Shared spaces */                                                       \
                                                                             \
-  product(bool, UseSharedSpaces, true,                                      \
+  product(bool, UseSharedSpaces, false,                                     \
           "Use shared spaces for metadata")                                 \
                                                                             \
   product(bool, VerifySharedSpaces, false,                                  \
@@ -2095,6 +2095,20 @@ const intx ObjectAlignmentInBytes = 8;
                                                                             \
   develop(bool, TraceOptimizedUpcallStubs, false,                              \
                 "Trace optimized upcall stub generation")                      \
+                                                                            \
+  CLASSLIB8_ONLY(develop(bool, VerifyLatin1NamesOnly, false,                \
+                 "Ensure class/method/field names are encoded in Latin1"))  \
+                                                                            \
+  CLASSLIB8_ONLY(product(bool, UseStringOpts, true, DIAGNOSTIC,             \
+                 "Enable C2 string optimizations"))                         \
+                                                                            \
+  CLASSLIB8_ONLY(product(uintx, NumberOfGCLogFiles, 5,                      \
+                 "Number of gclog files in rotation "                       \
+                 "(default: 0, no rotation)"))                              \
+                                                                            \
+  CLASSLIB8_ONLY(product(uintx, GCLogFileSize, 20 * M,                      \
+                 "GC log file size, requires UseGCLogFileRotation. "        \
+                 "Set to 0 to only trigger rotation via jcmd"))             \
 
 // end of RUNTIME_FLAGS
 

@@ -65,25 +65,35 @@ class RecordComponent;
   f(java_lang_reflect_Method) \
   f(java_lang_reflect_Constructor) \
   f(java_lang_reflect_Field) \
-  f(java_lang_reflect_RecordComponent) \
   f(java_nio_Buffer) \
   f(reflect_ConstantPool) \
   f(reflect_UnsafeStaticFieldAccessorImpl) \
   f(java_lang_reflect_Parameter) \
-  f(java_lang_Module) \
   f(java_lang_StackTraceElement) \
-  f(java_lang_StackFrameInfo) \
-  f(java_lang_LiveStackFrameInfo) \
   f(java_util_concurrent_locks_AbstractOwnableSynchronizer) \
-  f(jdk_internal_invoke_NativeEntryPoint) \
-  f(jdk_internal_misc_UnsafeConstants) \
   f(java_lang_boxing_object) \
-  f(vector_VectorPayload) \
   //end
 
-#define BASIC_JAVA_CLASSES_DO(f) \
-        BASIC_JAVA_CLASSES_DO_PART1(f) \
-        BASIC_JAVA_CLASSES_DO_PART2(f)
+#define BASIC_JAVA_CLASSES_DO_CLASSLIB17(f) \
+  f(java_lang_reflect_RecordComponent) \
+  f(java_lang_StackFrameInfo) \
+  f(java_lang_LiveStackFrameInfo) \
+  f(jdk_internal_invoke_NativeEntryPoint) \
+  f(jdk_internal_misc_UnsafeConstants) \
+  f(vector_VectorPayload) \
+  f(java_lang_Module) \
+  //end
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  #define BASIC_JAVA_CLASSES_DO(f) \
+          BASIC_JAVA_CLASSES_DO_PART1(f) \
+          BASIC_JAVA_CLASSES_DO_PART2(f)
+#else // HOTSPOT_TARGET_CLASSLIB == 8
+  #define BASIC_JAVA_CLASSES_DO(f) \
+          BASIC_JAVA_CLASSES_DO_PART1(f) \
+          BASIC_JAVA_CLASSES_DO_PART2(f) \
+          BASIC_JAVA_CLASSES_DO_CLASSLIB17(f)
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
 
 #define CHECK_INIT(offset)  assert(offset != 0, "should be initialized"); return offset;
 
@@ -233,6 +243,12 @@ class java_lang_String : AllStatic {
   static Handle externalize_classname(Handle java_string, TRAPS) {
     return char_converter(java_string, JVM_SIGNATURE_SLASH, JVM_SIGNATURE_DOT, THREAD);
   }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static Handle internalize_classname(Handle java_string, TRAPS) {
+    return char_converter(java_string, JVM_SIGNATURE_DOT, JVM_SIGNATURE_SLASH, THREAD);
+  }
+#endif
 
   // Conversion
   static Symbol* as_symbol(oop java_string);
@@ -567,6 +583,9 @@ class java_lang_Throwable: AllStatic {
   static void fill_in_stack_trace(Handle throwable, const methodHandle& method = methodHandle());
   // Programmatic access to stack trace
   static void get_stack_trace_elements(Handle throwable, objArrayHandle stack_trace, TRAPS);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static oop  get_stack_trace_element(Handle throwable, int index, TRAPS);
+#endif
 
   // For recreating class initialization error exceptions.
   static Handle create_initialization_error(JavaThread* current, Handle throwable);
@@ -1113,9 +1132,15 @@ class java_lang_invoke_ResolvedMethodName : AllStatic {
   static bool is_instance(oop resolved_method);
 };
 
-
-#define MEMBERNAME_INJECTED_FIELDS(macro)                               \
-  macro(java_lang_invoke_MemberName, vmindex,  intptr_signature, false)
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  #define MEMBERNAME_INJECTED_FIELDS(macro)                               \
+    macro(java_lang_invoke_MemberName, vmloader, object_signature, false) \
+    macro(java_lang_invoke_MemberName, vmindex,  intptr_signature, false) \
+    macro(java_lang_invoke_MemberName, vmtarget, intptr_signature, false)
+#else
+  #define MEMBERNAME_INJECTED_FIELDS(macro)                               \
+    macro(java_lang_invoke_MemberName, vmindex,  intptr_signature, false)
+#endif
 
 
 class java_lang_invoke_MemberName: AllStatic {
@@ -1133,7 +1158,12 @@ class java_lang_invoke_MemberName: AllStatic {
   static int _name_offset;
   static int _type_offset;
   static int _flags_offset;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static int _vmtarget_offset;
+  static int _vmloader_offset;
+#else
   static int _method_offset;
+#endif
   static int _vmindex_offset;
 
   static void compute_offsets();
@@ -1155,7 +1185,11 @@ class java_lang_invoke_MemberName: AllStatic {
 
   // Link through ResolvedMethodName field to get Method*
   static Method*        vmtarget(oop mname);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static void       set_vmtarget(oop mname, Method* ref);
+#else
   static void       set_method(oop mname, oop method);
+#endif
 
   static intptr_t       vmindex(oop mname);
   static void       set_vmindex(oop mname, intptr_t index);
@@ -1195,7 +1229,11 @@ class java_lang_invoke_MemberName: AllStatic {
   static int clazz_offset()   { CHECK_INIT(_clazz_offset); }
   static int type_offset()    { CHECK_INIT(_type_offset); }
   static int flags_offset()   { CHECK_INIT(_flags_offset); }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static int vmtarget_offset() { CHECK_INIT(_vmtarget_offset); }
+#else
   static int method_offset()  { CHECK_INIT(_method_offset); }
+#endif
   static int vmindex_offset() { CHECK_INIT(_vmindex_offset); }
 };
 
@@ -1530,7 +1568,7 @@ class java_lang_LiveStackFrameInfo: AllStatic {
 };
 
 // Interface to java.lang.reflect.RecordComponent objects
-
+#if HOTSPOT_TARGET_CLASSLIB == 17
 class java_lang_reflect_RecordComponent: AllStatic {
  private:
   static int _clazz_offset;
@@ -1561,6 +1599,7 @@ class java_lang_reflect_RecordComponent: AllStatic {
   friend class JavaClasses;
 };
 
+#endif // HOTSPOT_TARGET_CLASSLIB == 17
 
 // Interface to java.lang.AssertionStatusDirectives objects
 

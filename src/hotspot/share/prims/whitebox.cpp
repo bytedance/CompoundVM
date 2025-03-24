@@ -2354,7 +2354,13 @@ WB_END
 #define CC (char*)
 
 static JNINativeMethod methods[] = {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  {CC"getObjectAddress",                 CC"(Ljava/lang/Object;)J", (void*)&WB_GetObjectAddress  },
+#elif HOTSPOT_TARGET_CLASSLIB == 17
   {CC"getObjectAddress0",                CC"(Ljava/lang/Object;)J", (void*)&WB_GetObjectAddress  },
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
   {CC"getObjectSize0",                   CC"(Ljava/lang/Object;)J", (void*)&WB_GetObjectSize     },
   {CC"isObjectInOldGen0",                CC"(Ljava/lang/Object;)Z", (void*)&WB_isObjectInOldGen  },
   {CC"getHeapOopSize",                   CC"()I",                   (void*)&WB_GetHeapOopSize    },

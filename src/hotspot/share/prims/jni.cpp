@@ -327,7 +327,11 @@ JNI_ENTRY(jclass, jni_FindClass(JNIEnv *env, const char *name))
     // Special handling to make sure JNI_OnLoad and JNI_OnUnload are executed
     // in the correct class context.
     if (k->class_loader() == NULL &&
+#if HOTSPOT_TARGET_CLASSLIB == 8
+        k->name() == vmSymbols::java_lang_ClassLoader_NativeLibrary()) {
+#else
         k->name() == vmSymbols::jdk_internal_loader_NativeLibraries()) {
+#endif
       JavaValue result(T_OBJECT);
       JavaCalls::call_static(&result, k,
                              vmSymbols::getFromClass_name(),

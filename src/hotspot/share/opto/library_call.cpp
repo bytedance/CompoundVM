@@ -298,6 +298,15 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_compareToLU:              return inline_string_compareTo(StrIntrinsicNode::LU);
   case vmIntrinsics::_compareToUL:              return inline_string_compareTo(StrIntrinsicNode::UL);
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_sgetChars:                return inline_string_getCharsU();
+  // String.equals(), Arrays.equals() both are comparing char[], and have identical signature
+  case vmIntrinsics::_sequals:                  return inline_array_equals(StrIntrinsicNode::UU);
+  case vmIntrinsics::_scompareTo:               return inline_string_compareTo(StrIntrinsicNode::UU);
+  case vmIntrinsics::_sindexOf:                 return inline_string_indexOf(StrIntrinsicNode::UU);
+  case vmIntrinsics::_sindexOfI:                return inline_string_indexOfI(StrIntrinsicNode::UU);
+  case vmIntrinsics::_sindexOfChar:             return inline_string_indexOfChar(StrIntrinsicNode::U);
+#else
   case vmIntrinsics::_indexOfL:                 return inline_string_indexOf(StrIntrinsicNode::LL);
   case vmIntrinsics::_indexOfU:                 return inline_string_indexOf(StrIntrinsicNode::UU);
   case vmIntrinsics::_indexOfUL:                return inline_string_indexOf(StrIntrinsicNode::UL);
@@ -306,6 +315,7 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_indexOfIUL:               return inline_string_indexOfI(StrIntrinsicNode::UL);
   case vmIntrinsics::_indexOfU_char:            return inline_string_indexOfChar(StrIntrinsicNode::U);
   case vmIntrinsics::_indexOfL_char:            return inline_string_indexOfChar(StrIntrinsicNode::L);
+#endif
 
   case vmIntrinsics::_equalsL:                  return inline_string_equals(StrIntrinsicNode::LL);
   case vmIntrinsics::_equalsU:                  return inline_string_equals(StrIntrinsicNode::UU);
@@ -339,6 +349,71 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_putLong:                  return inline_unsafe_access( is_store, T_LONG,     Relaxed, false);
   case vmIntrinsics::_putFloat:                 return inline_unsafe_access( is_store, T_FLOAT,    Relaxed, false);
   case vmIntrinsics::_putDouble:                return inline_unsafe_access( is_store, T_DOUBLE,   Relaxed, false);
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_getObject2:               return inline_unsafe_access(!is_store, T_OBJECT,   Relaxed, false);
+  case vmIntrinsics::_getBoolean2:              return inline_unsafe_access(!is_store, T_BOOLEAN,  Relaxed, false);
+  case vmIntrinsics::_getByte2:                 return inline_unsafe_access(!is_store, T_BYTE,     Relaxed, false);
+  case vmIntrinsics::_getShort2:                return inline_unsafe_access(!is_store, T_SHORT,    Relaxed, false);
+  case vmIntrinsics::_getChar2:                 return inline_unsafe_access(!is_store, T_CHAR,     Relaxed, false);
+  case vmIntrinsics::_getInt2:                  return inline_unsafe_access(!is_store, T_INT,      Relaxed, false);
+  case vmIntrinsics::_getLong2:                 return inline_unsafe_access(!is_store, T_LONG,     Relaxed, false);
+  case vmIntrinsics::_getFloat2:                return inline_unsafe_access(!is_store, T_FLOAT,    Relaxed, false);
+  case vmIntrinsics::_getDouble2:               return inline_unsafe_access(!is_store, T_DOUBLE,   Relaxed, false);
+
+  case vmIntrinsics::_putObject2:               return inline_unsafe_access( is_store, T_OBJECT,   Relaxed, false);
+  case vmIntrinsics::_putBoolean2:              return inline_unsafe_access( is_store, T_BOOLEAN,  Relaxed, false);
+  case vmIntrinsics::_putByte2:                 return inline_unsafe_access( is_store, T_BYTE,     Relaxed, false);
+  case vmIntrinsics::_putShort2:                return inline_unsafe_access( is_store, T_SHORT,    Relaxed, false);
+  case vmIntrinsics::_putChar2:                 return inline_unsafe_access( is_store, T_CHAR,     Relaxed, false);
+  case vmIntrinsics::_putInt2:                  return inline_unsafe_access( is_store, T_INT,      Relaxed, false);
+  case vmIntrinsics::_putLong2:                 return inline_unsafe_access( is_store, T_LONG,     Relaxed, false);
+  case vmIntrinsics::_putFloat2:                return inline_unsafe_access( is_store, T_FLOAT,    Relaxed, false);
+  case vmIntrinsics::_putDouble2:               return inline_unsafe_access( is_store, T_DOUBLE,   Relaxed, false);
+
+  case vmIntrinsics::_getByte_raw:              return inline_unsafe_access_raw(true, !is_store, T_BYTE,    Relaxed, false);
+  case vmIntrinsics::_getShort_raw:             return inline_unsafe_access_raw(true, !is_store, T_SHORT,   Relaxed, false);
+  case vmIntrinsics::_getChar_raw:              return inline_unsafe_access_raw(true, !is_store, T_CHAR,    Relaxed, false);
+  case vmIntrinsics::_getInt_raw:               return inline_unsafe_access_raw(true, !is_store, T_INT,     Relaxed, false);
+  case vmIntrinsics::_getLong_raw:              return inline_unsafe_access_raw(true, !is_store, T_LONG,    Relaxed, false);
+  case vmIntrinsics::_getFloat_raw:             return inline_unsafe_access_raw(true, !is_store, T_FLOAT,   Relaxed, false);
+  case vmIntrinsics::_getDouble_raw:            return inline_unsafe_access_raw(true, !is_store, T_DOUBLE,  Relaxed, false);
+  case vmIntrinsics::_getAddress_raw:           return inline_unsafe_access_raw(true, !is_store, T_ADDRESS, Relaxed, false);
+
+  case vmIntrinsics::_putByte_raw:              return inline_unsafe_access_raw(true, is_store, T_BYTE,    Relaxed, false);
+  case vmIntrinsics::_putShort_raw:             return inline_unsafe_access_raw(true, is_store, T_SHORT,   Relaxed, false);
+  case vmIntrinsics::_putChar_raw:              return inline_unsafe_access_raw(true, is_store, T_CHAR,    Relaxed, false);
+  case vmIntrinsics::_putInt_raw:               return inline_unsafe_access_raw(true, is_store, T_INT,     Relaxed, false);
+  case vmIntrinsics::_putLong_raw:              return inline_unsafe_access_raw(true, is_store, T_LONG,    Relaxed, false);
+  case vmIntrinsics::_putFloat_raw:             return inline_unsafe_access_raw(true, is_store, T_FLOAT,   Relaxed, false);
+  case vmIntrinsics::_putDouble_raw:            return inline_unsafe_access_raw(true, is_store, T_DOUBLE,  Relaxed, false);
+  case vmIntrinsics::_putAddress_raw:           return inline_unsafe_access_raw(true, is_store, T_ADDRESS, Relaxed, false);
+
+  // Release or Relaxed?
+  case vmIntrinsics::_putOrderedObject:         return inline_unsafe_access( is_store, T_OBJECT,   Volatile, false); // TODO: may change inline_unsafe_access later
+  case vmIntrinsics::_putOrderedInt:            return inline_unsafe_access( is_store, T_INT,      Volatile, false);
+  case vmIntrinsics::_putOrderedLong:           return inline_unsafe_access( is_store, T_LONG,     Volatile, false);
+
+  case vmIntrinsics::_getObjectVolatile2:       return inline_unsafe_access(!is_store, T_OBJECT,   Volatile, false);
+  case vmIntrinsics::_getBooleanVolatile2:      return inline_unsafe_access(!is_store, T_BOOLEAN,  Volatile, false);
+  case vmIntrinsics::_getByteVolatile2:         return inline_unsafe_access(!is_store, T_BYTE,     Volatile, false);
+  case vmIntrinsics::_getShortVolatile2:        return inline_unsafe_access(!is_store, T_SHORT,    Volatile, false);
+  case vmIntrinsics::_getCharVolatile2:         return inline_unsafe_access(!is_store, T_CHAR,     Volatile, false);
+  case vmIntrinsics::_getIntVolatile2:          return inline_unsafe_access(!is_store, T_INT,      Volatile, false);
+  case vmIntrinsics::_getLongVolatile2:         return inline_unsafe_access(!is_store, T_LONG,     Volatile, false);
+  case vmIntrinsics::_getFloatVolatile2:        return inline_unsafe_access(!is_store, T_FLOAT,    Volatile, false);
+  case vmIntrinsics::_getDoubleVolatile2:       return inline_unsafe_access(!is_store, T_DOUBLE,   Volatile, false);
+
+  case vmIntrinsics::_putObjectVolatile2:       return inline_unsafe_access( is_store, T_OBJECT,   Volatile, false);
+  case vmIntrinsics::_putBooleanVolatile2:      return inline_unsafe_access( is_store, T_BOOLEAN,  Volatile, false);
+  case vmIntrinsics::_putByteVolatile2:         return inline_unsafe_access( is_store, T_BYTE,     Volatile, false);
+  case vmIntrinsics::_putShortVolatile2:        return inline_unsafe_access( is_store, T_SHORT,    Volatile, false);
+  case vmIntrinsics::_putCharVolatile2:         return inline_unsafe_access( is_store, T_CHAR,     Volatile, false);
+  case vmIntrinsics::_putIntVolatile2:          return inline_unsafe_access( is_store, T_INT,      Volatile, false);
+  case vmIntrinsics::_putLongVolatile2:         return inline_unsafe_access( is_store, T_LONG,     Volatile, false);
+  case vmIntrinsics::_putFloatVolatile2:        return inline_unsafe_access( is_store, T_FLOAT,    Volatile, false);
+  case vmIntrinsics::_putDoubleVolatile2:       return inline_unsafe_access( is_store, T_DOUBLE,   Volatile, false);
+#endif
 
   case vmIntrinsics::_getReferenceVolatile:     return inline_unsafe_access(!is_store, T_OBJECT,   Volatile, false);
   case vmIntrinsics::_getBooleanVolatile:       return inline_unsafe_access(!is_store, T_BOOLEAN,  Volatile, false);
@@ -415,7 +490,11 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_compareAndSetShort:       return inline_unsafe_load_store(T_SHORT,  LS_cmp_swap,      Volatile);
   case vmIntrinsics::_compareAndSetInt:         return inline_unsafe_load_store(T_INT,    LS_cmp_swap,      Volatile);
   case vmIntrinsics::_compareAndSetLong:        return inline_unsafe_load_store(T_LONG,   LS_cmp_swap,      Volatile);
-
+#if HOTSPOT_TARGET_CLASSLIB == 8  
+  case vmIntrinsics::_compareAndSwapObject:     return inline_unsafe_load_store(T_OBJECT, LS_cmp_swap,      Volatile);
+  case vmIntrinsics::_compareAndSwapInt:        return inline_unsafe_load_store(T_INT,    LS_cmp_swap,      Volatile);
+  case vmIntrinsics::_compareAndSwapLong:       return inline_unsafe_load_store(T_LONG,   LS_cmp_swap,      Volatile);
+#endif
   case vmIntrinsics::_weakCompareAndSetReferencePlain:     return inline_unsafe_load_store(T_OBJECT, LS_cmp_swap_weak, Relaxed);
   case vmIntrinsics::_weakCompareAndSetReferenceAcquire:   return inline_unsafe_load_store(T_OBJECT, LS_cmp_swap_weak, Acquire);
   case vmIntrinsics::_weakCompareAndSetReferenceRelease:   return inline_unsafe_load_store(T_OBJECT, LS_cmp_swap_weak, Release);
@@ -457,13 +536,24 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_getAndAddShort:                   return inline_unsafe_load_store(T_SHORT,  LS_get_add,       Volatile);
   case vmIntrinsics::_getAndAddInt:                     return inline_unsafe_load_store(T_INT,    LS_get_add,       Volatile);
   case vmIntrinsics::_getAndAddLong:                    return inline_unsafe_load_store(T_LONG,   LS_get_add,       Volatile);
-
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_getAndAddInt2:                    return inline_unsafe_load_store(T_INT,    LS_get_add,       Volatile);
+  case vmIntrinsics::_getAndAddLong2:                   return inline_unsafe_load_store(T_LONG,   LS_get_add,       Volatile);
+  case vmIntrinsics::_getAndSetInt2:                    return inline_unsafe_load_store(T_INT,    LS_get_set,       Volatile);
+  case vmIntrinsics::_getAndSetLong2:                   return inline_unsafe_load_store(T_LONG,   LS_get_set,       Volatile);
+  case vmIntrinsics::_getAndSetObject:                  return inline_unsafe_load_store(T_OBJECT, LS_get_set,       Volatile);
+#endif
   case vmIntrinsics::_getAndSetByte:                    return inline_unsafe_load_store(T_BYTE,   LS_get_set,       Volatile);
   case vmIntrinsics::_getAndSetShort:                   return inline_unsafe_load_store(T_SHORT,  LS_get_set,       Volatile);
   case vmIntrinsics::_getAndSetInt:                     return inline_unsafe_load_store(T_INT,    LS_get_set,       Volatile);
   case vmIntrinsics::_getAndSetLong:                    return inline_unsafe_load_store(T_LONG,   LS_get_set,       Volatile);
   case vmIntrinsics::_getAndSetReference:               return inline_unsafe_load_store(T_OBJECT, LS_get_set,       Volatile);
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_loadFence_sun:
+  case vmIntrinsics::_storeFence_sun:
+  case vmIntrinsics::_fullFence_sun:
+#endif
   case vmIntrinsics::_loadFence:
   case vmIntrinsics::_storeFence:
   case vmIntrinsics::_storeStoreFence:
@@ -484,7 +574,13 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_writebackPreSync0:        return inline_unsafe_writebackSync0(true);
   case vmIntrinsics::_writebackPostSync0:       return inline_unsafe_writebackSync0(false);
   case vmIntrinsics::_allocateInstance:         return inline_unsafe_allocate();
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_allocateInstance_sun:     return inline_unsafe_allocate();
+#endif  
   case vmIntrinsics::_copyMemory:               return inline_unsafe_copyMemory();
+#if HOTSPOT_TARGET_CLASSLIB == 8  
+  case vmIntrinsics::_copyMemory_sun:           return inline_unsafe_copyMemory();
+#endif
   case vmIntrinsics::_getLength:                return inline_native_getLength();
   case vmIntrinsics::_copyOf:                   return inline_array_copyOf(false);
   case vmIntrinsics::_copyOfRange:              return inline_array_copyOf(true);
@@ -845,10 +941,12 @@ void LibraryCallKit::generate_string_range_check(Node* array, Node* offset, Node
   }
   RegionNode* bailout = new RegionNode(1);
   record_for_igvn(bailout);
+#if HOTSPOT_TARGET_CLASSLIB != 8
   if (char_count) {
     // Convert char count to byte count
     count = _gvn.transform(new LShiftINode(count, intcon(1)));
   }
+#endif
 
   // Offset and count must not be negative
   generate_negative_guard(offset, bailout);
@@ -883,15 +981,28 @@ Node* LibraryCallKit::generate_current_thread(Node* &tls_output) {
 // characters (depending on 'is_byte'). cnt1 and cnt2 are pointing to Int nodes
 // containing the lengths of str1 and str2.
 Node* LibraryCallKit::make_string_method_node(int opcode, Node* str1_start, Node* cnt1, Node* str2_start, Node* cnt2, StrIntrinsicNode::ArgEnc ae) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings && ae == StrIntrinsicNode::UU, "classlib8 requires CHARS");
+#endif
   Node* result = NULL;
   switch (opcode) {
   case Op_StrIndexOf:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    result = new StrIndexOfNode(control(), memory(TypeAryPtr::CHARS),
+                                str1_start, cnt1, str2_start, cnt2, ae);
+#else
     result = new StrIndexOfNode(control(), memory(TypeAryPtr::BYTES),
                                 str1_start, cnt1, str2_start, cnt2, ae);
+#endif
     break;
   case Op_StrComp:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    result = new StrCompNode(control(), memory(TypeAryPtr::CHARS),
+                             str1_start, cnt1, str2_start, cnt2, ae);
+#else
     result = new StrCompNode(control(), memory(TypeAryPtr::BYTES),
                              str1_start, cnt1, str2_start, cnt2, ae);
+#endif
     break;
   case Op_StrEquals:
     // We already know that cnt1 == cnt2 here (checked in 'inline_string_equals').
@@ -919,6 +1030,15 @@ bool LibraryCallKit::inline_string_compareTo(StrIntrinsicNode::ArgEnc ae) {
   arg1 = must_be_not_null(arg1, true);
   arg2 = must_be_not_null(arg2, true);
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // Get start addr and length of first argument
+  Node* arg1_start  = array_element_address(arg1, intcon(0), T_CHAR);
+  Node* arg1_cnt    = load_array_length(arg1);
+
+  // Get start addr and length of second argument
+  Node* arg2_start  = array_element_address(arg2, intcon(0), T_CHAR);
+  Node* arg2_cnt    = load_array_length(arg2);
+#else
   // Get start addr and length of first argument
   Node* arg1_start  = array_element_address(arg1, intcon(0), T_BYTE);
   Node* arg1_cnt    = load_array_length(arg1);
@@ -926,6 +1046,7 @@ bool LibraryCallKit::inline_string_compareTo(StrIntrinsicNode::ArgEnc ae) {
   // Get start addr and length of second argument
   Node* arg2_start  = array_element_address(arg2, intcon(0), T_BYTE);
   Node* arg2_cnt    = load_array_length(arg2);
+#endif
 
   Node* result = make_string_method_node(Op_StrComp, arg1_start, arg1_cnt, arg2_start, arg2_cnt, ae);
   set_result(result);
@@ -995,6 +1116,7 @@ bool LibraryCallKit::inline_array_equals(StrIntrinsicNode::ArgEnc ae) {
 
 //------------------------------inline_hasNegatives------------------------------
 bool LibraryCallKit::inline_hasNegatives() {
+  CLASSLIB8_ONLY(ShouldNotReachHere());
   if (too_many_traps(Deoptimization::Reason_intrinsic)) {
     return false;
   }
@@ -1092,6 +1214,15 @@ bool LibraryCallKit::inline_string_indexOf(StrIntrinsicNode::ArgEnc ae) {
   src = must_be_not_null(src, true);
   tgt = must_be_not_null(tgt, true);
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // Get start addr and length of source string
+  Node* src_start = array_element_address(src, intcon(0), T_CHAR);
+  Node* src_count = load_array_length(src);
+
+  // Get start addr and length of substring
+  Node* tgt_start = array_element_address(tgt, intcon(0), T_CHAR);
+  Node* tgt_count = load_array_length(tgt);
+#else
   // Get start addr and length of source string
   Node* src_start = array_element_address(src, intcon(0), T_BYTE);
   Node* src_count = load_array_length(src);
@@ -1108,6 +1239,7 @@ bool LibraryCallKit::inline_string_indexOf(StrIntrinsicNode::ArgEnc ae) {
     // Divide substring size by 2 if String is UTF16 encoded
     tgt_count = _gvn.transform(new RShiftINode(tgt_count, intcon(1)));
   }
+#endif
 
   Node* result = make_indexOf_node(src_start, src_count, tgt_start, tgt_count, result_rgn, result_phi, ae);
   if (result != NULL) {
@@ -1140,10 +1272,18 @@ bool LibraryCallKit::inline_string_indexOfI(StrIntrinsicNode::ArgEnc ae) {
   tgt = must_be_not_null(tgt, true);
 
   // Multiply byte array index by 2 if String is UTF16 encoded
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings && ae == StrIntrinsicNode::UU, "classlib-8 requires T_CHAR");
+  Node* src_offset =  from_index;
+  src_count = _gvn.transform(new SubINode(src_count, from_index));
+  Node* src_start = array_element_address(src, src_offset, T_CHAR);
+  Node* tgt_start = array_element_address(tgt, intcon(0), T_CHAR);
+#else
   Node* src_offset = (ae == StrIntrinsicNode::LL) ? from_index : _gvn.transform(new LShiftINode(from_index, intcon(1)));
   src_count = _gvn.transform(new SubINode(src_count, from_index));
   Node* src_start = array_element_address(src, src_offset, T_BYTE);
   Node* tgt_start = array_element_address(tgt, intcon(0), T_BYTE);
+#endif
 
   // Range checks
   generate_string_range_check(src, src_offset, src_count, ae != StrIntrinsicNode::LL);
@@ -1226,8 +1366,14 @@ bool LibraryCallKit::inline_string_indexOfChar(StrIntrinsicNode::ArgEnc ae) {
 
   src = must_be_not_null(src, true);
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings && ae == StrIntrinsicNode::U, "classlib8 requires CHARS");
+  Node* src_offset = from_index;
+  Node* src_start = array_element_address(src, src_offset, T_CHAR);
+#else
   Node* src_offset = ae == StrIntrinsicNode::L ? from_index : _gvn.transform(new LShiftINode(from_index, intcon(1)));
   Node* src_start = array_element_address(src, src_offset, T_BYTE);
+#endif
   Node* src_count = _gvn.transform(new SubINode(max, from_index));
 
   // Range checks
@@ -1280,6 +1426,7 @@ bool LibraryCallKit::inline_string_indexOfChar(StrIntrinsicNode::ArgEnc ae) {
 //   void StringLatin1.inflate(byte[] src, int srcOff, char[] dst, int dstOff, int len)
 //   void StringLatin1.inflate(byte[] src, int srcOff, byte[] dst, int dstOff, int len)
 bool LibraryCallKit::inline_string_copy(bool compress) {
+  CLASSLIB8_ONLY(ShouldNotReachHere());
   if (too_many_traps(Deoptimization::Reason_intrinsic)) {
     return false;
   }
@@ -1373,6 +1520,7 @@ bool LibraryCallKit::inline_string_copy(bool compress) {
 //------------------------inline_string_toBytesU--------------------------
 // public static byte[] StringUTF16.toBytes(char[] value, int off, int len)
 bool LibraryCallKit::inline_string_toBytesU() {
+  CLASSLIB8_ONLY(ShouldNotReachHere());
   if (too_many_traps(Deoptimization::Reason_intrinsic)) {
     return false;
   }
@@ -1487,7 +1635,9 @@ bool LibraryCallKit::inline_string_getCharsU() {
 
   // Get length and convert char[] offset to byte[] offset
   Node* length = _gvn.transform(new SubINode(src_end, src_begin));
+#if HOTSPOT_TARGET_CLASSLIB != 8
   src_begin = _gvn.transform(new LShiftINode(src_begin, intcon(1)));
+#endif
 
   // Range checks
   generate_string_range_check(src, src_begin, length, true);
@@ -1498,13 +1648,21 @@ bool LibraryCallKit::inline_string_getCharsU() {
 
   if (!stopped()) {
     // Calculate starting addresses.
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    Node* src_start = array_element_address(src, src_begin, T_CHAR);
+#else
     Node* src_start = array_element_address(src, src_begin, T_BYTE);
+#endif
     Node* dst_start = array_element_address(dst, dst_begin, T_CHAR);
 
     // Check if array addresses are aligned to HeapWordSize
     const TypeInt* tsrc = gvn().type(src_begin)->is_int();
     const TypeInt* tdst = gvn().type(dst_begin)->is_int();
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    bool aligned = tsrc->is_con() && ((tsrc->get_con() * type2aelembytes(T_CHAR)) % HeapWordSize == 0) &&
+#else
     bool aligned = tsrc->is_con() && ((tsrc->get_con() * type2aelembytes(T_BYTE)) % HeapWordSize == 0) &&
+#endif
                    tdst->is_con() && ((tdst->get_con() * type2aelembytes(T_CHAR)) % HeapWordSize == 0);
 
     // Figure out which arraycopy runtime method to call (disjoint, uninitialized).
@@ -1546,6 +1704,7 @@ bool LibraryCallKit::inline_string_getCharsU() {
 // static void StringUTF16.putChar(byte[] val, int index, int c)
 // static char StringUTF16.getChar(byte[] val, int index)
 bool LibraryCallKit::inline_string_char_access(bool is_store) {
+  CLASSLIB8_ONLY(ShouldNotReachHere());
   Node* value  = argument(0);
   Node* index  = argument(1);
   Node* ch = is_store ? argument(2) : NULL;
@@ -2230,6 +2389,244 @@ DecoratorSet LibraryCallKit::mo_decorator_for_access_kind(AccessKind kind) {
   }
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+bool LibraryCallKit::inline_unsafe_access_raw(bool is_raw, bool is_store, const BasicType type, const AccessKind kind, const bool unaligned) {
+   if (callee()->is_static())  return false;  // caller must have the capability!
+  DecoratorSet decorators = C2_UNSAFE_ACCESS;
+  guarantee(!is_store || kind != Acquire, "Acquire accesses can be produced only for loads");
+  guarantee( is_store || kind != Release, "Release accesses can be produced only for stores");
+  assert(type != T_OBJECT || !unaligned, "unaligned access not supported with object type");
+
+  if (is_reference_type(type)) {
+    decorators |= ON_UNKNOWN_OOP_REF;
+  }
+
+  if (unaligned) {
+    decorators |= C2_UNALIGNED;
+  }
+
+#ifndef PRODUCT
+  {
+    ResourceMark rm;
+    // Check the signatures.
+    ciSignature* sig = callee()->signature();
+#ifdef ASSERT
+    if (!is_store) {
+      // Object getReference(Object base, int/long offset), etc.
+      BasicType rtype = sig->return_type()->basic_type();
+      assert(rtype == type, "getter must return the expected value");
+      if (!is_raw) {
+        assert(sig->count() == 2, "oop getter has 2 arguments");
+        assert(sig->type_at(0)->basic_type() == T_OBJECT, "getter base is object");
+        assert(sig->type_at(1)->basic_type() == T_LONG, "getter offset is correct");
+      } else {
+        assert(sig->count() == 1, "native getter has 1 argument");
+        assert(sig->type_at(0)->basic_type() == T_LONG, "getter base is long");
+      }
+    } else {
+      // void putReference(Object base, int/long offset, Object x), etc.
+      assert(sig->return_type()->basic_type() == T_VOID, "putter must not return a value");
+      if (!is_raw) {
+        assert(sig->count() == 3, "oop putter has 3 arguments");
+        assert(sig->type_at(0)->basic_type() == T_OBJECT, "putter base is object");
+        assert(sig->type_at(1)->basic_type() == T_LONG, "putter offset is correct");
+      } else {
+        assert(sig->count() == 2, "native putter has 2 arguments");
+        assert(sig->type_at(0)->basic_type() == T_LONG, "putter base is long");
+      }
+      BasicType vtype = sig->type_at(sig->count()-1)->basic_type();
+      assert(vtype == type, "putter must accept the expected value");
+    }
+#endif // ASSERT
+ }
+#endif //PRODUCT
+
+  C->set_has_unsafe_access(true);  // Mark eventual nmethod as "unsafe".
+
+  Node* receiver = argument(0);  // type: oop
+
+  // Build address expression.
+  Node* heap_base_oop = top();
+  Node * offset = top();
+  Node *adr;
+  Node *val;
+
+  // The base is either a Java object or a value produced by Unsafe.staticFieldBase
+  Node* base = argument(1);  // type: oop
+
+  if (!is_raw) {
+    // The offset is a value produced by Unsafe.staticFieldOffset or Unsafe.objectFieldOffset
+    offset = argument(2);  // type: long
+    // We currently rely on the cookies produced by Unsafe.xxxFieldOffset
+    // to be plain byte offsets, which are also the same as those accepted
+    // by oopDesc::field_addr.
+    assert(Unsafe_field_offset_to_byte_offset(11) == 11,
+           "fieldOffset must be byte-scaled");
+    // 32-bit machines ignore the high half!
+    offset = ConvL2X(offset);
+    adr = make_unsafe_address(base, offset, type, kind == Relaxed);
+    heap_base_oop = base;
+    val = is_store ? argument(4):NULL;
+  } else {
+    Node* ptr = argument(1);  // type: long
+    ptr = ConvL2X(ptr);  // adjust Java long to machine word
+    // adr = make_unsafe_address(NULL, ptr);
+    // Since this is a NULL+long form, we have to switch to a rawptr.
+    Node *tbase = _gvn.transform(new CastX2PNode(ptr));
+    Node *toffset = MakeConX(0);
+    adr = basic_plus_adr(tbase, toffset);
+    val = is_store ? argument(3) : NULL;
+  }
+  // Save state and restore on bailout
+  uint old_sp = sp();
+  SafePointNode* old_map = clone_map();
+
+
+  if (_gvn.type(base)->isa_ptr() == TypePtr::NULL_PTR) {
+    if (type != T_OBJECT) {
+      decorators |= IN_NATIVE; // off-heap primitive access
+    } else {
+      set_map(old_map);
+      set_sp(old_sp);
+      return false; // off-heap oop accesses are not supported
+    }
+  } else {
+    heap_base_oop = base; // on-heap or mixed access
+  }
+
+  // Can base be NULL? Otherwise, always on-heap access.
+  bool can_access_non_heap = TypePtr::NULL_PTR->higher_equal(_gvn.type(base));
+
+  if (!can_access_non_heap) {
+    decorators |= IN_HEAP;
+  }
+
+  const TypePtr* adr_type = _gvn.type(adr)->isa_ptr();
+  if (adr_type == TypePtr::NULL_PTR) {
+    set_map(old_map);
+    set_sp(old_sp);
+    return false; // off-heap access with zero address
+  }
+
+  // Try to categorize the address.
+  Compile::AliasType* alias_type = C->alias_type(adr_type);
+  assert(alias_type->index() != Compile::AliasIdxBot, "no bare pointers here");
+
+  if (alias_type->adr_type() == TypeInstPtr::KLASS ||
+      alias_type->adr_type() == TypeAryPtr::RANGE) {
+    set_map(old_map);
+    set_sp(old_sp);
+    return false; // not supported
+  }
+
+  bool mismatched = false;
+  BasicType bt = alias_type->basic_type();
+  if (bt != T_ILLEGAL) {
+    assert(alias_type->adr_type()->is_oopptr(), "should be on-heap access");
+    if (bt == T_BYTE && adr_type->isa_aryptr()) {
+      // Alias type doesn't differentiate between byte[] and boolean[]).
+      // Use address type to get the element type.
+      bt = adr_type->is_aryptr()->elem()->array_element_basic_type();
+    }
+    if (bt == T_ARRAY || bt == T_NARROWOOP) {
+      // accessing an array field with getReference is not a mismatch
+      bt = T_OBJECT;
+    }
+    if ((bt == T_OBJECT) != (type == T_OBJECT)) {
+      // Don't intrinsify mismatched object accesses
+      set_map(old_map);
+      set_sp(old_sp);
+      return false;
+    }
+    mismatched = (bt != type);
+  } else if (alias_type->adr_type()->isa_oopptr()) {
+    mismatched = true; // conservatively mark all "wide" on-heap accesses as mismatched
+  }
+
+  destruct_map_clone(old_map);
+  assert(!mismatched || alias_type->adr_type()->is_oopptr(), "off-heap access can't be mismatched");
+
+  if (mismatched) {
+    decorators |= C2_MISMATCHED;
+  }
+
+  // First guess at the value type.
+  const Type *value_type = Type::get_const_basic_type(type);
+
+  // Figure out the memory ordering.
+  decorators |= mo_decorator_for_access_kind(kind);
+
+  if (!is_store && type == T_OBJECT) {
+    const TypeOopPtr* tjp = sharpen_unsafe_type(alias_type, adr_type);
+    if (tjp != NULL) {
+      value_type = tjp;
+    }
+  }
+
+  receiver = null_check(receiver);
+  if (stopped()) {
+    return true;
+  }
+  // Heap pointers get a null-check from the interpreter,
+  // as a courtesy.  However, this is not guaranteed by Unsafe,
+  // and it is not possible to fully distinguish unintended nulls
+  // from intended ones in this API.
+
+  if (!is_store) {
+    Node* p = NULL;
+    // Try to constant fold a load from a constant field
+    ciField* field = alias_type->field();
+    if (heap_base_oop != top() && field != NULL && field->is_constant() && !mismatched) {
+      // final or stable field
+      p = make_constant_from_field(field, heap_base_oop);
+    }
+
+    if (p == NULL) { // Could not constant fold the load
+      p = access_load_at(heap_base_oop, adr, adr_type, value_type, type, decorators);
+      // Normalize the value returned by getBoolean in the following cases
+      if (type == T_BOOLEAN &&
+          (mismatched ||
+           heap_base_oop == top() ||                  // - heap_base_oop is NULL or
+           (can_access_non_heap && field == NULL))    // - heap_base_oop is potentially NULL
+                                                      //   and the unsafe access is made to large offset
+                                                      //   (i.e., larger than the maximum offset necessary for any
+                                                      //   field access)
+            ) {
+          IdealKit ideal = IdealKit(this);
+#define __ ideal.
+          IdealVariable normalized_result(ideal);
+          __ declarations_done();
+          __ set(normalized_result, p);
+          __ if_then(p, BoolTest::ne, ideal.ConI(0));
+          __ set(normalized_result, ideal.ConI(1));
+          ideal.end_if();
+          final_sync(ideal);
+          p = __ value(normalized_result);
+#undef __
+      }
+    }
+    if (type == T_ADDRESS) {
+      p = gvn().transform(new CastP2XNode(NULL, p));
+      p = ConvX2UL(p);
+    }
+    // The load node has the control of the preceding MemBarCPUOrder.  All
+    // following nodes will have the control of the MemBarCPUOrder inserted at
+    // the end of this method.  So, pushing the load onto the stack at a later
+    // point is fine.
+    set_result(p);
+  } else {
+    if (bt == T_ADDRESS) {
+      // Repackage the long as a pointer.
+      val = ConvL2X(val);
+      val = gvn().transform(new CastX2PNode(val));
+    }
+    access_store_at(heap_base_oop, adr, adr_type, val, value_type, type, decorators);
+  }
+
+  return true;
+}
+#endif
+
 bool LibraryCallKit::inline_unsafe_access(bool is_store, const BasicType type, const AccessKind kind, const bool unaligned) {
   if (callee()->is_static())  return false;  // caller must have the capability!
   DecoratorSet decorators = C2_UNSAFE_ACCESS;
@@ -2698,15 +3095,24 @@ bool LibraryCallKit::inline_unsafe_fence(vmIntrinsics::ID id) {
   insert_mem_bar(Op_MemBarCPUOrder);
   switch(id) {
     case vmIntrinsics::_loadFence:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    case vmIntrinsics::_loadFence_sun:
+#endif      
       insert_mem_bar(Op_LoadFence);
       return true;
     case vmIntrinsics::_storeFence:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    case vmIntrinsics::_storeFence_sun:
+#endif
       insert_mem_bar(Op_StoreFence);
       return true;
     case vmIntrinsics::_storeStoreFence:
       insert_mem_bar(Op_StoreStoreFence);
       return true;
     case vmIntrinsics::_fullFence:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    case vmIntrinsics::_fullFence_sun:
+#endif
       insert_mem_bar(Op_MemBarVolatile);
       return true;
     default:

@@ -41,10 +41,16 @@ private:
   static PerfVariable*      _end_vm_creation_time;
   static PerfVariable*      _vm_init_done_time;
   static jmmOptionalSupport _optional_support;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static jmmOptionalSupport_jdk8 _optional_support_jdk8;
+#endif
   static TimeStamp          _stamp; // Timestamp since vm init done time
 
   // Management klasses
   static InstanceKlass*     _diagnosticCommandImpl_klass;
+  #if HOTSPOT_TARGET_CLASSLIB == 8
+  static InstanceKlass*     _garbageCollectorImpl_klass;
+  #endif
   static InstanceKlass*     _garbageCollectorExtImpl_klass;
   static InstanceKlass*     _garbageCollectorMXBean_klass;
   static InstanceKlass*     _gcInfo_klass;
@@ -67,6 +73,10 @@ public:
 
   static void* get_jmm_interface(int version);
   static void  get_optional_support(jmmOptionalSupport* support);
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static void  get_optional_support_jdk8(jmmOptionalSupport_jdk8* support);
+#endif
 
   static void  record_vm_startup_time(jlong begin, jlong duration)
       NOT_MANAGEMENT_RETURN;
@@ -96,6 +106,10 @@ public:
       NOT_MANAGEMENT_RETURN_(NULL);
   static InstanceKlass* sun_management_Sensor_klass(TRAPS)
       NOT_MANAGEMENT_RETURN_(NULL);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static InstanceKlass* sun_management_GarbageCollectorImpl_klass(TRAPS)
+      NOT_MANAGEMENT_RETURN_(NULL);
+#endif
   static InstanceKlass* com_sun_management_internal_GarbageCollectorExtImpl_klass(TRAPS)
       NOT_MANAGEMENT_RETURN_(NULL);
   static InstanceKlass* com_sun_management_GcInfo_klass(TRAPS)

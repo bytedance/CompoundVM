@@ -2019,6 +2019,37 @@ AnnotationCollector::annotation_index(const ClassLoaderData* loader_data,
       }
       return _jdk_internal_vm_annotation_Contended;
     }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    case VM_SYMBOL_ENUM_NAME(java_lang_invoke_ForceInline_signature): {
+      if (_location != _in_method)  break;  // only allow for methods
+      if (!privileged)              break;  // only allow in privileged code
+      return _method_ForceInline;
+    }
+    case VM_SYMBOL_ENUM_NAME(java_lang_invoke_DontInline_signature): {
+      if (_location != _in_method)  break;  // only allow for methods
+      if (!privileged)              break;  // only allow in privileged code
+      return _method_DontInline;
+    }
+    case VM_SYMBOL_ENUM_NAME(java_lang_invoke_LambdaForm_Hidden_signature):{
+      if (_location != _in_method)  break;  // only allow for methods
+      if (!privileged)              break;  // only allow in privileged code
+      return _method_Hidden;
+    }
+    case VM_SYMBOL_ENUM_NAME(java_lang_invoke_Stable_signature): {
+      if (_location != _in_field)   break;  // only allow for fields
+      if (!privileged)              break;  // only allow in privileged code
+      return _field_Stable;
+    }
+    case VM_SYMBOL_ENUM_NAME(sun_misc_Contended_signature): {
+      if (_location != _in_field && _location != _in_class) {
+        break;  // only allow for fields and classes
+      }
+      if (!EnableContended || (RestrictContended && !privileged)) {
+        break;  // honor privileges
+      }
+      return _jdk_internal_vm_annotation_Contended;
+    }
+#endif
     case VM_SYMBOL_ENUM_NAME(jdk_internal_vm_annotation_ReservedStackAccess_signature): {
       if (_location != _in_method)  break;  // only allow for methods
       if (RestrictReservedStack && !privileged) break; // honor privileges
@@ -4335,6 +4366,7 @@ void ClassFileParser::check_super_class_access(const InstanceKlass* this_klass, 
       }
     }
 
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
     Reflection::VerifyClassAccessResults vca_result =
       Reflection::verify_class_access(this_klass, InstanceKlass::cast(super), false);
     if (vca_result != Reflection::ACCESS_OK) {
@@ -4363,6 +4395,7 @@ void ClassFileParser::check_super_class_access(const InstanceKlass* this_klass, 
           msg);
       }
     }
+#endif
   }
 }
 
@@ -5140,6 +5173,7 @@ static void check_methods_for_intrinsics(const InstanceKlass* ik,
       Method* method = methods->at(j);
       method->init_intrinsic_id(klass_id);
 
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
       if (CheckIntrinsics) {
         // Check if an intrinsic is defined for method 'method',
         // but the method is not annotated with @IntrinsicCandidate.
@@ -5166,9 +5200,11 @@ static void check_methods_for_intrinsics(const InstanceKlass* ik,
           DEBUG_ONLY(vm_exit(1));
         }
       }
+#endif
     } // end for
 
 #ifdef ASSERT
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
     if (CheckIntrinsics) {
       // Check for orphan methods in the current class. A method m
       // of a class C is orphan if an intrinsic is defined for method m,
@@ -5215,6 +5251,7 @@ static void check_methods_for_intrinsics(const InstanceKlass* ik,
         }
       } // end for
     } // CheckIntrinsics
+#endif // !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
 #endif // ASSERT
   }
 }
@@ -5395,12 +5432,18 @@ void ClassFileParser::fill_instance_klass(InstanceKlass* ik,
     check_illegal_static_method(ik, CHECK);
   }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // module is null if classlib v8
+  ModuleEntry* module_entry = NULL;
+  Handle module_handle;
+#else
   // Obtain this_klass' module entry
   ModuleEntry* module_entry = ik->module();
   assert(module_entry != NULL, "module_entry should always be set");
 
   // Obtain java.lang.Module
   Handle module_handle(THREAD, module_entry->module());
+#endif // HOTSPOT_TARGET_CLASSLIB == 17
 
   // Allocate mirror and initialize static fields
   // The create_mirror() call will also call compute_modifiers()
@@ -5777,6 +5820,13 @@ void ClassFileParser::parse_stream(const ClassFileStream* const stream,
                        "Bad class name in class file %s",
                        CHECK);
   }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  if (_is_hidden) {
+    if (_class_name == vmSymbols::unknown_class_name()) {
+      update_class_name(class_name_in_cp);
+    }
+  }
+#endif
 
 #ifdef ASSERT
   // Basic sanity checks

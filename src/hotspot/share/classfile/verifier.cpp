@@ -2894,8 +2894,26 @@ void ClassVerifier::verify_invoke_instructions(
                   current_class()->super()->name()))) {
     bool subtype = false;
     bool have_imr_indirect = cp->tag_at(index).value() == JVM_CONSTANT_InterfaceMethodref;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    if (!current_class()->is_hidden()) {
+      subtype = ref_class_type.is_assignable_from(
+                 current_type(), this, false, CHECK_VERIFY(this));
+    } else {
+      VerificationType host_klass_type =
+                        VerificationType::reference_type(current_class()->nest_host(THREAD)->name());
+      subtype = ref_class_type.is_assignable_from(host_klass_type, this, false, CHECK_VERIFY(this));
+
+      // If invokespecial of IMR, need to recheck for same or
+      // direct interface relative to the host class
+      have_imr_indirect = (have_imr_indirect &&
+                           !is_same_or_direct_interface(
+                             InstanceKlass::cast(current_class()->nest_host(THREAD)),
+                             host_klass_type, ref_class_type));
+    }
+#else
     subtype = ref_class_type.is_assignable_from(
                current_type(), this, false, CHECK_VERIFY(this));
+#endif
     if (!subtype) {
       verify_error(ErrorContext::bad_code(bci),
           "Bad invokespecial instruction: "
@@ -2930,7 +2948,28 @@ void ClassVerifier::verify_invoke_instructions(
     } else {   // other methods
       // Ensures that target class is assignable to method class.
       if (opcode == Bytecodes::_invokespecial) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+        if (!current_class()->is_hidden()) {
+          current_frame->pop_stack(current_type(), CHECK_VERIFY(this));
+        } else {
+          // anonymous class invokespecial calls: check if the
+          // objectref is a subtype of the host_klass of the current class
+          // to allow an anonymous class to reference methods in the host_klass
+          VerificationType top = current_frame->pop_stack(CHECK_VERIFY(this));
+          VerificationType hosttype =
+            VerificationType::reference_type(current_class()->nest_host(THREAD)->name());
+          bool subtype = hosttype.is_assignable_from(top, this, false, CHECK_VERIFY(this));
+          if (!subtype) {
+            verify_error( ErrorContext::bad_type(current_frame->offset(),
+              current_frame->stack_top_ctx(),
+              TypeOrigin::implicit(top)),
+              "Bad type on operand stack");
+            return;
+          }
+        }
+#else
         current_frame->pop_stack(current_type(), CHECK_VERIFY(this));
+#endif
       } else if (opcode == Bytecodes::_invokevirtual) {
         VerificationType stack_object_type =
           current_frame->pop_stack(ref_class_type, CHECK_VERIFY(this));

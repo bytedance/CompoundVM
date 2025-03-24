@@ -3113,10 +3113,13 @@ void C2_MacroAssembler::string_compare(Register str1, Register str2,
   subl(result, cnt1);
   jcc(Assembler::notZero,  POP_LABEL);
 
+#if HOTSPOT_TARGET_CLASSLIB != 8
   if (ae == StrIntrinsicNode::UU) {
+    // LibraryCallKit::inline_string_compareTo() already generated char[] length
     // Divide length by 2 to get number of chars
     shrl(cnt2, 1);
   }
+#endif
   cmpl(cnt2, 1);
   jcc(Assembler::equal, LENGTH_DIFF_LABEL);
 
@@ -3401,10 +3404,13 @@ void C2_MacroAssembler::string_compare(Register str1, Register str2,
   // Strings are equal up to min length.  Return the length difference.
   bind(LENGTH_DIFF_LABEL);
   pop(result);
+#if HOTSPOT_TARGET_CLASSLIB != 8
   if (ae == StrIntrinsicNode::UU) {
+    // LibraryCallKit::inline_string_compareTo() already generated char[] length
     // Divide diff by 2 to get number of chars
     sarl(result, 1);
   }
+#endif
   jmpb(DONE_LABEL);
 
 #ifdef _LP64

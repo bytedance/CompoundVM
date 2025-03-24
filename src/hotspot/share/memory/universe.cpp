@@ -916,11 +916,13 @@ void Universe::initialize_known_methods(TRAPS) {
                           "addClass",
                           vmSymbols::class_void_signature(), false, CHECK);
 
+#if HOTSPOT_TARGET_CLASSLIB == 17
   // Set up method for stack walking
   initialize_known_method(_do_stack_walk_cache,
                           vmClasses::AbstractStackWalker_klass(),
                           "doStackWalk",
                           vmSymbols::doStackWalk_signature(), false, CHECK);
+#endif
 }
 
 void universe2_init() {

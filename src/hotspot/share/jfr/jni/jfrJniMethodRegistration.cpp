@@ -36,7 +36,9 @@ JfrJniMethodRegistration::JfrJniMethodRegistration(JNIEnv* env) {
   if (jfr_clz != NULL) {
     JNINativeMethod method[] = {
       (char*)"beginRecording", (char*)"()V", (void*)jfr_begin_recording,
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
       (char*)"isRecording", (char*)"()Z", (void*)jfr_is_recording,
+#endif
       (char*)"endRecording", (char*)"()V", (void*)jfr_end_recording,
       (char*)"markChunkFinal", (char*)"()V", (void*)jfr_mark_chunk_final,
       (char*)"counterTime", (char*)"()J", (void*)jfr_elapsed_counter,

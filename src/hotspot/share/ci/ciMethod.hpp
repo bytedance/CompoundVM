@@ -210,7 +210,11 @@ class ciMethod : public ciMetadata {
       // flag is set. The intrinsic is still correct.
       return true;
     }
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
     return (CheckIntrinsics ? intrinsic_candidate() : true);
+#else
+    return true;
+#endif
   }
 
   int highest_osr_comp_level();

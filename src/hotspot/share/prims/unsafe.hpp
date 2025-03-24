@@ -30,6 +30,9 @@
 
 extern "C" {
   void JNICALL JVM_RegisterJDKInternalMiscUnsafeMethods(JNIEnv *env, jclass unsafecls);
+#if defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
+  void JNICALL JVM_RegisterSunMiscUnsafeMethods(JNIEnv *env, jclass unsafecls);
+#endif
 }
 
 jlong Unsafe_field_offset_to_byte_offset(jlong field_offset);

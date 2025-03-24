@@ -240,7 +240,18 @@ bool CgroupSubsystemFactory::determine_type(CgroupInfo* cg_infos,
    *  - on a cgroups v1 system, collect info for mapping
    *    the host mount point to the local one via /proc/self/mountinfo below.
    */
+#if HOTSPOT_TARGET_CLASSLIB == 17
   cgroup = fopen(proc_self_cgroup, "r");
+#elif HOTSPOT_TARGET_CLASSLIB == 8
+  if (is_cgroupsV2) {
+    const char* proc_1_cgroup = "/proc/1/cgroup";
+    cgroup = fopen(proc_1_cgroup, "r");
+  } else {
+    cgroup = fopen(proc_self_cgroup, "r");
+  }
+#else
+  #error "Only classlib 8 & 17 are supported!"
+#endif
   if (cgroup == NULL) {
     log_debug(os, container)("Can't open %s, %s",
                              proc_self_cgroup, os::strerror(errno));
@@ -255,6 +266,9 @@ bool CgroupSubsystemFactory::determine_type(CgroupInfo* cg_infos,
     char *hierarchy_id_str;
     int  hierarchy_id;
     char *cgroup_path;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    char *last_slash;
+#endif
 
     hierarchy_id_str = strsep(&p, ":");
     hierarchy_id = atoi(hierarchy_id_str);
@@ -291,6 +305,15 @@ bool CgroupSubsystemFactory::determine_type(CgroupInfo* cg_infos,
       if (hierarchy_id != 0) {
         continue;
       }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+      // fix systemd as 1 process, create a init.scope
+      if (strstr(cgroup_path, "init.scope") != NULL) {
+        cgroup_path = strsep(&cgroup_path, "i");
+        // handle the last slash
+        last_slash = strrchr(cgroup_path, '/');
+        memset(last_slash, '\0', 1);
+      }
+#endif
       for (int i = 0; i < CG_INFO_LENGTH; i++) {
         assert(cg_infos[i]._cgroup_path == NULL, "cgroup path must only be set once");
         cg_infos[i]._cgroup_path = os::strdup(cgroup_path);

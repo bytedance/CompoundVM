@@ -318,6 +318,26 @@ void ObjectMonitor::ClearSuccOnSuspend::operator()(JavaThread* current) {
 // -----------------------------------------------------------------------------
 // Enter support
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+bool ObjectMonitor::try_enter(Thread* current) {
+  if (current != _owner) {
+    if (current->is_lock_owned ((address)_owner)) {
+       assert(_recursions == 0, "internal state error");
+       _owner = current ;
+       _recursions = 1 ;
+       return true;
+    }
+    if (Atomic::cmpxchg (&_owner, (void*)(NULL), (void*)(current)) != NULL) {
+      return false;
+    }
+    return true;
+  } else {
+    _recursions++;
+    return true;
+  }
+}
+#endif
+
 bool ObjectMonitor::enter(JavaThread* current) {
   // The following code is ordered to check the most common cases first
   // and to reduce RTS->RTO cache line upgrades on SPARC and IA32 processors.

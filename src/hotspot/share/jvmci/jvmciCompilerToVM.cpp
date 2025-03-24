@@ -1404,9 +1404,11 @@ C2V_END
 C2V_VMENTRY_NULL(jobject, getSignaturePolymorphicHolders, (JNIEnv* env, jobject))
   JVMCIObjectArray holders = JVMCIENV->new_String_array(2, JVMCI_CHECK_NULL);
   JVMCIObject mh = JVMCIENV->create_string("Ljava/lang/invoke/MethodHandle;", JVMCI_CHECK_NULL);
-  JVMCIObject vh = JVMCIENV->create_string("Ljava/lang/invoke/VarHandle;", JVMCI_CHECK_NULL);
   JVMCIENV->put_object_at(holders, 0, mh);
+#if HOTSPOT_TARGET_CLASSLIB == 17
+  JVMCIObject vh = JVMCIENV->create_string("Ljava/lang/invoke/VarHandle;", JVMCI_CHECK_NULL);
   JVMCIENV->put_object_at(holders, 1, vh);
+#endif
   return JVMCIENV->get_jobject(holders);
 C2V_END
 

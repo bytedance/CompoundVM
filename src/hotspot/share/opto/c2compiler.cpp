@@ -214,6 +214,9 @@ bool C2Compiler::is_intrinsic_supported(const methodHandle& method, bool is_virt
     if (!Matcher::match_rule_supported(Op_AryEq)) return false;
     break;
   case vmIntrinsics::_copyMemory:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_copyMemory_sun:
+#endif
     if (StubRoutines::unsafe_arraycopy() == NULL) return false;
     break;
   case vmIntrinsics::_encodeAsciiArray:
@@ -259,6 +262,9 @@ bool C2Compiler::is_intrinsic_supported(const methodHandle& method, bool is_virt
 
   /* CompareAndSet, Object: */
   case vmIntrinsics::_compareAndSetReference:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_compareAndSwapObject:
+#endif
 #ifdef _LP64
     if ( UseCompressedOops && !Matcher::match_rule_supported(Op_CompareAndSwapN)) return false;
     if (!UseCompressedOops && !Matcher::match_rule_supported(Op_CompareAndSwapP)) return false;
@@ -279,6 +285,9 @@ bool C2Compiler::is_intrinsic_supported(const methodHandle& method, bool is_virt
     break;
   /* CompareAndSet, Long: */
   case vmIntrinsics::_compareAndSetLong:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_compareAndSwapLong:
+#endif
     if (!Matcher::match_rule_supported(Op_CompareAndSwapL)) return false;
     break;
   case vmIntrinsics::_weakCompareAndSetLongPlain:
@@ -290,6 +299,9 @@ bool C2Compiler::is_intrinsic_supported(const methodHandle& method, bool is_virt
 
   /* CompareAndSet, Int: */
   case vmIntrinsics::_compareAndSetInt:
+#if HOTSPOT_TARGET_CLASSLIB == 8    
+  case vmIntrinsics::_compareAndSwapInt:
+#endif
     if (!Matcher::match_rule_supported(Op_CompareAndSwapI)) return false;
     break;
   case vmIntrinsics::_weakCompareAndSetIntPlain:
@@ -368,9 +380,15 @@ bool C2Compiler::is_intrinsic_supported(const methodHandle& method, bool is_virt
     if (!Matcher::match_rule_supported(Op_GetAndAddS)) return false;
     break;
   case vmIntrinsics::_getAndAddInt:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_getAndAddInt2:
+#endif
     if (!Matcher::match_rule_supported(Op_GetAndAddI)) return false;
     break;
   case vmIntrinsics::_getAndAddLong:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_getAndAddLong2:
+#endif
     if (!Matcher::match_rule_supported(Op_GetAndAddL)) return false;
     break;
 
@@ -381,12 +399,21 @@ bool C2Compiler::is_intrinsic_supported(const methodHandle& method, bool is_virt
     if (!Matcher::match_rule_supported(Op_GetAndSetS)) return false;
     break;
   case vmIntrinsics::_getAndSetInt:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_getAndSetInt2:
+#endif
     if (!Matcher::match_rule_supported(Op_GetAndSetI)) return false;
     break;
   case vmIntrinsics::_getAndSetLong:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_getAndSetLong2:
+#endif
     if (!Matcher::match_rule_supported(Op_GetAndSetL)) return false;
     break;
   case vmIntrinsics::_getAndSetReference:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_getAndSetObject:
+#endif
 #ifdef _LP64
     if (!UseCompressedOops && !Matcher::match_rule_supported(Op_GetAndSetP)) return false;
     if (UseCompressedOops && !Matcher::match_rule_supported(Op_GetAndSetN)) return false;
@@ -507,6 +534,14 @@ bool C2Compiler::is_intrinsic_supported(const methodHandle& method, bool is_virt
   case vmIntrinsics::_min:
   case vmIntrinsics::_max:
   case vmIntrinsics::_arraycopy:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_sgetChars:
+  case vmIntrinsics::_sequals:
+  case vmIntrinsics::_scompareTo:
+  case vmIntrinsics::_sindexOf:
+  case vmIntrinsics::_sindexOfI:
+  case vmIntrinsics::_sindexOfChar:
+#else
   case vmIntrinsics::_indexOfL:
   case vmIntrinsics::_indexOfU:
   case vmIntrinsics::_indexOfUL:
@@ -515,6 +550,7 @@ bool C2Compiler::is_intrinsic_supported(const methodHandle& method, bool is_virt
   case vmIntrinsics::_indexOfIUL:
   case vmIntrinsics::_indexOfU_char:
   case vmIntrinsics::_indexOfL_char:
+#endif
   case vmIntrinsics::_toBytesStringU:
   case vmIntrinsics::_getCharsStringU:
   case vmIntrinsics::_getCharStringU:
@@ -537,6 +573,63 @@ bool C2Compiler::is_intrinsic_supported(const methodHandle& method, bool is_virt
   case vmIntrinsics::_putLong:
   case vmIntrinsics::_putFloat:
   case vmIntrinsics::_putDouble:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_putOrderedObject:
+  case vmIntrinsics::_putOrderedInt:
+  case vmIntrinsics::_putOrderedLong:
+  case vmIntrinsics::_getObject2:
+  case vmIntrinsics::_getBoolean2:
+  case vmIntrinsics::_getByte2:
+  case vmIntrinsics::_getShort2:
+  case vmIntrinsics::_getChar2:
+  case vmIntrinsics::_getInt2:
+  case vmIntrinsics::_getLong2:
+  case vmIntrinsics::_getFloat2:
+  case vmIntrinsics::_getDouble2:
+  case vmIntrinsics::_putObject2:
+  case vmIntrinsics::_putBoolean2:
+  case vmIntrinsics::_putByte2:
+  case vmIntrinsics::_putShort2:
+  case vmIntrinsics::_putChar2:
+  case vmIntrinsics::_putInt2:
+  case vmIntrinsics::_putLong2:
+  case vmIntrinsics::_putFloat2:
+  case vmIntrinsics::_putDouble2:
+  case vmIntrinsics::_getByte_raw:
+  case vmIntrinsics::_getShort_raw:
+  case vmIntrinsics::_getChar_raw:
+  case vmIntrinsics::_getInt_raw:
+  case vmIntrinsics::_getLong_raw:
+  case vmIntrinsics::_getFloat_raw:
+  case vmIntrinsics::_getDouble_raw:
+  case vmIntrinsics::_getAddress_raw:
+  case vmIntrinsics::_putByte_raw:
+  case vmIntrinsics::_putShort_raw:
+  case vmIntrinsics::_putChar_raw:
+  case vmIntrinsics::_putInt_raw:
+  case vmIntrinsics::_putLong_raw:
+  case vmIntrinsics::_putFloat_raw:
+  case vmIntrinsics::_putDouble_raw:
+  case vmIntrinsics::_putAddress_raw:
+  case vmIntrinsics::_getObjectVolatile2:
+  case vmIntrinsics::_getBooleanVolatile2:
+  case vmIntrinsics::_getByteVolatile2:
+  case vmIntrinsics::_getShortVolatile2:
+  case vmIntrinsics::_getCharVolatile2:
+  case vmIntrinsics::_getIntVolatile2:
+  case vmIntrinsics::_getLongVolatile2:
+  case vmIntrinsics::_getFloatVolatile2:
+  case vmIntrinsics::_getDoubleVolatile2:
+  case vmIntrinsics::_putObjectVolatile2:
+  case vmIntrinsics::_putBooleanVolatile2:
+  case vmIntrinsics::_putByteVolatile2:
+  case vmIntrinsics::_putShortVolatile2:
+  case vmIntrinsics::_putCharVolatile2:
+  case vmIntrinsics::_putIntVolatile2:
+  case vmIntrinsics::_putLongVolatile2:
+  case vmIntrinsics::_putFloatVolatile2:
+  case vmIntrinsics::_putDoubleVolatile2:
+#endif
   case vmIntrinsics::_getReferenceVolatile:
   case vmIntrinsics::_getBooleanVolatile:
   case vmIntrinsics::_getByteVolatile:
@@ -603,6 +696,11 @@ bool C2Compiler::is_intrinsic_supported(const methodHandle& method, bool is_virt
   case vmIntrinsics::_storeFence:
   case vmIntrinsics::_storeStoreFence:
   case vmIntrinsics::_fullFence:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_loadFence_sun:
+  case vmIntrinsics::_storeFence_sun:
+  case vmIntrinsics::_fullFence_sun:
+#endif
   case vmIntrinsics::_currentThread:
 #ifdef JFR_HAVE_INTRINSICS
   case vmIntrinsics::_counterTime:
@@ -612,6 +710,9 @@ bool C2Compiler::is_intrinsic_supported(const methodHandle& method, bool is_virt
   case vmIntrinsics::_currentTimeMillis:
   case vmIntrinsics::_nanoTime:
   case vmIntrinsics::_allocateInstance:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_allocateInstance_sun:
+#endif
   case vmIntrinsics::_allocateUninitializedArray:
   case vmIntrinsics::_newArray:
   case vmIntrinsics::_getLength:

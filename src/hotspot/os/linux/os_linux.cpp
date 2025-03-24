@@ -428,6 +428,9 @@ void os::init_system_properties_values() {
 // Base path of extensions installed on the system.
 #define SYS_EXT_DIR     "/usr/java/packages"
 #define EXTENSIONS_DIR  "/lib/ext"
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define ENDORSED_DIR    "/lib/endorsed"
+#endif
 
   // Buffer that fits several sprintfs.
   // Note that the space for the colon and the trailing null are provided
@@ -453,6 +456,15 @@ void os::init_system_properties_values() {
       *pslash = '\0';            // Get rid of /{client|server|hotspot}.
     }
     Arguments::set_dll_dir(buf);
+
+#if defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
+    if (pslash != NULL) {
+      pslash = strrchr(buf, '/');
+      if (pslash != NULL) {
+        *pslash = '\0';        // Get rid of /amd64.
+      }
+    }
+#endif
 
     if (pslash != NULL) {
       pslash = strrchr(buf, '/');
@@ -496,6 +508,12 @@ void os::init_system_properties_values() {
   // Extensions directories.
   sprintf(buf, "%s" EXTENSIONS_DIR ":" SYS_EXT_DIR EXTENSIONS_DIR, Arguments::get_java_home());
   Arguments::set_ext_dirs(buf);
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // Endorsed standards default directory.
+  sprintf(buf, "%s" ENDORSED_DIR, Arguments::get_java_home());
+  Arguments::set_endorsed_dirs(buf);
+#endif
 
   FREE_C_HEAP_ARRAY(char, buf);
 
@@ -5470,3 +5488,14 @@ void os::print_memory_mappings(char* addr, size_t bytes, outputStream* st) {
     st->cr();
   }
 }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+int os::socket_available(int fd, jint *pbytes) {
+  // Linux doc says EINTR not returned, unlike Solaris
+  int ret = ::ioctl(fd, FIONREAD, pbytes);
+
+  //%% note ioctl can return 0 when successful, JVM_SocketAvailable
+  // is expected to return 0 on failure and 1 on success to the jdk.
+  return (ret < 0) ? 0 : 1;
+}
+#endif

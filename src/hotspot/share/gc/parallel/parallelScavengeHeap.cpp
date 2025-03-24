@@ -84,6 +84,13 @@ jint ParallelScavengeHeap::initialize() {
   ReservedSpace young_rs = heap_rs.last_part(MaxOldSize);
   assert(young_rs.size() == MaxNewSize, "Didn't reserve all of the heap");
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // manually set
+  if (DisableAdaptiveSizePolicy) {
+     MinOldSize = OldSize;
+  }
+#endif
+
   // Set up WorkGang
   _workers.initialize_workers();
 
