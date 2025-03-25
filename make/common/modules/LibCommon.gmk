@@ -49,6 +49,8 @@ else ifeq ($(TOOLCHAIN_TYPE), clang)
   EXPORT_ALL_SYMBOLS := -fvisibility=default
 endif
 
+CFLAGS_JDKLIB += -DHOTSPOT_TARGET_CLASSLIB=$(HOTSPOT_TARGET_CLASSLIB)
+
 # Put the libraries here.
 INSTALL_LIBRARIES_HERE := $(call FindLibDirForModule, $(MODULE))
 
