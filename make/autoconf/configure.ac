@@ -236,6 +236,7 @@ LIB_SETUP_LIBRARIES
 JVM_FEATURES_PARSE_OPTIONS
 JVM_FEATURES_SETUP
 
+HOTSPOT_SETUP_TARGET_CLASSLIB
 HOTSPOT_SETUP_MISC
 
 ###############################################################################
