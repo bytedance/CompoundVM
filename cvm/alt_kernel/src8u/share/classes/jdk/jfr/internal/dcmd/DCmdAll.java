@@ -1,3 +1,5 @@
+// This project is a modified version of OpenJDK, licensed under GPL v2.
+// Modifications Copyright (C) 2025 ByteDance Inc.
 package jdk.jfr.internal.dcmd;
 
 class DCmdAll {
