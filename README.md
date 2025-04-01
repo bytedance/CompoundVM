@@ -1,11 +1,50 @@
-# Welcome to the JDK!
+# Welcome to the CompoundVM!
 
-For build instructions please see the
-[online documentation](https://openjdk.java.net/groups/build/doc/building.html),
-or either of these files:
+For many legacy Java applications (e.g. using Java 8), upgrading the application to
+higher version of JDK often requires costly and time-consuming project migration.
 
-- [doc/building.html](doc/building.html) (html version)
-- [doc/building.md](doc/building.md) (markdown version)
+CompoundVM (CVM) is a project that aims to bring higher version JVM performance to
+lower version JDK. Now you can run your application with advanced JVM features with
+almost zero cost to upgrade your project.
 
-See <https://openjdk.java.net/> for more information about
-the OpenJDK Community and the JDK.
+The current release is CVM-8+17, which enables JVM 17 on JDK 8. We aim to keep
+up with the latest JVM. The current release supports Linux/x86_64 platform only.
+
+CVM is developed under the same licence as the upstream OpenJDK project.
+
+## Features and Benefits
+
+Higher version of JVM brings enhancements in garbage colleciton, JIT, etc.
+
++ Production-ready low-latency ZGC
++ Enhanced ParallelGC and G1GC, with higher throughput, lower latency, and less memory footprints
++ Enhanced intrinsics
++ Drop-in replacement for existing JDK, easy to upgrade and rollback
+
+## Using CVM
+
+### Download and install pre-built CVM
+
+You may download a pre-built CVM from its release page, and uncompress the
+package to your destination directory.
+
+### Build from source
+
+You can build CVM from source, by running the following command:
+`make -f cvm.mk cvm8`
+
+For more options run `make -f cvm.mk help`
+
+### Enable CVM for your project
+
+After CVM is installed, command `java -version` will show the following output:
+```
+openjdk version "1.8.0_382-internal"
+OpenJDK Runtime Environment (build 1.8.0_382-internal-xxx_2025_03_24_16_21-b00)
+OpenJDK 64-Bit Server VM (build 17.0.8-internal+0-adhoc.xxx.jdk17u, mixed mode)
+```
+Notice the VM version, JVM 17 has been enabled in a JDK 8!
+
+## Contributing to CVM
+
+See [CONTRIBUTING.md](CONTRIBUTING.md)
