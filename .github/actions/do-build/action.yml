@@ -1,3 +1,5 @@
+# This project is a modified version of OpenJDK, licensed under GPL v2.
+# Modifications Copyright (C) 2025 ByteDance Inc.
 #
 # Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
 # DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
@@ -41,40 +43,39 @@ runs:
   steps:
     - name: 'Build'
       id: build
-      run: >
-        make LOG=info ${{ inputs.make-target }}
-        || bash ./.github/scripts/gen-build-failure-report.sh "$GITHUB_STEP_SUMMARY"
-      shell: bash
-
-    - name: 'Check for failure'
-      id: check
       run: |
-        # Check for failure marker file
-        build_dir="$(ls -d build/*)"
-        if [[ -e $build_dir/build-failure ]]; then
-          # Collect relevant log files
-          mkdir failure-logs
-          cp \
-              $build_dir/spec.gmk \
-              $build_dir/build.log \
-              $build_dir/configure.log \
-              $build_dir/make-support/failure-summary.log \
-              $build_dir/make-support/failure-logs/* \
-              failure-logs/ 2> /dev/null || true
-          echo 'failure=true' >> $GITHUB_OUTPUT
-        fi
+        make -f cvm.mk ${{ inputs.make-target }} MODE=${{ matrix.debug-level}}
       shell: bash
 
-    - name: 'Upload build logs'
-      uses: actions/upload-artifact@v3
-      with:
-        name: failure-logs-${{ inputs.platform }}${{ inputs.debug-suffix }}
-        path: failure-logs
-      if: steps.check.outputs.failure == 'true'
-
-      # This is the best way I found to abort the job with an error message
-    - name: 'Notify about build failures'
-      uses: actions/github-script@v6
-      with:
-        script: core.setFailed('Build failed. See summary for details.')
-      if: steps.check.outputs.failure == 'true'
+      #    - name: 'Check for failure'
+      #      id: check
+      #      run: |
+      #        # Check for failure marker file
+      #        build_dir="$(ls -d build/*)"
+      #        if [[ -e $build_dir/build-failure ]]; then
+      #          # Collect relevant log files
+      #          mkdir failure-logs
+      #          cp \
+      #              $build_dir/spec.gmk \
+      #              $build_dir/build.log \
+      #              $build_dir/configure.log \
+      #              $build_dir/make-support/failure-summary.log \
+      #              $build_dir/make-support/failure-logs/* \
+      #              failure-logs/ 2> /dev/null || true
+      #          echo 'failure=true' >> $GITHUB_OUTPUT
+      #        fi
+      #      shell: bash
+      #
+      #    - name: 'Upload build logs'
+      #      uses: actions/upload-artifact@v3
+      #      with:
+      #        name: failure-logs-${{ inputs.platform }}${{ inputs.debug-suffix }}
+      #        path: failure-logs
+      #      if: steps.check.outputs.failure == 'true'
+      #
+      #      # This is the best way I found to abort the job with an error message
+      #    - name: 'Notify about build failures'
+      #      uses: actions/github-script@v6
+      #      with:
+      #        script: core.setFailed('Build failed. See summary for details.')
+      #      if: steps.check.outputs.failure == 'true'
