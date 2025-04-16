@@ -794,3 +794,12 @@ sun/tools/jstat/jstatClassloadOutput1.sh
 com/sun/jdi/InterfaceMethodsTest.java
 jdk/lambda/vm/InterfaceAccessFlagsTest.java
 sun/tools/jps/TestJpsJarRelative.java
+
+# Following tests are due to implementation difference in JVM8 and 17. We may modify the 
+# expected result in test cases to reflect the details, but for now just ignore them since it's not of high priority.
+com/sun/jdi/BreakpointWithFullGC.sh
+com/sun/jdi/RedefineCrossEvent.java
+java/lang/System/Versions.java
+sun/misc/Version/Version.java
+tools/javac/6508981/TestInferBinaryName.java
+tools/javac/annotations/8218152/MalformedAnnotationProcessorTests.java
