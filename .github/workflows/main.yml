@@ -1,3 +1,5 @@
+# This project is a modified version of OpenJDK, licensed under GPL v2.
+# Modifications Copyright (C) 2025 ByteDance Inc.
 #
 # Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
 # DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
@@ -23,7 +25,7 @@
 # questions.
 #
 
-name: 'OpenJDK GHA Sanity Checks'
+name: 'CVM build and test'
 
 on:
   push:
@@ -35,7 +37,7 @@ on:
       platforms:
         description: 'Platform(s) to execute on (comma separated, e.g. "linux-x64, macos, aarch64")'
         required: true
-        default: 'linux-x64, linux-x86, linux-x64-variants, linux-cross-compile, macos-x64, macos-aarch64, windows-x64, windows-aarch64'
+        default: 'linux-x64'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -49,16 +51,9 @@ jobs:
 
   select:
     name: 'Select platforms'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     outputs:
       linux-x64: ${{ steps.include.outputs.linux-x64 }}
-      linux-x86: ${{ steps.include.outputs.linux-x86 }}
-      linux-x64-variants: ${{ steps.include.outputs.linux-x64-variants }}
-      linux-cross-compile: ${{ steps.include.outputs.linux-cross-compile }}
-      macos-x64: ${{ steps.include.outputs.macos-x64 }}
-      macos-aarch64: ${{ steps.include.outputs.macos-aarch64 }}
-      windows-x64: ${{ steps.include.outputs.windows-x64 }}
-      windows-aarch64: ${{ steps.include.outputs.windows-aarch64 }}
 
     steps:
         # This function must be inlined in main.yml, or we'd be forced to checkout the repo
@@ -105,13 +100,6 @@ jobs:
           }
 
           echo "linux-x64=$(check_platform linux-x64 linux x64)" >> $GITHUB_OUTPUT
-          echo "linux-x86=$(check_platform linux-x86 linux x86)" >> $GITHUB_OUTPUT
-          echo "linux-x64-variants=$(check_platform linux-x64-variants variants)" >> $GITHUB_OUTPUT
-          echo "linux-cross-compile=$(check_platform linux-cross-compile cross-compile)" >> $GITHUB_OUTPUT
-          echo "macos-x64=$(check_platform macos-x64 macos x64)" >> $GITHUB_OUTPUT
-          echo "macos-aarch64=$(check_platform macos-aarch64 macos aarch64)" >> $GITHUB_OUTPUT
-          echo "windows-x64=$(check_platform windows-x64 windows x64)" >> $GITHUB_OUTPUT
-          echo "windows-aarch64=$(check_platform windows-aarch64 windows aarch64)" >> $GITHUB_OUTPUT
 
   ###
   ### Build jobs
@@ -123,121 +111,9 @@ jobs:
     uses: ./.github/workflows/build-linux.yml
     with:
       platform: linux-x64
-      apt-gcc-version: '10=10.3.0-1ubuntu1~20.04'
+      apt-gcc-version: '9'
     # The linux-x64 jdk bundle is used as buildjdk for the cross-compile job
     if: needs.select.outputs.linux-x64 == 'true' || needs.select.outputs.linux-cross-compile == 'true'
-
-  build-linux-x86:
-    name: linux-x86
-    needs: select
-    uses: ./.github/workflows/build-linux.yml
-    with:
-      platform: linux-x86
-      apt-gcc-version: '10-multilib'
-      apt-architecture: 'i386'
-      # Some multilib libraries do not have proper inter-dependencies, so we have to
-      # install their dependencies manually.
-      apt-extra-packages: 'libfreetype6-dev:i386 libtiff-dev:i386 libcupsimage2-dev:i386'
-      extra-conf-options: '--with-target-bits=32'
-    if: needs.select.outputs.linux-x86 == 'true'
-
-  build-linux-x64-hs-nopch:
-    name: linux-x64-hs-nopch
-    needs: select
-    uses: ./.github/workflows/build-linux.yml
-    with:
-      platform: linux-x64
-      make-target: 'hotspot'
-      debug-levels: '[ "debug" ]'
-      apt-gcc-version: '10=10.3.0-1ubuntu1~20.04'
-      extra-conf-options: '--disable-precompiled-headers'
-    if: needs.select.outputs.linux-x64-variants == 'true'
-
-  build-linux-x64-hs-zero:
-    name: linux-x64-hs-zero
-    needs: select
-    uses: ./.github/workflows/build-linux.yml
-    with:
-      platform: linux-x64
-      make-target: 'hotspot'
-      debug-levels: '[ "debug" ]'
-      apt-gcc-version: '10=10.3.0-1ubuntu1~20.04'
-      extra-conf-options: '--with-jvm-variants=zero --disable-precompiled-headers'
-    if: needs.select.outputs.linux-x64-variants == 'true'
-
-  build-linux-x64-hs-minimal:
-    name: linux-x64-hs-minimal
-    needs: select
-    uses: ./.github/workflows/build-linux.yml
-    with:
-      platform: linux-x64
-      make-target: 'hotspot'
-      debug-levels: '[ "debug" ]'
-      apt-gcc-version: '10=10.3.0-1ubuntu1~20.04'
-      extra-conf-options: '--with-jvm-variants=minimal --disable-precompiled-headers'
-    if: needs.select.outputs.linux-x64-variants == 'true'
-
-  build-linux-x64-hs-optimized:
-    name: linux-x64-hs-optimized
-    needs: select
-    uses: ./.github/workflows/build-linux.yml
-    with:
-      platform: linux-x64
-      make-target: 'hotspot'
-      # Technically this is not the "debug" level, but we can't inject a new matrix state for just this job
-      debug-levels: '[ "debug" ]'
-      apt-gcc-version: '10=10.3.0-1ubuntu1~20.04'
-      extra-conf-options: '--with-debug-level=optimized --disable-precompiled-headers'
-    if: needs.select.outputs.linux-x64-variants == 'true'
-
-  build-linux-cross-compile:
-    name: linux-cross-compile
-    needs:
-      - select
-      - build-linux-x64
-    uses: ./.github/workflows/build-cross-compile.yml
-    if: needs.select.outputs.linux-cross-compile == 'true'
-
-  build-macos-x64:
-    name: macos-x64
-    needs: select
-    uses: ./.github/workflows/build-macos.yml
-    with:
-      platform: macos-x64
-      xcode-toolset-version: '11.7'
-    if: needs.select.outputs.macos-x64 == 'true'
-
-  build-macos-aarch64:
-    name: macos-aarch64
-    needs: select
-    uses: ./.github/workflows/build-macos.yml
-    with:
-      platform: macos-aarch64
-      xcode-toolset-version: '12.4'
-      extra-conf-options: '--openjdk-target=aarch64-apple-darwin'
-    if: needs.select.outputs.macos-aarch64 == 'true'
-
-  build-windows-x64:
-    name: windows-x64
-    needs: select
-    uses: ./.github/workflows/build-windows.yml
-    with:
-      platform: windows-x64
-      msvc-toolset-version: '14.29'
-      msvc-toolset-architecture: 'x86.x64'
-    if: needs.select.outputs.windows-x64 == 'true'
-
-  build-windows-aarch64:
-    name: windows-aarch64
-    needs: select
-    uses: ./.github/workflows/build-windows.yml
-    with:
-      platform: windows-aarch64
-      msvc-toolset-version: '14.29'
-      msvc-toolset-architecture: 'arm64'
-      make-target: 'hotspot'
-      extra-conf-options: '--openjdk-target=aarch64-unknown-cygwin'
-    if: needs.select.outputs.windows-aarch64 == 'true'
 
   ###
   ### Test jobs
@@ -247,63 +123,21 @@ jobs:
     name: linux-x64
     needs:
       - build-linux-x64
-    uses: ./.github/workflows/test.yml
+    uses: ./.github/workflows/test-cvm8+17.yml
     with:
       platform: linux-x64
       bootjdk-platform: linux-x64
-      runs-on: ubuntu-20.04
-
-  test-linux-x86:
-    name: linux-x86
-    needs:
-      - build-linux-x86
-    uses: ./.github/workflows/test.yml
-    with:
-      platform: linux-x86
-      bootjdk-platform: linux-x64
-      runs-on: ubuntu-20.04
-
-  test-macos-x64:
-    name: macos-x64
-    needs:
-      - build-macos-x64
-    uses: ./.github/workflows/test.yml
-    with:
-      platform: macos-x64
-      bootjdk-platform: macos-x64
-      runs-on: macos-11
-
-  test-windows-x64:
-    name: windows-x64
-    needs:
-      - build-windows-x64
-    uses: ./.github/workflows/test.yml
-    with:
-      platform: windows-x64
-      bootjdk-platform: windows-x64
-      runs-on: windows-2019
+      runs-on: ubuntu-22.04
+      debug-level: fastdebug
 
   # Remove bundles so they are not misconstrued as binary distributions from the JDK project
   remove-bundles:
     name: 'Remove bundle artifacts'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     if: always()
     needs:
       - build-linux-x64
-      - build-linux-x86
-      - build-linux-x64-hs-nopch
-      - build-linux-x64-hs-zero
-      - build-linux-x64-hs-minimal
-      - build-linux-x64-hs-optimized
-      - build-linux-cross-compile
-      - build-macos-x64
-      - build-macos-aarch64
-      - build-windows-x64
-      - build-windows-aarch64
       - test-linux-x64
-      - test-linux-x86
-      - test-macos-x64
-      - test-windows-x64
 
     steps:
         # Hack to get hold of the api environment variables that are only defined for actions
@@ -316,16 +150,19 @@ jobs:
       - name: 'Remove bundle artifacts'
         run: |
           # Find and remove all bundle artifacts
-          ALL_ARTIFACT_URLS="$(curl -s \
-              -H 'Accept: application/json;api-version=6.0-preview' \
-              -H 'Authorization: Bearer ${{ fromJson(steps.api.outputs.result).token }}' \
-              '${{ fromJson(steps.api.outputs.result).url }}_apis/pipelines/workflows/${{ github.run_id }}/artifacts?api-version=6.0-preview')"
-          BUNDLE_ARTIFACT_URLS="$(echo "$ALL_ARTIFACT_URLS" | jq -r -c '.value | map(select(.name|startswith("bundles-"))) | .[].url')"
-          for url in $BUNDLE_ARTIFACT_URLS; do
-            echo "Removing $url"
-            curl -s \
-                -H 'Accept: application/json;api-version=6.0-preview' \
-                -H 'Authorization: Bearer ${{ fromJson(steps.api.outputs.result).token }}' \
-                -X DELETE "$url" \
+          ALL_ARTIFACT_IDS="$(curl -sL \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'Authorization: Bearer ${{ github.token }}' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              '${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?per_page=100')"
+          BUNDLE_ARTIFACT_IDS="$(echo "$ALL_ARTIFACT_IDS" | jq -r -c '.artifacts | map(select(.name|startswith("cvm"))) | .[].id')"
+          for id in $BUNDLE_ARTIFACT_IDS; do
+            echo "Removing $id"
+            curl -sL \
+                -X DELETE \
+                -H 'Accept: application/vnd.github+json' \
+                -H 'Authorization: Bearer ${{ github.token }}' \
+                -H 'X-GitHub-Api-Version: 2022-11-28' \
+                "${{ github.api_url }}/repos/${{ github.repository }}/actions/artifacts/$id" \
             || echo "Failed to remove bundle"
           done

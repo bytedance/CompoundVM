@@ -279,11 +279,11 @@ test_jtreg8_jdk_core: -setup_jtreg8
 
 test_jtreg8_hotspot: -setup_jtreg8
 	$(eval JT_REPO = hotspot)
-	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST))
+	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
 
 test_jtreg8_langtools: -setup_jtreg8
 	$(eval JT_REPO = langtools)
-	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST))
+	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
 
 ################# Help ########################
 help:
