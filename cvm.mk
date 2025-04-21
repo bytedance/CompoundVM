@@ -22,6 +22,7 @@ SHELL := /bin/bash
 BOOTJDK17 := $(WORKSPACE)/.bootjdks/jdk-17.0.7+7
 BOOTJDK8 := $(WORKSPACE)/.bootjdks/jdk8u372-b07
 BUILDDIR := $(WORKSPACE)/cvm/build
+OUTPUTDIR := $(WORKSPACE)/output
 CVM8DIR := $(BUILDDIR)/jdk8
 CVM8_JARDIR := $(CVM8DIR)/jre/lib
 CVM8_LIBDIR := $(CVM8DIR)/jre/lib/amd64
@@ -92,7 +93,7 @@ endef
 
 -init-dirs:
 	[[ -d $(BUILDDIR) ]] || mkdir -p $(BUILDDIR)
-	[[ -d $(JDK8_SRCROOT) ]] || mkdir -p $(JDK8_SRCROOT)
+	[[ -d $(OUTPUTDIR) ]] || mkdir -p $(OUTPUTDIR)
 
 # Setup bootstrap JDK from a given URL
 # $1  URL of JDK in tar.gz format
@@ -120,7 +121,7 @@ $(BOOTJDK8)/:
 
 jdk8u/jdk/src:
 	wget -nc https://github.com/openjdk/jdk8u/archive/refs/tags/jdk8u382-b03.tar.gz
-	tar -xzf jdk8u382-b03.tar.gz -C $(JDK8_SRCROOT) --strip-components=1
+	[[ -d $(JDK8_SRCROOT) ]] || (mkdir -p $(JDK8_SRCROOT) && tar -xzf jdk8u382-b03.tar.gz -C $(JDK8_SRCROOT) --strip-components=1)
 
 cvm8: jdk8vm17
 
@@ -128,9 +129,21 @@ cvm8default17: jdk8vm17
 	echo "-server17 KNOWN" > $(CVM8_LIBDIR)//jvm.cfg
 	echo "-server KNOWN" >> $(CVM8_LIBDIR)//jvm.cfg
 	echo "-client IGNORE" >> $(CVM8_LIBDIR)//jvm.cfg
+	echo "-server17 KNOWN" > $(OUTPUTDIR)/jdk8/jre/lib/amd64//jvm.cfg
+	echo "-server KNOWN" >> $(OUTPUTDIR)/jdk8/jre/lib/amd64/jvm.cfg
+	echo "-client IGNORE" >> $(OUTPUTDIR)/jdk8/jre/lib/amd64//jvm.cfg
 
 -clean-jdk8vm17:
-	rm -fr $(BUILDDIR)/*
+	rm -fr $(BUILDDIR)/alt_kernel
+	rm -fr $(BUILDDIR)/jdk8
+
+clean:
+	rm -fr $(BUILDDIR)
+	cd $(JDK8_SRCROOT) && make clean
+	cd $(JDK17_SRCROOT) && make clean
+
+full-clean:
+	rm -fr $(BUILDDIR) $(JDK17_SRCROOT)/build $(JDK8_SRCROOT)/build
 
 jdk8vm17: -clean-jdk8vm17 -bootstrap build_jdk8u build_jdk17u altkernel
 	@echo
@@ -154,6 +167,7 @@ jdk8vm17: -clean-jdk8vm17 -bootstrap build_jdk8u build_jdk17u altkernel
 		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjimage.debuginfo $(CVM8_LIBDIR)/libjimage17.debuginfo; \
 		cp -f $(SRC_BUILDDIR_17)/jdk/lib/server/libjvm.debuginfo $(CVM8_LIBDIR)/server17/libjvm.debuginfo; \
 		[[ "x$$(grep server17 $(CVM8_LIBDIR)/jvm.cfg)" = "x" ]] && echo "-server17 KNOWN" >> $(CVM8_LIBDIR)/jvm.cfg; \
+		cp -rf $(CVM8DIR) $(OUTPUTDIR)/; \
 	}
 	@echo "###### Done ######"
 	@echo
@@ -162,7 +176,13 @@ build_jdk8u: -bootstrap jdk8u/jdk/src
 	{ cd $(JDK8_SRCROOT); \
 		if [[ "x$$(find ./build -type f -name config.log | grep $(MODE))" = "x" ]]; then \
 			bash configure --with-debug-level=$(MODE) \
-										 --with-boot-jdk=$(BOOTJDK8) \
+											--with-boot-jdk=$(BOOTJDK8) \
+											--with-milestone=fcs \
+											--with-user-release-suffix="cvm" \
+											--with-vendor-name="ByteDance" \
+											--with-vendor-url="https://github.com/bytedance/CompoundVM" \
+											--with-vendor-bug-url="https://github.com/bytedance/CompoundVM/issues" \
+											--with-vendor-vm-bug-url="https://github.com/bytedance/CompoundVM/issues" \
 										 ;\
 		fi; \
 		make $(JDK_MAKE_OPTS) CONF=linux-x86_64-normal-server-$(MODE) images; \
@@ -176,7 +196,14 @@ build_jdk17u: -bootstrap
 			bash configure --with-debug-level=$(MODE) \
 											--with-boot-jdk=$(BOOTJDK17) \
 											--with-hotspot-target-classlib=8 \
-											--with-vendor-version-string="cvm8+17" \
+											--with-vendor-name="ByteDance" \
+											--with-vendor-url="https://github.com/bytedance/CompoundVM" \
+											--with-vendor-bug-url="https://github.com/bytedance/CompoundVM/issues" \
+											--with-vendor-vm-bug-url="https://github.com/bytedance/CompoundVM/issues" \
+											--without-version-pre \
+											--without-version-opt \
+											--with-cvm-version-string="8.0.0" \
+											--with-vendor-name="CompoundVM" \
 											; \
 		fi; \
 	}

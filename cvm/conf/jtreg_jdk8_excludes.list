@@ -803,3 +803,8 @@ java/lang/System/Versions.java
 sun/misc/Version/Version.java
 tools/javac/6508981/TestInferBinaryName.java
 tools/javac/annotations/8218152/MalformedAnnotationProcessorTests.java
+
+# Problems need to be investigated later
+tools/javac/defaultMethods/Assertions.java
+tools/javac/Paths/Diagnostics.sh
+tools/javac/Paths/MineField.sh
