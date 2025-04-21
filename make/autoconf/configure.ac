@@ -240,6 +240,7 @@ JVM_FEATURES_SETUP
 
 HOTSPOT_SETUP_TARGET_CLASSLIB
 HOTSPOT_SETUP_MISC
+CVM_SETUP_VERSION_STRING
 
 ###############################################################################
 #

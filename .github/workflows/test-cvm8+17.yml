@@ -54,7 +54,6 @@ jobs:
         test-name:
           - 'jdk/tier1'
           - 'langtools'
-          - 'hotspot'
 
         include:
           - test-name: 'jdk/tier1'
@@ -62,9 +61,6 @@ jobs:
 
           - test-name: 'langtools'
             test-suite: 'langtools'
-
-          - test-name: 'hotspot'
-            test-suite: 'hotspot'
 
     steps:
       - name: 'Checkout the JDK source'

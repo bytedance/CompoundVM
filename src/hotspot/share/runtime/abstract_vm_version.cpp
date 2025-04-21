@@ -108,7 +108,11 @@ int Abstract_VM_Version::_vm_build_number = VERSION_BUILD;
 #ifndef HOTSPOT_VM_DISTRO
   #error HOTSPOT_VM_DISTRO must be defined
 #endif
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define VMNAME HOTSPOT_VM_DISTRO " " VMLP VMTYPE " VM (CompoundVM " CVM_VERSION_STRING ")"
+#else
 #define VMNAME HOTSPOT_VM_DISTRO " " VMLP VMTYPE " VM"
+#endif
 
 const char* Abstract_VM_Version::vm_name() {
   return VMNAME;

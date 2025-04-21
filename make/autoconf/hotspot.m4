@@ -162,3 +162,19 @@ AC_DEFUN_ONCE([HOTSPOT_SETUP_TARGET_CLASSLIB],
   fi
   AC_SUBST(HOTSPOT_TARGET_CLASSLIB)
 ])
+
+###############################################################################
+# CompoundVM version string setup
+#
+AC_DEFUN_ONCE([CVM_SETUP_VERSION_STRING],
+[
+  AC_ARG_WITH([cvm-version-string], [AS_HELP_STRING([--with-cvm-version-string],
+  [CVM version string, default is 8.0.0])])
+
+  if test "x$with_cvm_version_string" != x; then
+    CVM_VERSION_STRING="$with_cvm_version_string"
+  else
+    CVM_VERSION_STRING="8.0.0"
+  fi
+  AC_SUBST(CVM_VERSION_STRING)
+])
