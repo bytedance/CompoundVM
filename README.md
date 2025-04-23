@@ -31,7 +31,7 @@ package to your destination directory.
 ### Build from source
 
 You can build CVM from source, by running the following command:
-`make -f cvm.mk cvm8`
+`make -f cvm.mk cvm8default17`
 
 For more options run `make -f cvm.mk help`
 
@@ -39,9 +39,9 @@ For more options run `make -f cvm.mk help`
 
 After CVM is installed, command `java -version` will show the following output:
 ```
-openjdk version "1.8.0_382-internal"
-OpenJDK Runtime Environment (build 1.8.0_382-internal-xxx_2025_03_24_16_21-b00)
-OpenJDK 64-Bit Server VM (build 17.0.8-internal+0-adhoc.xxx.jdk17u, mixed mode)
+openjdk version "1.8.0_382"
+OpenJDK Runtime Environment (build 1.8.0_382-cvm-b00)
+OpenJDK 64-Bit Server VM (CompoundVM 8.0.0) (build 17.0.8+0, mixed mode)
 ```
 Notice the VM version, JVM 17 has been enabled in a JDK 8!
 
