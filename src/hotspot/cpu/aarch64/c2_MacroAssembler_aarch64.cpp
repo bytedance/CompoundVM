@@ -25,10 +25,14 @@
 #include "precompiled.hpp"
 #include "asm/assembler.hpp"
 #include "asm/assembler.inline.hpp"
+#include "opto/c2_CodeStubs.hpp"
 #include "opto/c2_MacroAssembler.hpp"
+#include "opto/compile.hpp"
+#include "opto/output.hpp"
 #include "opto/intrinsicnode.hpp"
 #include "opto/subnode.hpp"
 #include "runtime/stubRoutines.hpp"
+#include "utilities/globalDefinitions.hpp"
 
 #ifdef PRODUCT
 #define BLOCK_COMMENT(str) /* nothing */
@@ -41,6 +45,434 @@
 #define BIND(label) bind(label); BLOCK_COMMENT(#label ":")
 
 typedef void (MacroAssembler::* chr_insn)(Register Rt, const Address &adr);
+
+void C2_MacroAssembler::fast_lock(Register objectReg, Register boxReg, Register tmpReg,
+                                  Register tmp2Reg, Register tmp3Reg) {
+  Register oop = objectReg;
+  Register box = boxReg;
+  Register disp_hdr = tmpReg;
+  Register tmp = tmp2Reg;
+  Label cont;
+  Label object_has_monitor;
+  Label cas_failed;
+
+  assert(LockingMode != LM_LIGHTWEIGHT, "lightweight locking should use fast_lock_lightweight");
+  assert_different_registers(oop, box, tmp, disp_hdr);
+
+  // Load markWord from object into displaced_header.
+  ldr(disp_hdr, Address(oop, oopDesc::mark_offset_in_bytes()));
+
+  if (DiagnoseSyncOnValueBasedClasses != 0) {
+    load_klass(tmp, oop);
+    ldrw(tmp, Address(tmp, Klass::access_flags_offset()));
+    tstw(tmp, JVM_ACC_IS_VALUE_BASED_CLASS);
+    br(Assembler::NE, cont);
+  }
+
+  if (UseBiasedLocking && !UseOptoBiasInlining) {
+    biased_locking_enter(box, oop, disp_hdr, tmp, true, cont);
+  }
+
+  // Check for existing monitor
+  tbnz(disp_hdr, exact_log2(markWord::monitor_value), object_has_monitor);
+
+  if (LockingMode == LM_MONITOR) {
+    tst(oop, oop); // Set NE to indicate 'failure' -> take slow-path. We know that oop != 0.
+    b(cont);
+  } else {
+    assert(LockingMode == LM_LEGACY, "must be");
+    // Set tmp to be (markWord of object | UNLOCK_VALUE).
+    orr(tmp, disp_hdr, markWord::unlocked_value);
+
+    // Initialize the box. (Must happen before we update the object mark!)
+    str(tmp, Address(box, BasicLock::displaced_header_offset_in_bytes()));
+
+    // Compare object markWord with an unlocked value (tmp) and if
+    // equal exchange the stack address of our box with object markWord.
+    // On failure disp_hdr contains the possibly locked markWord.
+    cmpxchg(oop, tmp, box, Assembler::xword, /*acquire*/ true,
+            /*release*/ true, /*weak*/ false, disp_hdr);
+    br(Assembler::EQ, cont);
+
+    assert(oopDesc::mark_offset_in_bytes() == 0, "offset of _mark is not 0");
+
+    // If the compare-and-exchange succeeded, then we found an unlocked
+    // object, will have now locked it will continue at label cont
+
+    bind(cas_failed);
+    // We did not see an unlocked object so try the fast recursive case.
+
+    // Check if the owner is self by comparing the value in the
+    // markWord of object (disp_hdr) with the stack pointer.
+    mov(rscratch1, sp);
+    sub(disp_hdr, disp_hdr, rscratch1);
+    mov(tmp, (address) (~(os::vm_page_size()-1) | markWord::lock_mask_in_place));
+    // If condition is true we are cont and hence we can store 0 as the
+    // displaced header in the box, which indicates that it is a recursive lock.
+    ands(tmp/*==0?*/, disp_hdr, tmp);   // Sets flags for result
+    str(tmp/*==0, perhaps*/, Address(box, BasicLock::displaced_header_offset_in_bytes()));
+    b(cont);
+  }
+
+  // Handle existing monitor.
+  bind(object_has_monitor);
+
+  // The object's monitor m is unlocked iff m->owner == NULL,
+  // otherwise m->owner may contain a thread or a stack address.
+  //
+  // Try to CAS m->owner from NULL to current thread.
+  add(tmp, disp_hdr, (ObjectMonitor::owner_offset_in_bytes()-markWord::monitor_value));
+  cmpxchg(tmp, zr, rthread, Assembler::xword, /*acquire*/ true,
+          /*release*/ true, /*weak*/ false, rscratch1); // Sets flags for result
+
+  // Store a non-null value into the box to avoid looking like a re-entrant
+  // lock. The fast-path monitor unlock code checks for
+  // markWord::monitor_value so use markWord::unused_mark which has the
+  // relevant bit set, and also matches ObjectSynchronizer::enter.
+  mov(tmp, (address)markWord::unused_mark().value());
+  str(tmp, Address(box, BasicLock::displaced_header_offset_in_bytes()));
+
+  br(Assembler::EQ, cont); // CAS success means locking succeeded
+
+  cmp(rscratch1, rthread);
+  br(Assembler::NE, cont); // Check for recursive locking
+
+  // Recursive lock case
+  increment(Address(disp_hdr, ObjectMonitor::recursions_offset_in_bytes() - markWord::monitor_value), 1);
+  // flag == EQ still from the cmp above, checking if this is a reentrant lock
+
+  bind(cont);
+  // flag == EQ indicates success
+  // flag == NE indicates failure
+}
+
+void C2_MacroAssembler::fast_unlock(Register objectReg, Register boxReg, Register tmpReg,
+                                    Register tmp2Reg) {
+  Register oop = objectReg;
+  Register box = boxReg;
+  Register disp_hdr = tmpReg;
+  Register tmp = tmp2Reg;
+  Label cont;
+  Label object_has_monitor;
+
+  assert(LockingMode != LM_LIGHTWEIGHT, "lightweight locking should use fast_unlock_lightweight");
+  assert_different_registers(oop, box, tmp, disp_hdr);
+
+  if (UseBiasedLocking && !UseOptoBiasInlining) {
+    biased_locking_exit(oop, tmp, cont);
+  }
+
+  if (LockingMode == LM_LEGACY) {
+    // Find the lock address and load the displaced header from the stack.
+    ldr(disp_hdr, Address(box, BasicLock::displaced_header_offset_in_bytes()));
+
+    // If the displaced header is 0, we have a recursive unlock.
+    cmp(disp_hdr, zr);
+    br(Assembler::EQ, cont);
+  }
+
+  // Handle existing monitor.
+  ldr(tmp, Address(oop, oopDesc::mark_offset_in_bytes()));
+  tbnz(tmp, exact_log2(markWord::monitor_value), object_has_monitor);
+
+  if (LockingMode == LM_MONITOR) {
+    tst(oop, oop); // Set NE to indicate 'failure' -> take slow-path. We know that oop != 0.
+    b(cont);
+  } else {
+    assert(LockingMode == LM_LEGACY, "must be");
+    // Check if it is still a light weight lock, this is is true if we
+    // see the stack address of the basicLock in the markWord of the
+    // object.
+
+    cmpxchg(oop, box, disp_hdr, Assembler::xword, /*acquire*/ false,
+            /*release*/ true, /*weak*/ false, tmp);
+    b(cont);
+  }
+
+  assert(oopDesc::mark_offset_in_bytes() == 0, "offset of _mark is not 0");
+
+  // Handle existing monitor.
+  bind(object_has_monitor);
+  STATIC_ASSERT(markWord::monitor_value <= INT_MAX);
+  add(tmp, tmp, -(int)markWord::monitor_value); // monitor
+
+  ldr(disp_hdr, Address(tmp, ObjectMonitor::recursions_offset_in_bytes()));
+
+  Label notRecursive;
+  cbz(disp_hdr, notRecursive);
+
+  // Recursive lock
+  sub(disp_hdr, disp_hdr, 1u);
+  str(disp_hdr, Address(tmp, ObjectMonitor::recursions_offset_in_bytes()));
+  cmp(disp_hdr, disp_hdr); // Sets flags for result
+  b(cont);
+
+  bind(notRecursive);
+  ldr(rscratch1, Address(tmp, ObjectMonitor::EntryList_offset_in_bytes()));
+  ldr(disp_hdr, Address(tmp, ObjectMonitor::cxq_offset_in_bytes()));
+  orr(rscratch1, rscratch1, disp_hdr); // Will be 0 if both are 0.
+  cmp(rscratch1, zr); // Sets flags for result
+  cbnz(rscratch1, cont);
+  // need a release store here
+  lea(tmp, Address(tmp, ObjectMonitor::owner_offset_in_bytes()));
+  stlr(zr, tmp); // set unowned
+
+  bind(cont);
+  // flag == EQ indicates success
+  // flag == NE indicates failure
+}
+
+void C2_MacroAssembler::fast_lock_lightweight(Register obj, Register t1,
+                                              Register t2, Register t3) {
+  assert(LockingMode == LM_LIGHTWEIGHT, "must be");
+  assert_different_registers(obj, t1, t2, t3);
+
+  // Handle inflated monitor.
+  Label inflated;
+  // Finish fast lock successfully. MUST branch to with flag == EQ
+  Label locked;
+  // Finish fast lock unsuccessfully. MUST branch to with flag == NE
+  Label slow_path;
+
+  if (DiagnoseSyncOnValueBasedClasses != 0) {
+    load_klass(t1, obj);
+    ldrw(t1, Address(t1, Klass::access_flags_offset()));
+    tstw(t1, JVM_ACC_IS_VALUE_BASED_CLASS);
+    br(Assembler::NE, slow_path);
+  }
+
+  const Register t1_mark = t1;
+
+  { // Lightweight locking
+
+    // Push lock to the lock stack and finish successfully. MUST branch to with flag == EQ
+    Label push;
+
+    const Register t2_top = t2;
+    const Register t3_t = t3;
+
+    // Check if lock-stack is full.
+    ldrw(t2_top, Address(rthread, JavaThread::lock_stack_top_offset()));
+    cmpw(t2_top, (unsigned)LockStack::end_offset() - 1);
+    br(Assembler::GT, slow_path);
+
+    // Check if recursive.
+    subw(t3_t, t2_top, oopSize);
+    ldr(t3_t, Address(rthread, t3_t));
+    cmp(obj, t3_t);
+    br(Assembler::EQ, push);
+
+    // Relaxed normal load to check for monitor. Optimization for monitor case.
+    ldr(t1_mark, Address(obj, oopDesc::mark_offset_in_bytes()));
+    tbnz(t1_mark, exact_log2(markWord::monitor_value), inflated);
+
+    // Not inflated
+    assert(oopDesc::mark_offset_in_bytes() == 0, "required to avoid a lea");
+
+    // Try to lock. Transition lock-bits 0b01 => 0b00
+    orr(t1_mark, t1_mark, markWord::unlocked_value);
+    eor(t3_t, t1_mark, markWord::unlocked_value);
+    cmpxchg(/*addr*/ obj, /*expected*/ t1_mark, /*new*/ t3_t, Assembler::xword,
+            /*acquire*/ true, /*release*/ false, /*weak*/ false, noreg);
+    br(Assembler::NE, slow_path);
+
+    bind(push);
+    // After successful lock, push object on lock-stack.
+    str(obj, Address(rthread, t2_top));
+    addw(t2_top, t2_top, oopSize);
+    strw(t2_top, Address(rthread, JavaThread::lock_stack_top_offset()));
+    b(locked);
+  }
+
+  { // Handle inflated monitor.
+    bind(inflated);
+
+    // mark contains the tagged ObjectMonitor*.
+    const Register t1_tagged_monitor = t1_mark;
+    const uintptr_t monitor_tag = markWord::monitor_value;
+    const Register t2_owner_addr = t2;
+    const Register t3_owner = t3;
+
+    // Compute owner address.
+    lea(t2_owner_addr, Address(t1_tagged_monitor, ObjectMonitor::owner_offset_in_bytes() - monitor_tag));
+
+    // CAS owner (null => current thread).
+    cmpxchg(t2_owner_addr, zr, rthread, Assembler::xword, /*acquire*/ true,
+            /*release*/ false, /*weak*/ false, t3_owner);
+    br(Assembler::EQ, locked);
+
+    // Check if recursive.
+    cmp(t3_owner, rthread);
+    br(Assembler::NE, slow_path);
+
+    // Recursive.
+    increment(Address(t1_tagged_monitor, ObjectMonitor::recursions_offset_in_bytes() - monitor_tag), 1);
+  }
+
+  bind(locked);
+#ifdef ASSERT
+  // Check that locked label is reached with Flags == EQ.
+  Label flag_correct;
+  br(Assembler::EQ, flag_correct);
+  stop("Fast Lock Flag != EQ");
+#endif
+
+  bind(slow_path);
+#ifdef ASSERT
+  // Check that slow_path label is reached with Flags == NE.
+  br(Assembler::NE, flag_correct);
+  stop("Fast Lock Flag != NE");
+  bind(flag_correct);
+#endif
+  // C2 uses the value of Flags (NE vs EQ) to determine the continuation.
+}
+
+void C2_MacroAssembler::fast_unlock_lightweight(Register obj, Register t1, Register t2,
+                                                Register t3) {
+  assert(LockingMode == LM_LIGHTWEIGHT, "must be");
+  assert_different_registers(obj, t1, t2, t3);
+
+  // Handle inflated monitor.
+  Label inflated, inflated_load_monitor;
+  // Finish fast unlock successfully. MUST branch to with flag == EQ
+  Label unlocked;
+  // Finish fast unlock unsuccessfully. MUST branch to with flag == NE
+  Label slow_path;
+
+  const Register t1_mark = t1;
+  const Register t2_top = t2;
+  const Register t3_t = t3;
+
+  { // Lightweight unlock
+
+    // Check if obj is top of lock-stack.
+    ldrw(t2_top, Address(rthread, JavaThread::lock_stack_top_offset()));
+    subw(t2_top, t2_top, oopSize);
+    ldr(t3_t, Address(rthread, t2_top));
+    cmp(obj, t3_t);
+    // Top of lock stack was not obj. Must be monitor.
+    br(Assembler::NE, inflated_load_monitor);
+
+    // Pop lock-stack.
+    DEBUG_ONLY(str(zr, Address(rthread, t2_top));)
+    strw(t2_top, Address(rthread, JavaThread::lock_stack_top_offset()));
+
+    // Check if recursive.
+    subw(t3_t, t2_top, oopSize);
+    ldr(t3_t, Address(rthread, t3_t));
+    cmp(obj, t3_t);
+    br(Assembler::EQ, unlocked);
+
+    // Not recursive.
+    // Load Mark.
+    ldr(t1_mark, Address(obj, oopDesc::mark_offset_in_bytes()));
+
+    // Check header for monitor (0b10).
+    tbnz(t1_mark, exact_log2(markWord::monitor_value), inflated);
+
+    // Try to unlock. Transition lock bits 0b00 => 0b01
+    assert(oopDesc::mark_offset_in_bytes() == 0, "required to avoid lea");
+    orr(t3_t, t1_mark, markWord::unlocked_value);
+    cmpxchg(/*addr*/ obj, /*expected*/ t1_mark, /*new*/ t3_t, Assembler::xword,
+            /*acquire*/ false, /*release*/ true, /*weak*/ false, noreg);
+    br(Assembler::EQ, unlocked);
+
+    // Compare and exchange failed.
+    // Restore lock-stack and handle the unlock in runtime.
+    DEBUG_ONLY(str(obj, Address(rthread, t2_top));)
+    addw(t2_top, t2_top, oopSize);
+    str(t2_top, Address(rthread, JavaThread::lock_stack_top_offset()));
+    b(slow_path);
+  }
+
+
+  { // Handle inflated monitor.
+    bind(inflated_load_monitor);
+    ldr(t1_mark, Address(obj, oopDesc::mark_offset_in_bytes()));
+#ifdef ASSERT
+    tbnz(t1_mark, exact_log2(markWord::monitor_value), inflated);
+    stop("Fast Unlock not monitor");
+#endif
+
+    bind(inflated);
+
+#ifdef ASSERT
+    Label check_done;
+    subw(t2_top, t2_top, oopSize);
+    cmpw(t2_top, in_bytes(JavaThread::lock_stack_base_offset()));
+    br(Assembler::LT, check_done);
+    ldr(t3_t, Address(rthread, t2_top));
+    cmp(obj, t3_t);
+    br(Assembler::NE, inflated);
+    stop("Fast Unlock lock on stack");
+    bind(check_done);
+#endif
+
+    // mark contains the tagged ObjectMonitor*.
+    const Register t1_monitor = t1_mark;
+    const uintptr_t monitor_tag = markWord::monitor_value;
+
+    // Untag the monitor.
+    sub(t1_monitor, t1_mark, monitor_tag);
+
+    const Register t2_recursions = t2;
+    Label not_recursive;
+
+    // Check if recursive.
+    ldr(t2_recursions, Address(t1_monitor, ObjectMonitor::recursions_offset_in_bytes()));
+    cbz(t2_recursions, not_recursive);
+
+    // Recursive unlock.
+    sub(t2_recursions, t2_recursions, 1u);
+    str(t2_recursions, Address(t1_monitor, ObjectMonitor::recursions_offset_in_bytes()));
+    // Set flag == EQ
+    cmp(t2_recursions, t2_recursions);
+    b(unlocked);
+
+    bind(not_recursive);
+
+    Label release;
+    const Register t2_owner_addr = t2;
+
+    // Compute owner address.
+    lea(t2_owner_addr, Address(t1_monitor, ObjectMonitor::owner_offset_in_bytes()));
+
+    // Check if the entry lists are empty.
+    ldr(rscratch1, Address(t1_monitor, ObjectMonitor::EntryList_offset_in_bytes()));
+    ldr(t3_t, Address(t1_monitor, ObjectMonitor::cxq_offset_in_bytes()));
+    orr(rscratch1, rscratch1, t3_t);
+    cmp(rscratch1, zr);
+    br(Assembler::EQ, release);
+
+    // The owner may be anonymous and we removed the last obj entry in
+    // the lock-stack. This loses the information about the owner.
+    // Write the thread to the owner field so the runtime knows the owner.
+    str(rthread, Address(t2_owner_addr));
+    b(slow_path);
+
+    bind(release);
+    // Set owner to null.
+    // Release to satisfy the JMM
+    stlr(zr, t2_owner_addr);
+  }
+
+  bind(unlocked);
+#ifdef ASSERT
+  // Check that unlocked label is reached with Flags == EQ.
+  Label flag_correct;
+  br(Assembler::EQ, flag_correct);
+  stop("Fast Unlock Flag != EQ");
+#endif
+
+  bind(slow_path);
+#ifdef ASSERT
+  // Check that slow_path label is reached with Flags == NE.
+  br(Assembler::NE, flag_correct);
+  stop("Fast Unlock Flag != NE");
+  bind(flag_correct);
+#endif
+  // C2 uses the value of Flags (NE vs EQ) to determine the continuation.
+}
 
 // Search for str1 in str2 and return index or -1
 void C2_MacroAssembler::string_indexof(Register str2, Register str1,
@@ -874,4 +1306,31 @@ void C2_MacroAssembler::neon_compare(FloatRegister dst, BasicType bt, FloatRegis
         ShouldNotReachHere();
     }
   }
+}
+
+void C2_MacroAssembler::load_nklass_compact(Register dst, Register obj, Register index, int scale, int disp) {
+  C2LoadNKlassStub* stub = new (Compile::current()->comp_arena()) C2LoadNKlassStub(dst);
+  Compile::current()->output()->add_stub(stub);
+
+  // Note: Don't clobber obj anywhere in that method!
+
+  // The incoming address is pointing into obj-start + klass_offset_in_bytes. We need to extract
+  // obj-start, so that we can load from the object's mark-word instead. Usually the address
+  // comes as obj-start in obj and klass_offset_in_bytes in disp. However, sometimes C2
+  // emits code that pre-computes obj-start + klass_offset_in_bytes into a register, and
+  // then passes that register as obj and 0 in disp. The following code extracts the base
+  // and offset to load the mark-word.
+  int offset = oopDesc::mark_offset_in_bytes() + disp - oopDesc::klass_offset_in_bytes();
+  if (index == noreg) {
+    ldr(dst, Address(obj, offset));
+  } else {
+    lea(dst, Address(obj, index, Address::lsl(scale)));
+    ldr(dst, Address(dst, offset));
+  }
+  // NOTE: We can't use tbnz here, because the target is sometimes too far away
+  // and cannot be encoded.
+  tst(dst, markWord::monitor_value);
+  br(Assembler::NE, stub->entry());
+  bind(stub->continuation());
+  lsr(dst, dst, markWord::klass_shift);
 }

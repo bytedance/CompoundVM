@@ -47,8 +47,14 @@ inline void PreservedMarks::push_if_necessary(oop obj, markWord m) {
   }
 }
 
+inline void PreservedMarks::push_always(oop obj, markWord m) {
+  assert(!m.is_marked(), "precondition");
+  OopAndMarkWord elem(obj, m);
+  _stack.push(elem);
+}
+
 inline void PreservedMarks::init_forwarded_mark(oop obj) {
-  obj->init_mark();
+  obj->forward_safe_init_mark();
 }
 
 inline PreservedMarks::PreservedMarks()

@@ -177,13 +177,27 @@ inline bool HeapRegion::is_obj_dead(const oop obj, const G1CMBitMap* const prev_
          !is_closed_archive();
 }
 
+template <bool RESOLVE>
 inline size_t HeapRegion::block_size(const HeapWord *addr) const {
   if (addr == top()) {
     return pointer_delta(end(), addr);
   }
 
   if (block_is_obj(addr)) {
-    return cast_to_oop(addr)->size();
+    oop obj = cast_to_oop(addr);
+#ifdef _LP64
+#ifdef ASSERT
+    if (RESOLVE) {
+      assert(UseCompactObjectHeaders && !G1CollectedHeap::heap()->collector_state()->in_full_gc(), "Illegal/excessive resolve during full-GC");
+    } else {
+      assert(!UseCompactObjectHeaders || G1CollectedHeap::heap()->collector_state()->in_full_gc() || !obj->is_forwarded(), "Missing resolve when forwarded during normal GC");
+    }
+#endif
+    if (RESOLVE && obj->is_forwarded()) {
+      obj = obj->forwardee();
+    }
+#endif
+    return obj->size();
   }
 
   return block_size_using_bitmap(addr, G1CollectedHeap::heap()->concurrent_mark()->prev_mark_bitmap());

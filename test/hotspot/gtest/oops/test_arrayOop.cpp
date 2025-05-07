@@ -87,3 +87,58 @@ TEST_VM(arrayOopDesc, narrowOop) {
   ASSERT_PRED1(check_max_length_overflow, T_NARROWOOP);
 }
 // T_VOID and T_ADDRESS are not supported by max_array_length()
+
+TEST_VM(arrayOopDesc, base_offset) {
+#ifdef _LP64
+  if (UseCompactObjectHeaders) {
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_BOOLEAN), 12);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_BYTE),    12);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_SHORT),   12);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_CHAR),    12);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_INT),     12);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_FLOAT),   12);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_LONG),    16);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_DOUBLE),  16);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_OBJECT),  12);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_ARRAY),   12);
+  } else if (UseCompressedClassPointers) {
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_BOOLEAN), 16);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_BYTE),    16);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_SHORT),   16);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_CHAR),    16);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_INT),     16);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_FLOAT),   16);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_LONG),    16);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_DOUBLE),  16);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_OBJECT),  16);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_ARRAY),   16);
+  } else {
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_BOOLEAN), 20);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_BYTE),    20);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_SHORT),   20);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_CHAR),    20);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_INT),     20);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_FLOAT),   20);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_LONG),    24);
+    EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_DOUBLE),  24);
+    if (UseCompressedOops) {
+      EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_OBJECT), 20);
+      EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_ARRAY),  20);
+    } else {
+      EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_OBJECT), 24);
+      EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_ARRAY),  24);
+    }
+  }
+#else
+  EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_BOOLEAN), 12);
+  EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_BYTE),    12);
+  EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_SHORT),   12);
+  EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_CHAR),    12);
+  EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_INT),     12);
+  EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_FLOAT),   12);
+  EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_LONG),    16);
+  EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_DOUBLE),  16);
+  EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_OBJECT),  12);
+  EXPECT_EQ(arrayOopDesc::base_offset_in_bytes(T_ARRAY),   12);
+#endif
+}

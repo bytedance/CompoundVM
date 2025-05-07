@@ -22,6 +22,7 @@
  */
 
 #include "precompiled.hpp"
+#include "gc/shared/gc_globals.hpp"
 #include "gc/shared/preservedMarks.inline.hpp"
 #include "oops/oop.inline.hpp"
 #include "unittest.hpp"
@@ -65,6 +66,8 @@ TEST_VM(PreservedMarks, iterate_and_restore) {
   FakeOop o2;
   FakeOop o3;
   FakeOop o4;
+
+  FlagSetting fs(UseAltGCForwarding, false);
 
   // Make sure initial marks are correct.
   ASSERT_MARK_WORD_EQ(o1.mark(), FakeOop::originalMark());

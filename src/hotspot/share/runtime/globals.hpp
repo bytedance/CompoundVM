@@ -131,6 +131,9 @@ const size_t minimumSymbolTableSize = 1024;
           "Use 32-bit class pointers in 64-bit VM. "                        \
           "lp64_product means flag is always constant in 32 bit VM")        \
                                                                             \
+  product(bool, UseCompactObjectHeaders, false, EXPERIMENTAL,               \
+          "Use 64-bit object headers instead of 96-bit headers")            \
+                                                                            \
   product(intx, ObjectAlignmentInBytes, 8,                                  \
           "Default object alignment in bytes, 8 is minimum")                \
           range(8, 256)                                                     \
@@ -148,6 +151,7 @@ const size_t minimumSymbolTableSize = 1024;
                            constraint)
 const bool UseCompressedOops = false;
 const bool UseCompressedClassPointers = false;
+const bool UseCompactObjectHeaders = false;
 const intx ObjectAlignmentInBytes = 8;
 
 #endif // _LP64
@@ -2095,8 +2099,39 @@ const intx ObjectAlignmentInBytes = 8;
              "Mark all threads after a safepoint, and clear on a modify "   \
              "fence. Add cleanliness checks.")                              \
                                                                             \
+  product(bool, HeapObjectStats, false, DIAGNOSTIC,                         \
+             "Enable gathering of heap object statistics")                  \
+                                                                            \
+  product(size_t, HeapObjectStatsSamplingInterval, 500, DIAGNOSTIC,         \
+             "Heap object statistics sampling interval (ms)")               \
+                                                                            \
+  product(int, LockingMode, LM_LEGACY, EXPERIMENTAL,                        \
+          "Select locking mode: "                                           \
+          "0: monitors only (LM_MONITOR), "                                 \
+          "1: monitors & legacy stack-locking (LM_LEGACY, default), "       \
+          "2: monitors & new lightweight locking (LM_LIGHTWEIGHT)")         \
+          range(0, 2)                                                       \
+                                                                            \
+  product(bool, UseObjectMonitorTable, false, DIAGNOSTIC,                   \
+          "With Lightweight Locking mode, use a table to record inflated "  \
+          "monitors rather than the first word of the object.")             \
+                                                                            \
+  product(int, LightweightFastLockingSpins, 13, DIAGNOSTIC,                 \
+          "Specifies the number of time lightweight fast locking will "     \
+          "attempt to CAS the markWord before inflating. Between each "     \
+          "CAS it will spin for exponentially more time, resulting in "     \
+          "a total number of spins on the order of O(2^value)")             \
+          range(1, 30)                                                      \
+                                                                            \
   develop(bool, TraceOptimizedUpcallStubs, false,                              \
                 "Trace optimized upcall stub generation")                      \
+                                                                            \
+  product(uint, TrimNativeHeapInterval, 0, EXPERIMENTAL,                    \
+          "Interval, in ms, at which the JVM will trim the native heap if " \
+          "the platform supports that. Lower values will reclaim memory "   \
+          "more eagerly at the cost of higher overhead. A value of 0 "      \
+          "(default) disables native heap trimming.")                       \
+          range(0, UINT_MAX)                                                \
                                                                             \
   CLASSLIB8_ONLY(develop(bool, VerifyLatin1NamesOnly, false,                \
                  "Ensure class/method/field names are encoded in Latin1"))  \

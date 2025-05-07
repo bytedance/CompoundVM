@@ -30,6 +30,7 @@
 #include "c1/c1_Runtime1.hpp"
 #include "classfile/javaClasses.hpp"
 #include "nativeInst_x86.hpp"
+#include "runtime/objectMonitor.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "utilities/align.hpp"
 #include "utilities/macros.hpp"
@@ -299,7 +300,6 @@ void MonitorExitStub::emit_code(LIR_Assembler* ce) {
   __ call(RuntimeAddress(Runtime1::entry_for(exit_id)));
   __ jmp(_continuation);
 }
-
 
 // Implementation of patching:
 // - Copy the code at given offset to an inlined buffer (first the bytes, then the number of bytes)

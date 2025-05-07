@@ -142,6 +142,16 @@
 #include "opto/vectornode.hpp"
 #endif // COMPILER2
 
+// Used by VMStructs when CompactObjectHeaders are enabled.
+// Must match the relevant parts from the real oopDesc.
+class fakeOopDesc {
+private:
+  union _metadata {
+    Klass*      _klass;
+    narrowKlass _compressed_klass;
+  } _metadata;
+};
+
 // Note: the cross-product of (c1, c2, product, nonproduct, ...),
 // (nonstatic, static), and (unchecked, checked) has not been taken.
 // Only the macros currently needed have been defined.
@@ -734,6 +744,9 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
   nonstatic_field(Thread,                      _active_handles,                               JNIHandleBlock*)                       \
   nonstatic_field(Thread,                      _tlab,                                         ThreadLocalAllocBuffer)                \
   nonstatic_field(Thread,                      _allocated_bytes,                              jlong)                                 \
+  nonstatic_field(JavaThread,                  _lock_stack,                                   LockStack)                             \
+  nonstatic_field(LockStack,                   _top,                                          uint32_t)                              \
+  nonstatic_field(LockStack,                   _base[0],                                      oop)                                   \
   nonstatic_field(NamedThread,                 _name,                                         char*)                                 \
   nonstatic_field(NamedThread,                 _processed_thread,                             Thread*)                               \
   nonstatic_field(JavaThread,                  _threadObj,                                    OopHandle)                             \
@@ -876,11 +889,11 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
   /* Monitors */                                                                                                                     \
   /************/                                                                                                                     \
                                                                                                                                      \
-  volatile_nonstatic_field(ObjectMonitor,      _header,                                       markWord)                              \
+  volatile_nonstatic_field(ObjectMonitor,      _metadata,                                     uintptr_t)                             \
   unchecked_nonstatic_field(ObjectMonitor,     _object,                                       sizeof(void *)) /* NOTE: no type */    \
   unchecked_nonstatic_field(ObjectMonitor,     _owner,                                        sizeof(void *)) /* NOTE: no type */    \
   volatile_nonstatic_field(ObjectMonitor,      _next_om,                                      ObjectMonitor*)                        \
-  volatile_nonstatic_field(BasicLock,          _displaced_header,                             markWord)                              \
+  volatile_nonstatic_field(BasicLock,          _metadata,                                     uintptr_t)                             \
   nonstatic_field(ObjectMonitor,               _contentions,                                  jint)                                  \
   volatile_nonstatic_field(ObjectMonitor,      _waiters,                                      jint)                                  \
   volatile_nonstatic_field(ObjectMonitor,      _recursions,                                   intx)                                  \
@@ -1239,6 +1252,8 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
       declare_type(objArrayOopDesc, arrayOopDesc)                         \
     declare_type(instanceOopDesc, oopDesc)                                \
                                                                           \
+  declare_toplevel_type(fakeOopDesc)                                      \
+                                                                          \
   /**************************************************/                    \
   /* MetadataOopDesc hierarchy (NOTE: some missing) */                    \
   /**************************************************/                    \
@@ -1350,6 +1365,7 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
                                                                           \
   declare_toplevel_type(ThreadsSMRSupport)                                \
   declare_toplevel_type(ThreadsList)                                      \
+  declare_toplevel_type(LockStack)                                        \
                                                                           \
   /***************/                                                       \
   /* Interpreter */                                                       \
@@ -2471,6 +2487,14 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
   declare_constant(T_NARROWKLASS_size)                                    \
   declare_constant(T_VOID_size)                                           \
                                                                           \
+  /**********************************************/                        \
+  /* LockingMode enum (globalDefinitions.hpp) */                          \
+  /**********************************************/                        \
+                                                                          \
+  declare_constant(LM_MONITOR)                                            \
+  declare_constant(LM_LEGACY)                                             \
+  declare_constant(LM_LIGHTWEIGHT)                                        \
+                                                                          \
   /*********************/                                                 \
   /* Matcher (C2 only) */                                                 \
   /*********************/                                                 \
@@ -2633,11 +2657,14 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
   declare_constant(markWord::biased_lock_bits)                            \
   declare_constant(markWord::max_hash_bits)                               \
   declare_constant(markWord::hash_bits)                                   \
+  declare_constant(markWord::hash_bits_compact)                           \
                                                                           \
   declare_constant(markWord::lock_shift)                                  \
   declare_constant(markWord::biased_lock_shift)                           \
   declare_constant(markWord::age_shift)                                   \
   declare_constant(markWord::hash_shift)                                  \
+  declare_constant(markWord::hash_shift_compact)                          \
+  LP64_ONLY(declare_constant(markWord::klass_shift))                      \
                                                                           \
   declare_constant(markWord::lock_mask)                                   \
   declare_constant(markWord::lock_mask_in_place)                          \
@@ -2650,6 +2677,8 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
   declare_constant(markWord::epoch_mask_in_place)                         \
   declare_constant(markWord::hash_mask)                                   \
   declare_constant(markWord::hash_mask_in_place)                          \
+  declare_constant(markWord::hash_mask_compact)                           \
+  declare_constant(markWord::hash_mask_compact_in_place)                  \
   declare_constant(markWord::biased_lock_alignment)                       \
                                                                           \
   declare_constant(markWord::locked_value)                                \
@@ -2665,8 +2694,10 @@ typedef HashtableEntry<InstanceKlass*, mtClass>  KlassHashtableEntry;
                                                                           \
   /* InvocationCounter constants */                                       \
   declare_constant(InvocationCounter::count_increment)                    \
-  declare_constant(InvocationCounter::count_shift)
-
+  declare_constant(InvocationCounter::count_shift)                        \
+                                                                          \
+  /* ObjectMonitor constants */                                           \
+  declare_constant(ObjectMonitor::ANONYMOUS_OWNER)                        \
 
 //--------------------------------------------------------------------------------
 //
@@ -3186,3 +3217,29 @@ void vmStructs_init() {
   VMStructs::init();
 }
 #endif // ASSERT
+
+void VMStructs::compact_headers_overrides() {
+  assert(UseCompactObjectHeaders, "Should have been checked before");
+
+  // We cannot allow SA and other facilities to poke into VM internal fields
+  // expecting the class pointers there. This will crash in the best case,
+  // or yield incorrect execution in the worst case. This code hides the
+  // risky fields from external code by replacing their original container
+  // type to a fake one. The fake type should exist for VMStructs verification
+  // code to work.
+
+  size_t len = localHotSpotVMStructsLength();
+  for (size_t off = 0; off < len; off++) {
+    VMStructEntry* e = &localHotSpotVMStructs[off];
+    if (e == nullptr) continue;
+    if (e->typeName == nullptr) continue;
+    if (e->fieldName == nullptr) continue;
+
+    if (strcmp(e->typeName, "oopDesc") == 0) {
+      if ((strcmp(e->fieldName, "_metadata._klass") == 0) ||
+          (strcmp(e->fieldName, "_metadata._compressed_klass") == 0)) {
+        e->typeName = "fakeOopDesc";
+      }
+    }
+  }
+}

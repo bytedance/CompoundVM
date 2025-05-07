@@ -32,15 +32,9 @@
 
 class instanceOopDesc : public oopDesc {
  public:
-  // aligned header size.
-  static int header_size() { return sizeof(instanceOopDesc)/HeapWordSize; }
-
   // If compressed, the offset of the fields of the instance may not be aligned.
   static int base_offset_in_bytes() {
-    return (UseCompressedClassPointers) ?
-            klass_gap_offset_in_bytes() :
-            sizeof(instanceOopDesc);
-
+    return oopDesc::base_offset_in_bytes();
   }
 };
 

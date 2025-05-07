@@ -32,6 +32,7 @@
 #include "gc/shared/locationPrinter.inline.hpp"
 #include "gc/shared/memAllocator.hpp"
 #include "gc/shared/plab.hpp"
+#include "gc/shared/slidingForwarding.hpp"
 #include "gc/shared/tlab_globals.hpp"
 
 #include "gc/shenandoah/shenandoahBarrierSet.hpp"
@@ -400,6 +401,8 @@ jint ShenandoahHeap::initialize() {
   _control_thread = new ShenandoahControlThread();
 
   ShenandoahInitLogger::print();
+
+  SlidingForwarding::initialize(_heap_region, ShenandoahHeapRegion::region_size_words());
 
   return JNI_OK;
 }
@@ -951,7 +954,7 @@ public:
 
   void do_object(oop p) {
     shenandoah_assert_marked(NULL, p);
-    if (!p->is_forwarded()) {
+    if (!ShenandoahForwarding::is_forwarded(p)) {
       _heap->evacuate_object(p, _thread);
     }
   }
@@ -1239,7 +1242,7 @@ private:
         // There may be dead oops in weak roots in concurrent root phase, do not touch them.
         return;
       }
-      obj = ShenandoahBarrierSet::resolve_forwarded_not_null(obj);
+      obj = ShenandoahBarrierSet::barrier_set()->load_reference_barrier(obj);
 
       assert(oopDesc::is_oop(obj), "must be a valid oop");
       if (!_bitmap->is_marked(obj)) {
@@ -1295,6 +1298,7 @@ void ShenandoahHeap::object_iterate(ObjectClosure* cl) {
   while (! oop_stack.is_empty()) {
     oop obj = oop_stack.pop();
     assert(oopDesc::is_oop(obj), "must be a valid oop");
+    shenandoah_assert_not_in_cset_except(NULL, obj, cancelled_gc());
     cl->do_object(obj);
     obj->oop_iterate(&oops);
   }
@@ -1348,7 +1352,7 @@ private:
         // There may be dead oops in weak roots in concurrent root phase, do not touch them.
         return;
       }
-      obj = ShenandoahBarrierSet::resolve_forwarded_not_null(obj);
+      obj = ShenandoahBarrierSet::barrier_set()->load_reference_barrier(obj);
 
       assert(oopDesc::is_oop(obj), "Must be a valid oop");
       if (_bitmap->par_mark(obj)) {

@@ -44,6 +44,8 @@ public class JavaThread extends Thread {
   private static final boolean DEBUG = System.getProperty("sun.jvm.hotspot.runtime.JavaThread.DEBUG") != null;
 
   private static long          threadObjFieldOffset;
+  private static long          lockStackTopOffset;
+  private static long          lockStackBaseOffset;
   private static AddressField  anchorField;
   private static AddressField  lastJavaSPField;
   private static AddressField  lastJavaPCField;
@@ -52,6 +54,7 @@ public class JavaThread extends Thread {
   private static AddressField  stackBaseField;
   private static CIntegerField stackSizeField;
   private static CIntegerField terminatedField;
+  private static long oopPtrSize;
 
   private static JavaThreadPDAccess access;
 
@@ -84,6 +87,7 @@ public class JavaThread extends Thread {
   private static synchronized void initialize(TypeDataBase db) {
     Type type = db.lookupType("JavaThread");
     Type anchorType = db.lookupType("JavaFrameAnchor");
+    Type typeLockStack = db.lookupType("LockStack");
 
     threadObjFieldOffset = type.getField("_threadObj").getOffset();
 
@@ -95,6 +99,10 @@ public class JavaThread extends Thread {
     stackBaseField    = type.getAddressField("_stack_base");
     stackSizeField    = type.getCIntegerField("_stack_size");
     terminatedField   = type.getCIntegerField("_terminated");
+
+    lockStackTopOffset = type.getField("_lock_stack").getOffset() + typeLockStack.getField("_top").getOffset();
+    lockStackBaseOffset = type.getField("_lock_stack").getOffset() + typeLockStack.getField("_base[0]").getOffset();
+    oopPtrSize = VM.getVM().getAddressSize();
 
     UNINITIALIZED     = db.lookupIntConstant("_thread_uninitialized").intValue();
     NEW               = db.lookupIntConstant("_thread_new").intValue();
@@ -390,6 +398,23 @@ public class JavaThread extends Thread {
     // Be robust
     if (sp == null) return false;
     return stackBase.greaterThan(a) && sp.lessThanOrEqual(a);
+  }
+
+  public boolean isLockOwned(OopHandle obj) {
+    long current = lockStackBaseOffset;
+    long end = addr.getJIntAt(lockStackTopOffset);
+    if (Assert.ASSERTS_ENABLED) {
+      Assert.that(current <= end, "current stack offset must be above base offset");
+    }
+
+    while (current < end) {
+      Address oop = addr.getAddressAt(current);
+      if (oop.equals(obj)) {
+        return true;
+      }
+      current += oopPtrSize;
+    }
+    return false;
   }
 
   public boolean isLockOwned(Address a) {

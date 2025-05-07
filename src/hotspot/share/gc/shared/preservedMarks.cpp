@@ -24,6 +24,7 @@
 
 #include "precompiled.hpp"
 #include "gc/shared/preservedMarks.inline.hpp"
+#include "gc/shared/slidingForwarding.inline.hpp"
 #include "gc/shared/workgroup.hpp"
 #include "memory/allocation.inline.hpp"
 #include "memory/resourceArea.hpp"
@@ -39,15 +40,24 @@ void PreservedMarks::restore() {
   assert_empty();
 }
 
-void PreservedMarks::adjust_during_full_gc() {
+template <bool ALT_FWD>
+void PreservedMarks::adjust_during_full_gc_impl() {
   StackIterator<OopAndMarkWord, mtGC> iter(_stack);
   while (!iter.is_empty()) {
     OopAndMarkWord* elem = iter.next_addr();
 
     oop obj = elem->get_oop();
-    if (obj->is_forwarded()) {
-      elem->set_oop(obj->forwardee());
+    if (SlidingForwarding::is_forwarded(obj)) {
+      elem->set_oop(SlidingForwarding::forwardee<ALT_FWD>(obj));
     }
+  }
+}
+
+void PreservedMarks::adjust_during_full_gc() {
+  if (UseAltGCForwarding) {
+    adjust_during_full_gc_impl<true>();
+  } else {
+    adjust_during_full_gc_impl<false>();
   }
 }
 
@@ -124,8 +134,10 @@ public:
 
   ~RestorePreservedMarksTask() {
     assert(_total_size == _total_size_before, "total_size = %zu before = %zu", _total_size, _total_size_before);
-
-    log_trace(gc)("Restored %zu marks", _total_size);
+    size_t mem_size = _total_size * (sizeof(oop) + sizeof(markWord));
+    log_trace(gc)("Restored %zu marks, occupying %zu %s", _total_size,
+                                                          byte_size_in_proper_unit(mem_size),
+                                                          proper_unit_for_byte_size(mem_size));
   }
 };
 

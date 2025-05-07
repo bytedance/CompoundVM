@@ -47,6 +47,7 @@ static JNINativeMethod methods[] = {
     {"suspend0",         "()V",        (void *)&JVM_SuspendThread},
     {"resume0",          "()V",        (void *)&JVM_ResumeThread},
     {"setPriority0",     "(I)V",       (void *)&JVM_SetThreadPriority},
+    {"isAlive",          "()Z",        (void *)&JVM_IsThreadAlive},
     {"yield",            "()V",        (void *)&JVM_Yield},
     {"sleep",            "(J)V",       (void *)&JVM_Sleep},
     {"currentThread",    "()" THD,     (void *)&JVM_CurrentThread},

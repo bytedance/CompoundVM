@@ -52,10 +52,15 @@ public class Mark extends VMObject {
     biasedLockBits      = db.lookupLongConstant("markWord::biased_lock_bits").longValue();
     maxHashBits         = db.lookupLongConstant("markWord::max_hash_bits").longValue();
     hashBits            = db.lookupLongConstant("markWord::hash_bits").longValue();
+    hashBitsCompact     = db.lookupLongConstant("markWord::hash_bits_compact").longValue();
     lockShift           = db.lookupLongConstant("markWord::lock_shift").longValue();
     biasedLockShift     = db.lookupLongConstant("markWord::biased_lock_shift").longValue();
     ageShift            = db.lookupLongConstant("markWord::age_shift").longValue();
     hashShift           = db.lookupLongConstant("markWord::hash_shift").longValue();
+    hashShiftCompact    = db.lookupLongConstant("markWord::hash_shift_compact").longValue();
+    if (VM.getVM().isLP64()) {
+      klassShift          = db.lookupLongConstant("markWord::klass_shift").longValue();
+    }
     lockMask            = db.lookupLongConstant("markWord::lock_mask").longValue();
     lockMaskInPlace     = db.lookupLongConstant("markWord::lock_mask_in_place").longValue();
     biasedLockMask      = db.lookupLongConstant("markWord::biased_lock_mask").longValue();
@@ -65,6 +70,8 @@ public class Mark extends VMObject {
     ageMaskInPlace      = db.lookupLongConstant("markWord::age_mask_in_place").longValue();
     hashMask            = db.lookupLongConstant("markWord::hash_mask").longValue();
     hashMaskInPlace     = db.lookupLongConstant("markWord::hash_mask_in_place").longValue();
+    hashMaskCompact     = db.lookupLongConstant("markWord::hash_mask_compact").longValue();
+    hashMaskCompactInPlace = db.lookupLongConstant("markWord::hash_mask_compact_in_place").longValue();
     biasedLockAlignment  = db.lookupLongConstant("markWord::biased_lock_alignment").longValue();
     lockedValue         = db.lookupLongConstant("markWord::locked_value").longValue();
     unlockedValue       = db.lookupLongConstant("markWord::unlocked_value").longValue();
@@ -86,11 +93,14 @@ public class Mark extends VMObject {
   private static long biasedLockBits;
   private static long maxHashBits;
   private static long hashBits;
+  private static long hashBitsCompact;
 
   private static long lockShift;
   private static long biasedLockShift;
   private static long ageShift;
   private static long hashShift;
+  private static long hashShiftCompact;
+  private static long klassShift;
 
   private static long lockMask;
   private static long lockMaskInPlace;
@@ -101,6 +111,8 @@ public class Mark extends VMObject {
   private static long ageMaskInPlace;
   private static long hashMask;
   private static long hashMaskInPlace;
+  private static long hashMaskCompact;
+  private static long hashMaskCompactInPlace;
   private static long biasedLockAlignment;
 
   private static long lockedValue;
@@ -120,6 +132,10 @@ public class Mark extends VMObject {
   private static long cmsShift;
   private static long cmsMask;
   private static long sizeShift;
+
+  public static long getKlassShift() {
+    return klassShift;
+  }
 
   public Mark(Address addr) {
     super(addr);
@@ -197,6 +213,16 @@ public class Mark extends VMObject {
     if (Assert.ASSERTS_ENABLED) {
       Assert.that(hasMonitor(), "check");
     }
+    if (VM.getVM().getCommandLineFlag("UseObjectMonitorTable").getBool()) {
+      Iterator it = ObjectSynchronizer.objectMonitorIterator();
+      while (it != null && it.hasNext()) {
+        ObjectMonitor mon = (ObjectMonitor)it.next();
+        if (getAddress().equals(mon.object())) {
+          return mon;
+        }
+      }
+      return null;
+    }
     // Use xor instead of &~ to provide one extra tag-bit check.
     Address monAddr = valueAsAddress().xorWithMask(monitorValue);
     return new ObjectMonitor(monAddr);
@@ -215,11 +241,21 @@ public class Mark extends VMObject {
 
   // hash operations
   public long hash() {
-    return Bits.maskBitsLong(value() >> hashShift, hashMask);
+    if (VM.getVM().isCompactObjectHeadersEnabled()) {
+      return Bits.maskBitsLong(value() >> hashShiftCompact, hashMaskCompact);
+    } else {
+      return Bits.maskBitsLong(value() >> hashShift, hashMask);
+    }
   }
 
   public boolean hasNoHash() {
     return hash() == noHash;
+  }
+
+  public Klass getKlass() {
+    assert(VM.getVM().isCompactObjectHeadersEnabled());
+    assert(!hasMonitor());
+    return (Klass)Metadata.instantiateWrapperFor(addr.getCompKlassAddressAt(0));
   }
 
   // Debugging

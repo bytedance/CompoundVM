@@ -25,6 +25,7 @@
 #include "precompiled.hpp"
 #include "gc/g1/g1FullGCCompactionPoint.hpp"
 #include "gc/g1/heapRegion.hpp"
+#include "gc/shared/slidingForwarding.inline.hpp"
 #include "oops/oop.inline.hpp"
 #include "utilities/debug.hpp"
 
@@ -93,6 +94,7 @@ void G1FullGCCompactionPoint::switch_region() {
   initialize_values(true);
 }
 
+template <bool ALT_FWD>
 void G1FullGCCompactionPoint::forward(oop object, size_t size) {
   assert(_current_region != NULL, "Must have been initialized");
 
@@ -103,8 +105,10 @@ void G1FullGCCompactionPoint::forward(oop object, size_t size) {
 
   // Store a forwarding pointer if the object should be moved.
   if (cast_from_oop<HeapWord*>(object) != _compaction_top) {
-    object->forward_to(cast_to_oop(_compaction_top));
+    SlidingForwarding::forward_to<ALT_FWD>(object, cast_to_oop(_compaction_top));
   } else {
+    assert(!SlidingForwarding::is_forwarded(object), "should not be forwarded");
+    /*
     if (object->forwardee() != NULL) {
       // Object should not move but mark-word is used so it looks like the
       // object is forwarded. Need to clear the mark and it's no problem
@@ -123,6 +127,7 @@ void G1FullGCCompactionPoint::forward(oop object, size_t size) {
              p2i(object), object->mark().value(), markWord::prototype_for_klass(object->klass()).value());
     }
     assert(object->forwardee() == NULL, "should be forwarded to NULL");
+    */
   }
 
   // Update compaction values.
@@ -131,6 +136,9 @@ void G1FullGCCompactionPoint::forward(oop object, size_t size) {
     _threshold = _current_region->cross_threshold(_compaction_top - size, _compaction_top);
   }
 }
+
+template void G1FullGCCompactionPoint::forward<true>(oop object, size_t size);
+template void G1FullGCCompactionPoint::forward<false>(oop object, size_t size);
 
 void G1FullGCCompactionPoint::add(HeapRegion* hr) {
   _compaction_regions->append(hr);

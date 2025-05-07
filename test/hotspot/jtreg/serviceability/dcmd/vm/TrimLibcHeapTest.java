@@ -22,6 +22,7 @@
  * questions.
  */
 
+import jdk.test.lib.Platform;
 import org.testng.annotations.Test;
 import jdk.test.lib.dcmd.CommandExecutor;
 import jdk.test.lib.dcmd.JMXExecutor;
@@ -31,7 +32,7 @@ import jdk.test.lib.process.OutputAnalyzer;
  * @test
  * @summary Test of diagnostic command VM.trim_libc_heap
  * @library /test/lib
- * @requires os.family == "linux"
+ * @requires (os.family=="linux") & !vm.musl
  * @modules java.base/jdk.internal.misc
  *          java.compiler
  *          java.management
@@ -42,9 +43,10 @@ public class TrimLibcHeapTest {
     public void run(CommandExecutor executor) {
         OutputAnalyzer output = executor.execute("System.trim_native_heap");
         output.reportDiagnosticSummary();
-        output.shouldMatch("(Done|Not available)"); // Not available could happen on Linux + non-glibc (eg. muslc)
-        if (output.firstMatch("Done") != null) {
-            output.shouldMatch("(Virtual size before|RSS before|Swap before|No details available)");
+        if (Platform.isMusl()) {
+            output.shouldContain("Not available");
+        } else {
+            output.shouldMatch("Trim native heap: RSS\\+Swap: \\d+[BKMG]->\\d+[BKMG] \\(-\\d+[BKMG]\\)");
         }
     }
 

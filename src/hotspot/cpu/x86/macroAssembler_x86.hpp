@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -148,6 +148,8 @@ class MacroAssembler: public Assembler {
 
   void increment(Register reg, int value = 1) { LP64_ONLY(incrementq(reg, value)) NOT_LP64(incrementl(reg, value)) ; }
   void decrement(Register reg, int value = 1) { LP64_ONLY(decrementq(reg, value)) NOT_LP64(decrementl(reg, value)) ; }
+  void increment(Address dst, int value = 1)  { LP64_ONLY(incrementq(dst, value)) NOT_LP64(incrementl(dst, value)) ; }
+  void decrement(Address dst, int value = 1)  { LP64_ONLY(decrementq(dst, value)) NOT_LP64(decrementl(dst, value)) ; }
 
   void decrementl(Address dst, int value = 1);
   void decrementl(Register reg, int value = 1);
@@ -339,8 +341,19 @@ class MacroAssembler: public Assembler {
   void load_method_holder(Register holder, Register method);
 
   // oop manipulations
-  void load_klass(Register dst, Register src, Register tmp);
+  void load_klass(Register dst, Register src, Register tmp, bool null_check_src = false);
+#ifdef _LP64
+  void load_nklass_compact(Register dst, Register src);
+#endif
   void store_klass(Register dst, Register src, Register tmp);
+
+  // Compares the Klass pointer of an object to a given Klass (which might be narrow,
+  // depending on UseCompressedClassPointers).
+  void cmp_klass(Register klass, Register dst, Register tmp);
+
+  // Compares the Klass pointer of two objects o1 and o2. Result is in the condition flags.
+  // Uses t1 and t2 as temporary registers.
+  void cmp_klass(Register src, Register dst, Register tmp1, Register tmp2);
 
   void access_load_at(BasicType type, DecoratorSet decorators, Register dst, Address src,
                       Register tmp1, Register thread_tmp);
@@ -1910,6 +1923,9 @@ public:
 #endif // _LP64
 
   void vallones(XMMRegister dst, int vector_len);
+
+  void lightweight_lock(Register basic_lock, Register obj, Register reg_rax, Register thread, Register tmp, Label& slow);
+  void lightweight_unlock(Register obj, Register reg_rax, Register thread, Register tmp, Label& slow);
 };
 
 /**

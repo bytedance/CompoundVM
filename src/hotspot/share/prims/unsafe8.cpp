@@ -552,7 +552,7 @@ extern "C" jclass Unsafe_DefineClass0(JNIEnv *env, jobject unsafe, jstring name,
 static Klass*
 Unsafe_DefineAnonymousClass_impl(JNIEnv *env,
                                  jclass host_class, jbyteArray data, jobjectArray cp_patches_jh,
-                                 HeapWord* *temp_alloc,
+                                 jbyte* *temp_alloc,
                                  TRAPS) {
 
   if (UsePerfData) {
@@ -564,8 +564,7 @@ Unsafe_DefineAnonymousClass_impl(JNIEnv *env,
   }
 
   jint length = typeArrayOop(JNIHandles::resolve_non_null(data))->length();
-  jint word_length = (length + sizeof(HeapWord)-1) / sizeof(HeapWord);
-  HeapWord* body = NEW_C_HEAP_ARRAY(HeapWord, word_length, mtInternal);
+  jbyte* body = NEW_C_HEAP_ARRAY(jbyte, length, mtInternal);
   if (body == NULL) {
     THROW_0(vmSymbols::java_lang_OutOfMemoryError());
   }
@@ -575,7 +574,7 @@ Unsafe_DefineAnonymousClass_impl(JNIEnv *env,
 
   {
     jbyte* array_base = typeArrayOop(JNIHandles::resolve_non_null(data))->byte_at_addr(0);
-    Copy::conjoint_words((HeapWord*) array_base, body, word_length);
+    Copy::conjoint_jbytes(array_base, body, length);
   }
 
   u1* class_bytes = (u1*) body;
@@ -635,7 +634,7 @@ UNSAFE_ENTRY(jclass, Unsafe_DefineAnonymousClass(JNIEnv *env, jobject unsafe, jc
   UnsafeWrapper("Unsafe_DefineAnonymousClass");
   ResourceMark rm(THREAD);
 
-  HeapWord* temp_alloc = NULL;
+  jbyte* temp_alloc = NULL;
 
   anon_klass = Unsafe_DefineAnonymousClass_impl(env, host_class, data,
                                                 cp_patches_jh,
@@ -646,7 +645,7 @@ UNSAFE_ENTRY(jclass, Unsafe_DefineAnonymousClass(JNIEnv *env, jobject unsafe, jc
 
   // try/finally clause:
   if (temp_alloc != NULL) {
-    FREE_C_HEAP_ARRAY(HeapWord, temp_alloc);
+    FREE_C_HEAP_ARRAY(jbyte, temp_alloc);
   }
 
   // The anonymous class loader data has been artificially been kept alive to
