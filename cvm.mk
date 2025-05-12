@@ -153,7 +153,6 @@ jdk8vm17: -clean-jdk8vm17 -bootstrap build_jdk8u build_jdk17u altkernel
 	$(eval JDK8_IMAGEDIR=$(shell find $(JDK8_SRCROOT)/build -type d -name j2sdk-image | grep $(MODE)))
 	{ \
 		cp -Lfr $(JDK8_IMAGEDIR) $(CVM8DIR); \
-		cp -f $(SRC_BUILDDIR_8)/jdk/objs/libjli/libjli.debuginfo $(CVM8_LIBDIR)/jli/; \
 		cp -f $(BUILDDIR)/rt17.jar $(CVM8_JARDIR)/; \
 		cp -f $(BUILDDIR)/rt8.jar $(CVM8_JARDIR)/; \
 		cp -f $(BUILDDIR)/tools17.jar $(CVM8DIR)/lib/; \
@@ -163,12 +162,17 @@ jdk8vm17: -clean-jdk8vm17 -bootstrap build_jdk8u build_jdk17u altkernel
 		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjimage.so $(CVM8_LIBDIR)/libjimage17.so; \
 		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjava.so $(CVM8_LIBDIR)/libjava17.so; \
 		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjdwp.so $(CVM8_LIBDIR)/libjdwp17.so; \
-		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjava.debuginfo $(CVM8_LIBDIR)/libjava17.debuginfo; \
-		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjimage.debuginfo $(CVM8_LIBDIR)/libjimage17.debuginfo; \
-		cp -f $(SRC_BUILDDIR_17)/jdk/lib/server/libjvm.debuginfo $(CVM8_LIBDIR)/server17/libjvm.debuginfo; \
+		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjimage.diz $(CVM8_LIBDIR)/libjimage17.diz; \
+		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjava.diz $(CVM8_LIBDIR)/libjava17.diz; \
+		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjdwp.diz $(CVM8_LIBDIR)/libjdwp17.diz; \
 		[[ "x$$(grep server17 $(CVM8_LIBDIR)/jvm.cfg)" = "x" ]] && echo "-server17 KNOWN" >> $(CVM8_LIBDIR)/jvm.cfg; \
 		cp -rf $(CVM8DIR) $(OUTPUTDIR)/; \
 	}
+ifeq ($(MODE), release)
+	# Remove unwanted files from release build
+	find $(OUTPUTDIR)/jdk8 -name '*.diz' -execdir rm -f {} +
+	rm -fr $(OUTPUTDIR)/jdk8/demo
+endif
 	@echo "###### Done ######"
 	@echo
 
