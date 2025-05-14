@@ -258,7 +258,7 @@ ifeq ($(SKIP_BUILD), true)
 else
 -setup_jtreg8: $(JTREG) jdk8vm17
 endif
-	$(eval JT8_OPTS=-jdk:${CVM8DIR} -w:${JT8_WORKDIR} -r:${JT8_REPORTDIR} -a -ea -esa -ignore:quiet -ovm -v:fail,error,time -javaoption:-server17 ${JT8_OPTS})
+$(eval JT8_OPTS=-jdk:${CVM8DIR} -w:${JT8_WORKDIR} -r:${JT8_REPORTDIR} -a -ea -esa -ignore:quiet -ovm -v:fail,error,time -javaoption:-server17 -javaoptions:-Djdk.test.docker.image.name=ubuntu -javaoptions:-Djdk.test.docker.image.version=latest ${JT8_OPTS})
 
 # Setup bootstrap JDK from a given URL
 # $1  root directory of jtreg
