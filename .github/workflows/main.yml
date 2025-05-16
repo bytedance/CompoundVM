@@ -128,7 +128,7 @@ jobs:
       platform: linux-x64
       bootjdk-platform: linux-x64
       runs-on: ubuntu-22.04
-      debug-level: fastdebug
+      debug-level: release
 
   # Remove bundles so they are not misconstrued as binary distributions from the JDK project
   remove-bundles:
