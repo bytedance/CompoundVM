@@ -808,3 +808,4 @@ tools/javac/annotations/8218152/MalformedAnnotationProcessorTests.java
 tools/javac/defaultMethods/Assertions.java
 tools/javac/Paths/Diagnostics.sh
 tools/javac/Paths/MineField.sh
+tools/jdeps/DotFileTest.java
