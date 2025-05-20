@@ -126,12 +126,12 @@ jdk8u/jdk/src:
 cvm8: jdk8vm17
 
 cvm8default17: jdk8vm17
-	echo "-server17 KNOWN" > $(CVM8_LIBDIR)//jvm.cfg
-	echo "-server KNOWN" >> $(CVM8_LIBDIR)//jvm.cfg
-	echo "-client IGNORE" >> $(CVM8_LIBDIR)//jvm.cfg
-	echo "-server17 KNOWN" > $(OUTPUTDIR)/jdk8/jre/lib/amd64//jvm.cfg
+	echo "-server17 KNOWN" > $(CVM8_LIBDIR)/jvm.cfg
+	echo "-server KNOWN" >> $(CVM8_LIBDIR)/jvm.cfg
+	echo "-client IGNORE" >> $(CVM8_LIBDIR)/jvm.cfg
+	echo "-server17 KNOWN" > $(OUTPUTDIR)/jdk8/jre/lib/amd64/jvm.cfg
 	echo "-server KNOWN" >> $(OUTPUTDIR)/jdk8/jre/lib/amd64/jvm.cfg
-	echo "-client IGNORE" >> $(OUTPUTDIR)/jdk8/jre/lib/amd64//jvm.cfg
+	echo "-client IGNORE" >> $(OUTPUTDIR)/jdk8/jre/lib/amd64/jvm.cfg
 
 -clean-jdk8vm17:
 	rm -fr $(BUILDDIR)/alt_kernel
@@ -152,24 +152,26 @@ jdk8vm17: -clean-jdk8vm17 -bootstrap build_jdk8u build_jdk17u altkernel
 	$(eval SRC_BUILDDIR_8=$(shell find $(JDK8_SRCROOT)/build -type f -name build.log | grep $(MODE) | xargs dirname))
 	$(eval JDK8_IMAGEDIR=$(shell find $(JDK8_SRCROOT)/build -type d -name j2sdk-image | grep $(MODE)))
 	{ \
-		cp -Lfr $(JDK8_IMAGEDIR) $(CVM8DIR); \
-		cp -f $(BUILDDIR)/rt17.jar $(CVM8_JARDIR)/; \
-		cp -f $(BUILDDIR)/rt8.jar $(CVM8_JARDIR)/; \
-		cp -f $(BUILDDIR)/tools17.jar $(CVM8DIR)/lib/; \
-		cp -f $(BUILDDIR)/bin/* $(CVM8DIR)/bin/; \
-		mkdir -p $(CVM8_LIBDIR)/server17; \
-		cp -f $(SRC_BUILDDIR_17)/jdk/lib/server/libjvm.so $(CVM8_LIBDIR)/server17/libjvm.so; \
-		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjimage.so $(CVM8_LIBDIR)/libjimage17.so; \
-		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjava.so $(CVM8_LIBDIR)/libjava17.so; \
-		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjdwp.so $(CVM8_LIBDIR)/libjdwp17.so; \
-		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjimage.diz $(CVM8_LIBDIR)/libjimage17.diz; \
-		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjava.diz $(CVM8_LIBDIR)/libjava17.diz; \
-		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjdwp.diz $(CVM8_LIBDIR)/libjdwp17.diz; \
-		[[ "x$$(grep server17 $(CVM8_LIBDIR)/jvm.cfg)" = "x" ]] && echo "-server17 KNOWN" >> $(CVM8_LIBDIR)/jvm.cfg; \
+		cp -Lfr $(JDK8_IMAGEDIR) $(CVM8DIR) && \
+		cp -f $(BUILDDIR)/rt17.jar $(CVM8_JARDIR)/ && \
+		cp -f $(BUILDDIR)/rt8.jar $(CVM8_JARDIR)/ && \
+		cp -f $(BUILDDIR)/tools17.jar $(CVM8DIR)/lib/ && \
+		cp -f $(BUILDDIR)/bin/* $(CVM8DIR)/bin/ && \
+		mkdir -p $(CVM8_LIBDIR)/server17 && \
+		cp -f $(SRC_BUILDDIR_17)/jdk/lib/server/libjvm.so $(CVM8_LIBDIR)/server17/libjvm.so && \
+		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjimage.so $(CVM8_LIBDIR)/libjimage17.so && \
+		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjava.so $(CVM8_LIBDIR)/libjava17.so && \
+		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjdwp.so $(CVM8_LIBDIR)/libjdwp17.so && \
+		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjimage.debuginfo $(CVM8_LIBDIR)/libjimage17.debuginfo && \
+		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjava.debuginfo $(CVM8_LIBDIR)/libjava17.debuginfo && \
+		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjdwp.debuginfo $(CVM8_LIBDIR)/libjdwp17.debuginfo && \
+		cp -f $(SRC_BUILDDIR_17)/jdk/lib/server/libjvm.debuginfo $(CVM8_LIBDIR)/server17/libjvm.debuginfo && \
+		[[ "x$$(grep server17 $(CVM8_LIBDIR)/jvm.cfg)" = "x" ]] && echo "-server17 KNOWN" >> $(CVM8_LIBDIR)/jvm.cfg && \
 		cp -rf $(CVM8DIR) $(OUTPUTDIR)/; \
 	}
 ifeq ($(MODE), release)
 	# Remove unwanted files from release build
+	find $(OUTPUTDIR)/jdk8 -name '*.debuginfo' -execdir rm -f {} +
 	find $(OUTPUTDIR)/jdk8 -name '*.diz' -execdir rm -f {} +
 	rm -fr $(OUTPUTDIR)/jdk8/demo
 endif
