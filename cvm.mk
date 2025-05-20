@@ -167,6 +167,7 @@ jdk8vm17: -clean-jdk8vm17 -bootstrap build_jdk8u build_jdk17u altkernel
 		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjdwp.diz $(CVM8_LIBDIR)/libjdwp17.diz; \
 		[[ "x$$(grep server17 $(CVM8_LIBDIR)/jvm.cfg)" = "x" ]] && echo "-server17 KNOWN" >> $(CVM8_LIBDIR)/jvm.cfg; \
 		cp -rf $(CVM8DIR) $(OUTPUTDIR)/; \
+		[[ $$? -eq 0 ]] || exit 127; \
 	}
 ifeq ($(MODE), release)
 	# Remove unwanted files from release build
