@@ -103,7 +103,7 @@ jobs:
 
       - name: 'Pack bundles'
         run: |
-          tar cvzf cvm8+17-${{ inputs.platform }}-${{ matrix.debug-level}}.tar.gz -C cvm/build jdk8
+          tar cvzf cvm8+17-${{ inputs.platform }}-${{ matrix.debug-level}}.tar.gz -C output jdk8
         shell: bash
 
       - name: 'Upload bundles'
