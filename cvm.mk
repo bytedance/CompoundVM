@@ -283,6 +283,18 @@ define run_jtreg8_test
 	@{ cd ${JT8_DIR} && ${CUR_CMD}; }
 endef
 
+# Overwrite upstream source file with the modified version shipped in CompoundVM repo
+# $1   repository name from within cvm/overlay
+# $2   filepath relative to $1
+# $3   destination repo directory
+define overlay_single
+	$(eval REPO=$(1))
+	$(eval FILEPATH=$(2))
+	$(eval DESTDIR=$(3))
+	@{ test -e $(DESTDIR)/$(FILEPATH)_origin || cp -f $(DESTDIR)/$(FILEPATH) $(DESTDIR)/$(FILEPATH)_origin; }
+	@{ cd cvm/overlay/$(REPO) && cp -f --parents $(FILEPATH) $(DESTDIR)/; }
+endef
+
 JT_OPTS_EXCLUDE=-exclude:$(JDK8_SRCROOT)/jdk/test/ProblemList.txt -exclude:$(CVM8_SRCROOT)/conf/jtreg_jdk8_excludes.list
 
 test_jtreg8: -setup_jtreg8
@@ -306,7 +318,11 @@ test_jtreg8_hotspot: -setup_jtreg8
 	$(eval JT_REPO = hotspot)
 	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
 
-test_jtreg8_langtools: -setup_jtreg8
+-overlay-langtools8:
+	$(call overlay_single,jdk8u,langtools/test/tools/javac/annotations/8218152/MalformedAnnotationProcessorTests.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,langtools/test/tools/javac/6508981/TestInferBinaryName.java, $(JDK8_SRCROOT))
+
+test_jtreg8_langtools: -setup_jtreg8 -overlay-langtools8
 	$(eval JT_REPO = langtools)
 	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
 
