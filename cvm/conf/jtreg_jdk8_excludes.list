@@ -801,8 +801,6 @@ com/sun/jdi/BreakpointWithFullGC.sh
 com/sun/jdi/RedefineCrossEvent.java
 java/lang/System/Versions.java
 sun/misc/Version/Version.java
-tools/javac/6508981/TestInferBinaryName.java
-tools/javac/annotations/8218152/MalformedAnnotationProcessorTests.java
 
 # Problems need to be investigated later
 tools/javac/defaultMethods/Assertions.java

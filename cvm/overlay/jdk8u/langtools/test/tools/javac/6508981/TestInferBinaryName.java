@@ -77,7 +77,8 @@ public class TestInferBinaryName {
     }
 
     void testSymbolArchive() throws IOException {
-        String testClassName = "java.lang.String";
+        String testClassName = "8".equals(System.getProperty("java.vm.specification.version")) ?
+            "java.lang.String" : "java.lang.StringBuilder";
         JavaFileManager fm =
             getFileManager("sun.boot.class.path", USE_SYMBOL_FILE, DONT_USE_ZIP_FILE_INDEX);
         test("testSymbolArchive",
