@@ -14,6 +14,19 @@ CVM的主要特性如下：
 + 性能更高的 JIT 编译器，包括更全面的intrinsic支持和高性能的实现
 + 可直接替换现有 JDK8 使用，升级过程简单可控
 
+## 性能数据
+
+CVM已经在多种应用场景上进行功能和性能测试，包括JMH, SPECjbb2015, Flink nexmark等。与jdk8u372相比,
+一些性能数据如下：
+
+| 应用场景 | 性能提升 |
+| -------- | ------- |
+| JMH java.util 所有case平均          | 30% |
+| JMH java.util.stream 所有case平均   | 45% |
+| SPECjbb2015 critical-jOPS           | 90% |
+| SPECjbb2015 max-jOPS                | 5%  |
+| Flink nexmark 所有query平均         | 10% |
+
 ## 如何使用
 
 ### 选项一：下载安装
