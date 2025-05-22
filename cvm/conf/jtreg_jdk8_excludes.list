@@ -797,10 +797,6 @@ sun/tools/jps/TestJpsJarRelative.java
 
 # Following tests are due to implementation difference in JVM8 and 17. We may modify the 
 # expected result in test cases to reflect the details, but for now just ignore them since it's not of high priority.
-com/sun/jdi/BreakpointWithFullGC.sh
-com/sun/jdi/RedefineCrossEvent.java
-java/lang/System/Versions.java
-sun/misc/Version/Version.java
 
 # Problems need to be investigated later
 tools/javac/defaultMethods/Assertions.java
