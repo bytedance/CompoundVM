@@ -23,6 +23,19 @@ Higher version of JVM brings enhancements in garbage colleciton, JIT, etc.
 + Enhanced JIT compiler, support more intrinsics with faster implementation
 + Drop-in replacement for existing JDK, easy to upgrade and rollback
 
+## Performance Results
+
+CVM has been throughly tested on various application scenarios, including Java Microbenchmark Harness (JMH),
+SPECjbb2015, Flink nexmark, etc. Compared to jdk8u372, some of the performance results are as follows:
+
+| Application | Performance Improvement |
+| -------- | ------- |
+| JMH java.util all cases average           | 30% |
+| JMH java.util.stream all cases average    | 45% |
+| SPECjbb2015 critical-jOPS                 | 90% |
+| SPECjbb2015 max-jOPS                      | 5%  |
+| Flink nexmark all queries average         | 10% |
+
 ## Using CVM
 
 ### Option 1: Download and install
