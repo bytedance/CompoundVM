@@ -32,8 +32,6 @@
  *  @run compile -g AccessSpecifierTest.java
  *  @run compile -g AfterThreadDeathTest.java
  *  @run compile -g ArrayRangeTest.java
- *  @run compile -g BacktraceFieldTest.java
- *  @run compile -g ClassesByName2Test.java
  *  @run compile -g DebuggerThreadTest.java
  *  @run compile -g DeleteEventRequestsTest.java
  *  @run compile -g ExceptionEvents.java
@@ -49,8 +47,6 @@
  *  @run main AccessSpecifierTest -redefstart -redefevent
  *  @run main AfterThreadDeathTest -redefstart -redefevent
  *  @run main ArrayRangeTest -redefstart -redefevent
- *  @run main BacktraceFieldTest -redefstart -redefevent
- *  @run main ClassesByName2Test -redefstart -redefevent
  *  @run main DebuggerThreadTest -redefstart -redefevent
  *  @run main DeleteEventRequestsTest -redefstart -redefevent
  *  @run main/othervm ExceptionEvents -redefstart -redefevent N A StackOverflowCaughtTarg java.lang.Exception

@@ -46,7 +46,9 @@ public class Version {
         if (!jdk.equals(v1)) {
             throw new RuntimeException("Unmatched version: " + jdk + " vs " + v1);
         }
-        VersionInfo jvm = jvmVersionInfo(System.getProperty("java.vm.version"));
+        VersionInfo jvm = System.getProperty("java.vm.specification.version").equals("17") ?
+                jvm17VersionInfo(System.getProperty("java.vm.version"))
+                : jvmVersionInfo(System.getProperty("java.vm.version"));
         VersionInfo v2 = new VersionInfo(jvmMajorVersion(),
                                          jvmMinorVersion(),
                                          jvmMicroVersion(),
@@ -133,6 +135,36 @@ public class Version {
 
         VersionInfo vi = new VersionInfo(major, minor, micro, update, special, build);
         System.out.printf("jdkVersionInfo: input=%s output=%s\n", version, vi);
+        return vi;
+    }
+
+    private static VersionInfo jvm17VersionInfo(String version) throws Exception {
+        // According to jdk-version.m4 in jdk17u
+        // valid format of the version string is:
+        // <major>[.<minor>][.<update>][.<patch>[-<version_pre>]+<build>[-<version_opt>]
+        int major = 0;
+        int minor = 0;
+        int build = 0;
+
+        String regex = "^(?<major>[0-9]{1,2})";      // major
+        regex += "(\\.";                             // separator
+        regex += "(?<minor>[0-9]{1,3})";             // minor
+        regex += ")?";                               // minor '0'  might be stripped
+        regex += "(\\.[0-9]{1,3})?(\\.[0-9]{1,3})?"; // (not important) update, patch
+        regex += "(\\-[a-zA-Z0-9]+)?";               // (not important) version_pre
+        regex += "\\+(?<build>[0-9]{1,3})";          // build
+        regex += "(\\-[a-zA-Z0-9\\.\\-]+)?$";        // (not important) version_opt
+
+        Pattern p = Pattern.compile(regex);
+        Matcher m = p.matcher(version);
+        m.matches();
+
+        major = Integer.parseInt(m.group("major"));
+        minor = m.group("minor") == null ? 0 : Integer.parseInt(m.group("minor"));
+        build = Integer.parseInt(m.group("build"));
+
+        VersionInfo vi = new VersionInfo(major, minor, 0, 0, "", build);
+        System.out.printf("jvmVersionInfo: input=%s output=%s\n", version, vi);
         return vi;
     }
 
