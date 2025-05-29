@@ -68,6 +68,10 @@ jobs:
       - name: 'Checkout the JDK source'
         uses: actions/checkout@v3
 
+      - name: 'Determine version'
+        id: version
+        run: echo "::set-output name=version::$(cat ./cvm/conf/version)"
+
       - name: 'Get JTReg'
         id: jtreg
         uses: ./.github/actions/get-jtreg
@@ -99,18 +103,34 @@ jobs:
       - name: 'Build'
         run: |
           make -f cvm.mk ${{ inputs.make-target }} MODE=${{ matrix.debug-level}}
+          if [[ '${{ matrix.debug-level }}' == 'release' ]]; then
+            make -f cvm.mk jvm-patch MODE=release SKIP_BUILD=true
+          fi
         shell: bash
 
       - name: 'Pack bundles'
+        if: matrix.debug-level == 'release'
         run: |
-          tar cvzf cvm8+17-${{ inputs.platform }}-${{ matrix.debug-level}}.tar.gz -C output jdk8
+          tar czf CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}.tar.gz -C output CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}
+          tar czf CompoundVM_${{ steps.version.outputs.version }}_jvm_patch_${{ inputs.platform }}.tar.gz -C output/CompoundVM_${{ steps.version.outputs.version }}_jvm_patch_${{ inputs.platform }} .
         shell: bash
 
       - name: 'Upload bundles'
         uses: actions/upload-artifact@v4
+        if: matrix.debug-level == 'release'
         with:
-          name: cvm8+17-${{ inputs.platform }}-${{ matrix.debug-level}}.tar.gz
-          path: cvm8+17-${{ inputs.platform }}-${{ matrix.debug-level}}.tar.gz
+          name: CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}.tar.gz
+          path: CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}.tar.gz
+          retention-days: 1
+          if-no-files-found: error
+          overwrite: true
+
+      - name: 'Upload bundles jvm patch'
+        uses: actions/upload-artifact@v4
+        if: matrix.debug-level == 'release'
+        with:
+          name: CompoundVM_${{ steps.version.outputs.version }}_jvm_patch_${{ inputs.platform }}.tar.gz
+          path: CompoundVM_${{ steps.version.outputs.version }}_jvm_patch_${{ inputs.platform }}.tar.gz
           retention-days: 1
           if-no-files-found: error
           overwrite: true
