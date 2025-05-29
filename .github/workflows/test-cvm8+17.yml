@@ -25,9 +25,6 @@ on:
       platform:
         required: true
         type: string
-      bootjdk-platform:
-        required: true
-        type: string
       runs-on:
         required: true
         type: string
@@ -66,28 +63,39 @@ jobs:
       - name: 'Checkout the JDK source'
         uses: actions/checkout@v3
 
+      - name: 'Determine version'
+        id: version
+        run: echo "::set-output name=version::$(cat ./cvm/conf/version)"
+
       - name: 'Get bundles'
         uses: actions/download-artifact@v4
         with:
-          name: cvm8+17-${{ inputs.platform }}-${{ inputs.debug-level }}.tar.gz
+          name: CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}.tar.gz
           path: .
 
       - name: 'Unpack bundles'
         run: |
-          mkdir -p cvm/build
-          tar xzvf cvm8+17-${{ inputs.platform }}-${{ inputs.debug-level }}.tar.gz -C cvm/build
-        shell: bash
-
-      - name: 'Get jdk8u src'
-        id: jdk8u-src
-        run: |
-          wget -nc https://github.com/openjdk/jdk8u/archive/refs/tags/jdk8u382-b03.tar.gz
-          mkdir -p cvm/jdk8u
-          tar -xzf jdk8u382-b03.tar.gz -C cvm/jdk8u --strip-components=1
+          rm -rf cvm/build/jdk8
+          mkdir -p cvm/build/jdk8
+          tar xzvf CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}.tar.gz -C cvm/build/jdk8 --strip-components=1
         shell: bash
 
       - name: 'Run tests'
         id: run-tests
         run: |
           make -f cvm.mk test_jtreg8_${{ matrix.test-suite }} SKIP_BUILD=true MODE=${{ inputs.debug-level }}
+        shell: bash
+
+      - name: 'Get bundles jvm patch'
+        uses: actions/download-artifact@v4
+        with:
+          name: CompoundVM_${{ steps.version.outputs.version }}_jvm_patch_${{ inputs.platform }}.tar.gz
+          path: .
+
+      - name: 'Run sanity test jvm patch'
+        run: |
+          wget -nc https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u372-b07/OpenJDK8U-jdk_x64_linux_hotspot_8u372b07.tar.gz
+          tar xzf OpenJDK8U-jdk_x64_linux_hotspot_8u372b07.tar.gz
+          tar xzf CompoundVM_${{ steps.version.outputs.version }}_jvm_patch_${{ inputs.platform }}.tar.gz -C jdk8u372-b07/
+          jdk8u372-b07/bin/java -version 2>&1 | grep "CompoundVM"
         shell: bash

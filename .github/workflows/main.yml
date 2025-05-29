@@ -110,7 +110,7 @@ jobs:
     needs: select
     uses: ./.github/workflows/build-linux.yml
     with:
-      platform: linux-x64
+      platform: linux_x64
       apt-gcc-version: '9'
     # The linux-x64 jdk bundle is used as buildjdk for the cross-compile job
     if: needs.select.outputs.linux-x64 == 'true' || needs.select.outputs.linux-cross-compile == 'true'
@@ -125,8 +125,7 @@ jobs:
       - build-linux-x64
     uses: ./.github/workflows/test-cvm8+17.yml
     with:
-      platform: linux-x64
-      bootjdk-platform: linux-x64
+      platform: linux_x64
       runs-on: ubuntu-22.04
       debug-level: release
 

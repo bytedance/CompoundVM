@@ -22,7 +22,10 @@ SHELL := /bin/bash
 BOOTJDK17 := $(WORKSPACE)/.bootjdks/jdk-17.0.7+7
 BOOTJDK8 := $(WORKSPACE)/.bootjdks/jdk8u372-b07
 BUILDDIR := $(WORKSPACE)/cvm/build
+VERSION := $(shell cat $(WORKSPACE)/cvm/conf/version)
 OUTPUTDIR := $(WORKSPACE)/output
+DISTRO_NAME := CompoundVM_$(VERSION)_linux_x64
+DISTRO_JVM_PATCH_NAME := CompoundVM_$(VERSION)_jvm_patch_linux_x64
 CVM8DIR := $(BUILDDIR)/jdk8
 CVM8_JARDIR := $(CVM8DIR)/jre/lib
 CVM8_LIBDIR := $(CVM8DIR)/jre/lib/amd64
@@ -94,6 +97,8 @@ endef
 -init-dirs:
 	[[ -d $(BUILDDIR) ]] || mkdir -p $(BUILDDIR)
 	[[ -d $(OUTPUTDIR) ]] || mkdir -p $(OUTPUTDIR)
+	[[ -d $(OUTPUTDIR)/$(DISTRO_NAME) ]] || mkdir -p $(OUTPUTDIR)/$(DISTRO_NAME)
+	[[ -d $(OUTPUTDIR)/$(DISTRO_JVM_PATCH_NAME) ]] || mkdir -p $(OUTPUTDIR)/$(DISTRO_JVM_PATCH_NAME)
 
 # Setup bootstrap JDK from a given URL
 # $1  URL of JDK in tar.gz format
@@ -129,9 +134,18 @@ cvm8default17: jdk8vm17
 	echo "-server17 KNOWN" > $(CVM8_LIBDIR)/jvm.cfg
 	echo "-server KNOWN" >> $(CVM8_LIBDIR)/jvm.cfg
 	echo "-client IGNORE" >> $(CVM8_LIBDIR)/jvm.cfg
-	echo "-server17 KNOWN" > $(OUTPUTDIR)/jdk8/jre/lib/amd64/jvm.cfg
-	echo "-server KNOWN" >> $(OUTPUTDIR)/jdk8/jre/lib/amd64/jvm.cfg
-	echo "-client IGNORE" >> $(OUTPUTDIR)/jdk8/jre/lib/amd64/jvm.cfg
+	echo "-server17 KNOWN" > $(OUTPUTDIR)/$(DISTRO_NAME)/jre/lib/amd64/jvm.cfg
+	echo "-server KNOWN" >> $(OUTPUTDIR)/$(DISTRO_NAME)/jre/lib/amd64/jvm.cfg
+	echo "-client IGNORE" >> $(OUTPUTDIR)/$(DISTRO_NAME)/jre/lib/amd64/jvm.cfg
+
+JVM_PATCH_ARTIFACTS := jre/lib/rt17.jar jre/lib/rt8.jar jre/lib/amd64/libjava17.so jre/lib/amd64/libjimage17.so jre/lib/amd64/libjdwp17.so jre/lib/amd64/server17 jre/lib/amd64/jvm.cfg
+
+jvm-patch: cvm8default17
+	@echo "###### Composing CVM8 jvm patch ######"
+	mkdir -p $(OUTPUTDIR)/$(DISTRO_JVM_PATCH_NAME)
+	for file in $(JVM_PATCH_ARTIFACTS); do \
+		cd $(OUTPUTDIR)/$(DISTRO_NAME) && cp -rf --parents $$file $(OUTPUTDIR)/$(DISTRO_JVM_PATCH_NAME)/; \
+	done
 
 -clean-jdk8vm17:
 	rm -fr $(BUILDDIR)/alt_kernel
@@ -167,13 +181,13 @@ jdk8vm17: -clean-jdk8vm17 -bootstrap build_jdk8u build_jdk17u altkernel
 		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjdwp.debuginfo $(CVM8_LIBDIR)/libjdwp17.debuginfo && \
 		cp -f $(SRC_BUILDDIR_17)/jdk/lib/server/libjvm.debuginfo $(CVM8_LIBDIR)/server17/libjvm.debuginfo && \
 		[[ "x$$(grep server17 $(CVM8_LIBDIR)/jvm.cfg)" = "x" ]] && echo "-server17 KNOWN" >> $(CVM8_LIBDIR)/jvm.cfg && \
-		cp -rf $(CVM8DIR) $(OUTPUTDIR)/; \
+		cp -rf $(CVM8DIR)/* $(OUTPUTDIR)/$(DISTRO_NAME)/; \
 	}
 ifeq ($(MODE), release)
 	# Remove unwanted files from release build
-	find $(OUTPUTDIR)/jdk8 -name '*.debuginfo' -execdir rm -f {} +
-	find $(OUTPUTDIR)/jdk8 -name '*.diz' -execdir rm -f {} +
-	rm -fr $(OUTPUTDIR)/jdk8/demo
+	find $(OUTPUTDIR)/$(DISTRO_NAME) -name '*.debuginfo' -execdir rm -f {} +
+	find $(OUTPUTDIR)/$(DISTRO_NAME) -name '*.diz' -execdir rm -f {} +
+	rm -fr $(OUTPUTDIR)/$(DISTRO_NAME)/demo
 endif
 	@echo "###### Done ######"
 	@echo
@@ -208,7 +222,7 @@ build_jdk17u: -bootstrap
 											--with-vendor-vm-bug-url="https://github.com/bytedance/CompoundVM/issues" \
 											--without-version-pre \
 											--without-version-opt \
-											--with-cvm-version-string="8.0.0" \
+											--with-cvm-version-string=$(VERSION) \
 											--with-vendor-name="CompoundVM" \
 											; \
 		fi; \
