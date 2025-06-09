@@ -20,7 +20,7 @@
 WORKSPACE := $(shell pwd)
 SHELL := /bin/bash
 BOOTJDK17 := $(WORKSPACE)/.bootjdks/jdk-17.0.7+7
-BOOTJDK8 := $(WORKSPACE)/.bootjdks/jdk8u372-b07
+BOOTJDK8 := $(WORKSPACE)/.bootjdks/jdk8u452-b09
 BUILDDIR := $(WORKSPACE)/cvm/build
 VERSION := $(shell cat $(WORKSPACE)/cvm/conf/version)
 OUTPUTDIR := $(WORKSPACE)/output
@@ -121,12 +121,12 @@ $(BOOTJDK17)/:
 	#cp -f $(WORKSPACE)/bin/linux-x86_64/hsdis-amd64.so $$(dirname $$(find $@ -name libjava.so))
 
 $(BOOTJDK8)/:
-	$(call setup_boot_jdk,https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u372-b07/OpenJDK8U-jdk_x64_linux_hotspot_8u372b07.tar.gz,$@)
+	$(call setup_boot_jdk,https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u452-b09/OpenJDK8U-jdk_x64_linux_hotspot_8u452b09.tar.gz,$@)
 	#cp -f $(WORKSPACE)/bin/linux-x86_64/hsdis-amd64.so $$(dirname $$(find $@ -name libjava.so))
 
 jdk8u/jdk/src:
-	wget -nc https://github.com/openjdk/jdk8u/archive/refs/tags/jdk8u382-b03.tar.gz
-	[[ -d $(JDK8_SRCROOT) ]] || (mkdir -p $(JDK8_SRCROOT) && tar -xzf jdk8u382-b03.tar.gz -C $(JDK8_SRCROOT) --strip-components=1)
+	wget -nc https://github.com/openjdk/jdk8u-dev/archive/refs/tags/jdk8u452-b09.tar.gz
+	[[ -d $(JDK8_SRCROOT) ]] || (mkdir -p $(JDK8_SRCROOT) && tar -xzf jdk8u452-b09.tar.gz -C $(JDK8_SRCROOT) --strip-components=1)
 
 cvm8: jdk8vm17
 
