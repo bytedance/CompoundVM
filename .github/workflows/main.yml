@@ -27,6 +27,10 @@
 
 name: 'CVM build and test'
 
+permissions:
+  contents: read
+  pull-requests: write
+
 on:
   push:
     branches-ignore:
