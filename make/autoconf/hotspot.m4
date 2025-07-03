@@ -143,3 +143,19 @@ AC_DEFUN_ONCE([HOTSPOT_SETUP_MISC],
     HOTSPOT_TARGET_CPU_DEFINE="ARM32"
   fi
 ])
+
+###############################################################################
+# hotspot target classlib setup
+#
+AC_DEFUN_ONCE([HOTSPOT_SETUP_TARGET_CLASSLIB],
+[
+  AC_ARG_WITH([hotspot-target-classlib], [AS_HELP_STRING([--with-hotspot-target-classlib],
+  [target class library version for hotspot, can be: 8, 25(default)])])
+
+  if test "x$with_hotspot_target_classlib" != x; then
+    HOTSPOT_TARGET_CLASSLIB="$with_hotspot_target_classlib"
+  else
+    HOTSPOT_TARGET_CLASSLIB="25"
+  fi
+  AC_SUBST(HOTSPOT_TARGET_CLASSLIB)
+])
