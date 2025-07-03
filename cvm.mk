@@ -192,6 +192,7 @@ build_jdk25u: -bootstrap
 		if [[ "x$$(find ./build -type f -name config.log | grep $(MODE))" = "x" ]]; then \
 			bash configure --disable-warnings-as-errors \
 											--with-debug-level=$(MODE) \
+											--with-hotspot-target-classlib=8 \
 											--with-boot-jdk=$(BOOTJDK25) \
 											--with-vendor-name="ByteDance" \
 											--with-vendor-url="https://github.com/bytedance/CompoundVM" \
