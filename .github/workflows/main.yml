@@ -28,10 +28,10 @@
 name: 'CVM build and test'
 
 on:
-  push:
-    branches-ignore:
-      - master
-      - pr/*
+  pull_request:
+    branches:
+      - jdk17u-target8
+      - jdk25u-target8
   workflow_dispatch:
     inputs:
       platforms:
@@ -74,7 +74,7 @@ jobs:
 
             if [[ $GITHUB_EVENT_NAME == workflow_dispatch ]]; then
               input='${{ github.event.inputs.platforms }}'
-            elif [[ $GITHUB_EVENT_NAME == push ]]; then
+            elif [[ $GITHUB_EVENT_NAME == pull_request ]]; then
               input='${{ secrets.JDK_SUBMIT_PLATFORMS }}'
             else
               echo 'Internal error in GHA'
