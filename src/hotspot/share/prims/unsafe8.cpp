@@ -640,9 +640,10 @@ UNSAFE_ENTRY(jclass, Unsafe_DefineAnonymousClass(JNIEnv *env, jobject unsafe, jc
   anon_klass = Unsafe_DefineAnonymousClass_impl(env, host_class, data,
                                                 cp_patches_jh,
                                                    &temp_alloc, THREAD);
-  anon_klass->set_is_hidden();
-  if (anon_klass != NULL)
+  if (anon_klass != NULL) {
+    anon_klass->set_is_hidden();
     res_jh = JNIHandles::make_local(THREAD, anon_klass->java_mirror());
+  }
 
   // try/finally clause:
   if (temp_alloc != NULL) {
