@@ -3507,9 +3507,9 @@ void GraphBuilder::build_graph_for_intrinsic(ciMethod* callee, bool ignore_retur
   case vmIntrinsics::_putFloat           : append_unsafe_put_obj(callee, T_FLOAT,   false); return;
   case vmIntrinsics::_putDouble          : append_unsafe_put_obj(callee, T_DOUBLE,  false); return;
 #if HOTSPOT_TARGET_CLASSLIB == 8
-  case vmIntrinsics::_putOrderedObject   : append_unsafe_put_obj(callee, T_OBJECT,  false); return;
-  case vmIntrinsics::_putOrderedInt      : append_unsafe_put_obj(callee, T_INT,     false); return;
-  case vmIntrinsics::_putOrderedLong     : append_unsafe_put_obj(callee, T_LONG,    false); return;
+  case vmIntrinsics::_putOrderedObject   : append_unsafe_put_obj(callee, T_OBJECT,  true); return;
+  case vmIntrinsics::_putOrderedInt      : append_unsafe_put_obj(callee, T_INT,     true); return;
+  case vmIntrinsics::_putOrderedLong     : append_unsafe_put_obj(callee, T_LONG,    true); return;
   case vmIntrinsics::_getObject2         : append_unsafe_get_obj(callee, T_OBJECT,  false); return;
   case vmIntrinsics::_getBoolean2        : append_unsafe_get_obj(callee, T_BOOLEAN, false); return;
   case vmIntrinsics::_getByte2           : append_unsafe_get_obj(callee, T_BYTE,    false); return;

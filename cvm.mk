@@ -17,18 +17,34 @@
 # 2 along with this work; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
 
+CVM_ARCH := $(shell uname -m)
 WORKSPACE := $(shell pwd)
 SHELL := /bin/bash
 BOOTJDK17 := $(WORKSPACE)/.bootjdks/jdk-17.0.7+7
 BOOTJDK8 := $(WORKSPACE)/.bootjdks/jdk8u372-b07
+# Variable ARCH conflicts with jdk8's build variable
+ifeq ($(CVM_ARCH),x86_64)
+	BOOTJDK17_URL := https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.7%2B7/OpenJDK17U-jdk_x64_linux_hotspot_17.0.7_7.tar.gz
+	BOOTJDK8_URL := https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u372-b07/OpenJDK8U-jdk_x64_linux_hotspot_8u372b07.tar.gz
+	ARCH_DIR := amd64
+	ARCH_DIR1 := x64
+else ifeq ($(CVM_ARCH),aarch64)
+	BOOTJDK17_URL := https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.7%2B7/OpenJDK17U-jdk_aarch64_linux_hotspot_17.0.7_7.tar.gz
+	BOOTJDK8_URL := https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u372-b07/OpenJDK8U-jdk_aarch64_linux_hotspot_8u372b07.tar.gz
+	ARCH_DIR := aarch64
+	ARCH_DIR1 := aarch64
+else
+	ARCH_ERROR := 1
+endif
+CVM8_LIBDIR := $(WORKSPACE)/build/jdk8/jre/lib/$(ARCH_DIR)
 BUILDDIR := $(WORKSPACE)/cvm/build
 VERSION := $(shell cat $(WORKSPACE)/cvm/conf/version)
 OUTPUTDIR := $(WORKSPACE)/output
-DISTRO_NAME := CompoundVM_$(VERSION)_linux_x64
-DISTRO_JVM_PATCH_NAME := CompoundVM_$(VERSION)_jvm_patch_linux_x64
+DISTRO_NAME := CompoundVM_$(VERSION)_linux_$(ARCH_DIR1)
+DISTRO_JVM_PATCH_NAME := CompoundVM_$(VERSION)_jvm_patch_linux_$(ARCH_DIR1)
 CVM8DIR := $(BUILDDIR)/jdk8
 CVM8_JARDIR := $(CVM8DIR)/jre/lib
-CVM8_LIBDIR := $(CVM8DIR)/jre/lib/amd64
+CVM8_LIBDIR := $(CVM8DIR)/jre/lib/$(ARCH_DIR)
 MODE ?= release
 JAR ?= $(BOOTJDK17)/bin/jar
 JDK17_SRCROOT := $(WORKSPACE)
@@ -87,12 +103,18 @@ define compile_tools17_bin
 	  -DAPP_CLASSPATH='{ "/lib/tools17.jar", "/lib/tools.jar", }' \
 	  -o $(BUILDDIR)/bin/$(TOOL_NAME) \
 	  $(CVM8_SRCROOT)/alt_app/tools17/src/share/bin/tool.c \
-	  -L$(JDK8_LIB_DIR)/amd64/jli \
-	  -Wl,-rpath,'$$ORIGIN/../lib/amd64/jli' \
+	  -L$(JDK8_LIB_DIR)/$(ARCH_DIR)/jli \
+	  -Wl,-rpath,'$$ORIGIN/../lib/$(ARCH_DIR)/jli' \
 	  -ljli
 endef
 
--bootstrap: -init-dirs $(BOOTJDK17)/ $(BOOTJDK8)/
+-bootstrap: -check-arch -init-dirs $(BOOTJDK17)/ $(BOOTJDK8)/
+
+-check-arch:
+	if [ "$(ARCH_ERROR)" = "1" ]; then \
+		echo "Unsupported architecture! only x86_64 and aarch64 are supported."; \
+		exit 1; \
+	fi
 
 -init-dirs:
 	[[ -d $(BUILDDIR) ]] || mkdir -p $(BUILDDIR)
@@ -117,12 +139,12 @@ endef
 
 # '/' is indispensable otherwise target name will be treated as a file
 $(BOOTJDK17)/:
-	$(call setup_boot_jdk,https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.7%2B7/OpenJDK17U-jdk_x64_linux_hotspot_17.0.7_7.tar.gz,$@)
-	#cp -f $(WORKSPACE)/bin/linux-x86_64/hsdis-amd64.so $$(dirname $$(find $@ -name libjava.so))
+	$(call setup_boot_jdk,$(BOOTJDK17_URL),$@)
+	#cp -f $(WORKSPACE)/bin/linux-$(CVM_ARCH)/hsdis-$(ARCH_DIR).so $$(dirname $$(find $@ -name libjava.so))
 
 $(BOOTJDK8)/:
-	$(call setup_boot_jdk,https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u372-b07/OpenJDK8U-jdk_x64_linux_hotspot_8u372b07.tar.gz,$@)
-	#cp -f $(WORKSPACE)/bin/linux-x86_64/hsdis-amd64.so $$(dirname $$(find $@ -name libjava.so))
+	$(call setup_boot_jdk,$(BOOTJDK8_URL),$@)
+	#cp -f $(WORKSPACE)/bin/linux-$(CVM_ARCH)/hsdis-$(ARCH_DIR).so $$(dirname $$(find $@ -name libjava.so))
 
 jdk8u/jdk/src:
 	wget -nc https://github.com/openjdk/jdk8u/archive/refs/tags/jdk8u382-b03.tar.gz
@@ -134,11 +156,11 @@ cvm8default17: jdk8vm17
 	echo "-server17 KNOWN" > $(CVM8_LIBDIR)/jvm.cfg
 	echo "-server KNOWN" >> $(CVM8_LIBDIR)/jvm.cfg
 	echo "-client IGNORE" >> $(CVM8_LIBDIR)/jvm.cfg
-	echo "-server17 KNOWN" > $(OUTPUTDIR)/$(DISTRO_NAME)/jre/lib/amd64/jvm.cfg
-	echo "-server KNOWN" >> $(OUTPUTDIR)/$(DISTRO_NAME)/jre/lib/amd64/jvm.cfg
-	echo "-client IGNORE" >> $(OUTPUTDIR)/$(DISTRO_NAME)/jre/lib/amd64/jvm.cfg
+	echo "-server17 KNOWN" > $(OUTPUTDIR)/$(DISTRO_NAME)/jre/lib/$(ARCH_DIR)/jvm.cfg
+	echo "-server KNOWN" >> $(OUTPUTDIR)/$(DISTRO_NAME)/jre/lib/$(ARCH_DIR)/jvm.cfg
+	echo "-client IGNORE" >> $(OUTPUTDIR)/$(DISTRO_NAME)/jre/lib/$(ARCH_DIR)/jvm.cfg
 
-JVM_PATCH_ARTIFACTS := jre/lib/rt17.jar jre/lib/rt8.jar jre/lib/amd64/libjava17.so jre/lib/amd64/libjimage17.so jre/lib/amd64/libjdwp17.so jre/lib/amd64/server17 jre/lib/amd64/jvm.cfg
+JVM_PATCH_ARTIFACTS := jre/lib/rt17.jar jre/lib/rt8.jar jre/lib/$(ARCH_DIR)/libjava17.so jre/lib/$(ARCH_DIR)/libjimage17.so jre/lib/$(ARCH_DIR)/libjdwp17.so jre/lib/$(ARCH_DIR)/server17 jre/lib/$(ARCH_DIR)/jvm.cfg
 
 jvm-patch: cvm8default17
 	@echo "###### Composing CVM8 jvm patch ######"
@@ -205,7 +227,7 @@ build_jdk8u: -bootstrap jdk8u/jdk/src
 											--with-vendor-vm-bug-url="https://github.com/bytedance/CompoundVM/issues" \
 										 ;\
 		fi; \
-		make $(JDK_MAKE_OPTS) CONF=linux-x86_64-normal-server-$(MODE) images; \
+		make $(JDK_MAKE_OPTS) CONF=linux-$(CVM_ARCH)-normal-server-$(MODE) images; \
 		[[ $$? -eq 0 ]] || exit 127; \
 	}
 
@@ -227,7 +249,7 @@ build_jdk17u: -bootstrap
 											; \
 		fi; \
 	}
-	make $(JDK_MAKE_OPTS) CONF=linux-x86_64-server-$(MODE) hotspot jdk.jdwp.agent
+	make $(JDK_MAKE_OPTS) CONF=linux-$(CVM_ARCH)-server-$(MODE) hotspot jdk.jdwp.agent
 
 ################ alternative kernel classes ########
 # here we copy the JDK17 kernel classes to separate diretory,

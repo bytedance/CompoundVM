@@ -640,10 +640,13 @@ void C2_MacroAssembler::string_compare(Register str1, Register str2,
 
   BLOCK_COMMENT("string_compare {");
 
+// LibraryCallKit::inline_string_compareTo() already generated char[] length in cvm8
+#if HOTSPOT_TARGET_CLASSLIB != 8
   // Bizzarely, the counts are passed in bytes, regardless of whether they
   // are L or U strings, however the result is always in characters.
   if (!str1_isL) asrw(cnt1, cnt1, 1);
   if (!str2_isL) asrw(cnt2, cnt2, 1);
+#endif
 
   // Compute the minimum of the string lengths and save the difference.
   subsw(result, cnt1, cnt2);
