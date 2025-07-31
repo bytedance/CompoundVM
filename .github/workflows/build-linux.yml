@@ -33,8 +33,8 @@ on:
       platform:
         required: true
         type: string
-      extra-conf-options:
-        required: false
+      runs-on:
+        required: true
         type: string
       make-target:
         required: false
@@ -57,7 +57,7 @@ on:
 jobs:
   build-linux:
     name: build
-    runs-on: ubuntu-22.04
+    runs-on: ${{ inputs.runs-on }}
 
     strategy:
       fail-fast: false
