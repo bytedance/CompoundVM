@@ -24,13 +24,13 @@ BOOTJDK17 := $(WORKSPACE)/.bootjdks/jdk-17.0.7+7
 BOOTJDK8 := $(WORKSPACE)/.bootjdks/jdk8u372-b07
 # Variable ARCH conflicts with jdk8's build variable
 ifeq ($(CVM_ARCH),x86_64)
-	BOOTJDK17_URL := https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.7%2B7/OpenJDK17U-jdk_x64_linux_hotspot_17.0.7_7.tar.gz
-	BOOTJDK8_URL := https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u372-b07/OpenJDK8U-jdk_x64_linux_hotspot_8u372b07.tar.gz
+	BOOTJDK17_URL := http://tosv.byted.org/obj/rtdev/adoptium/linux/x64/OpenJDK17U-jdk_x64_linux_hotspot_17.0.7_7.tar.gz
+	BOOTJDK8_URL := http://tosv.byted.org/obj/rtdev/adoptium/linux/x64/OpenJDK8U-jdk_x64_linux_hotspot_8u372b07.tar.gz
 	ARCH_DIR := amd64
 	ARCH_DIR1 := x64
 else ifeq ($(CVM_ARCH),aarch64)
-	BOOTJDK17_URL := https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.7%2B7/OpenJDK17U-jdk_aarch64_linux_hotspot_17.0.7_7.tar.gz
-	BOOTJDK8_URL := https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u372-b07/OpenJDK8U-jdk_aarch64_linux_hotspot_8u372b07.tar.gz
+	BOOTJDK17_URL := https://tosv.byted.org/obj/rtdev/adoptium/linux/aarch64/OpenJDK17U-jdk_aarch64_linux_hotspot_17.0.7_7.tar.gz
+	BOOTJDK8_URL := https://tosv.byted.org/obj/rtdev/adoptium/linux/aarch64/OpenJDK8U-jdk_aarch64_linux_hotspot_8u372b07.tar.gz
 	ARCH_DIR := aarch64
 	ARCH_DIR1 := aarch64
 else
@@ -146,7 +146,7 @@ $(BOOTJDK8)/:
 	#cp -f $(WORKSPACE)/bin/linux-$(CVM_ARCH)/hsdis-$(ARCH_DIR).so $$(dirname $$(find $@ -name libjava.so))
 
 jdk8u/jdk/src:
-	wget -nc https://github.com/openjdk/jdk8u/archive/refs/tags/jdk8u382-b03.tar.gz
+	wget -nc https://tosv.byted.org/obj/rtdev/adoptium/src/jdk8u382-b03.tar.gz
 	[[ -d $(JDK8_SRCROOT) ]] || (mkdir -p $(JDK8_SRCROOT) && tar -xzf jdk8u382-b03.tar.gz -C $(JDK8_SRCROOT) --strip-components=1)
 
 cvm8: jdk8vm17
@@ -284,7 +284,7 @@ MY_JT_HOME := $(WORKSPACE)/.jtreg
 JTREG := $(MY_JT_HOME)/bin/jtreg
 
 $(JTREG):
-	$(eval JTREG_URL := https://builds.shipilev.net/jtreg/jtreg5.1-b01.zip)
+	$(eval JTREG_URL := https://tosv.byted.org/obj/rtdev/java/jtreg5.1-b01.zip)
 	$(eval JTREG_ZIP := $(shell basename $(JTREG_URL)))
 	@echo "Installing jtreg5.1 to $(MY_JT_HOME)"
 	{ \
