@@ -29,6 +29,12 @@
 #include "classfile/systemDictionary.hpp"
 #include "classfile/vmClasses.hpp"
 #include "gc/shared/gcVMOperations.hpp"
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#include "gc/g1/g1CollectedHeap.hpp"
+#include "gc/parallel/parallelScavengeHeap.hpp"
+#include "gc/serial/defNewGeneration.hpp"
+#include "gc/z/zCollectedHeap.hpp"
+#endif
 #include "memory/resourceArea.hpp"
 #include "memory/universe.hpp"
 #include "oops/oop.inline.hpp"
@@ -361,6 +367,146 @@ static jint print_flag(AttachOperation* op, outputStream* out) {
   return JNI_OK;
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+unsigned long MAX_ULONG = (unsigned long)-1;
+
+// printf heap info to outstream
+void print_heap_info(outputStream* out, const char name[], unsigned long capacity, unsigned long used, unsigned long regions = MAX_ULONG) {
+  out->print_cr("%s", name);
+  if (regions != MAX_ULONG)
+    out->print_cr("\tregions:    = %lu", regions);
+  out->print_cr("\tcapacity:   = %lu (%.3f MB)", capacity, (double) 1.0 * capacity / (1 << 20));
+  out->print_cr("\tused:       = %lu (%.3f MB)", used, (double) 1.0 * used / (1 << 20));
+  out->print_cr("\tfree:       = %lu (%.3f MB)", capacity - used, (double) 1.0 * (capacity - used) / (1 << 20));
+  double occu = capacity > 0 ? (double) 100.0 * used / capacity : 0;
+  out->print_cr("\t%f%% used", occu);
+}
+
+// Implementation of "heap" command
+// See also: HeapSummary class
+static jint heap_summary(AttachOperation* op, outputStream* out) {
+  const char* arg0 = op->arg(0);
+  if (arg0 != NULL && (strlen(arg0) > 0)) {
+    out->print_cr("Invalid argument to inspectheap operation: %s", arg0);
+    return JNI_ERR;
+  }
+
+  // some necessary info in out
+  //1.  UseTLB?
+  if(UseTLAB) {
+    out->print_cr("using thread-local object allocation.");
+  }
+
+  //2. gc algorithm
+  if (UseParallelGC) {
+    out->print_cr("Parallel GC ParallelGCThreads with %d thread(s)", ParallelGCThreads);
+  } else if (UseG1GC){
+    out->print_cr("Garbage-First (G1) GC ParallelGCThreads with %d thread(s)", ParallelGCThreads);
+  } else if (UseZGC) {
+    out->print_cr("ZGC ParallelGCThreads with %d thread(s)", ParallelGCThreads);
+  } else if (UseShenandoahGC) {
+    out->print_cr("Shenandoah GC ParallelGCThreads with %d thread(s)", ParallelGCThreads);
+  } else {
+    out->print_cr("Mark Sweep Compact GC");
+  }
+
+  out->print_cr("");
+
+  out->print_cr("Heap Configuration:");
+
+  out->print_cr("\tMinHeapFreeRatio         = %lu", MinHeapFreeRatio);
+  out->print_cr("\tMaxHeapFreeRatio         = %lu", MaxHeapFreeRatio);
+  out->print_cr("\tMaxHeapSize              = %lu (%.3f MB)", MaxHeapSize, (double) 1.0 * MaxHeapSize / (1 << 20));
+  out->print_cr("\tNewSize                  = %lu (%.3f MB)", NewSize, (double) 1.0 * NewSize / (1 << 20));
+  out->print_cr("\tMaxNewSize               = %lu (%.3f MB)", MaxNewSize, (double) 1.0 * MaxNewSize / (1 << 20));
+  out->print_cr("\tOldSize                  = %lu (%.3f MB)", OldSize, (double) 1.0 * OldSize / (1 << 20));
+  out->print_cr("\tNewRatio                 = %lu", NewRatio);
+  out->print_cr("\tSurvivorRatio            = %lu", SurvivorRatio);
+  out->print_cr("\tMetaspaceSize            = %lu (%.3f MB)", MetaspaceSize, (double) 1.0 * MetaspaceSize / (1 << 20));
+  out->print_cr("\tCompressedClassSpaceSize = %lu (%.3f MB)", CompressedClassSpaceSize, (double) 1.0 * CompressedClassSpaceSize / (1 << 20));
+  out->print_cr("\tMaxMetaspaceSize         = %lu (%.3f MB)", MaxMetaspaceSize, (double) 1.0 * MaxMetaspaceSize / (1 << 20));
+  if (UseShenandoahGC) {
+     out->print_cr("\tShenandoahRegionSize     = %lu (%.3f MB)", ShenandoahHeapRegion::region_size_bytes(), (double) 1.0 * ShenandoahHeapRegion::region_size_bytes() / (1 << 20));
+  } else {
+     out->print_cr("\tG1HeapRegionSize         = %lu (%.3f MB)", G1HeapRegionSize, (double) 1.0 * G1HeapRegionSize / (1 << 20));
+  }
+
+  out->print_cr("\nHeap Usage:");
+
+  // Try default G1GC first
+  if (UseG1GC) {
+    G1CollectedHeap *g1gc = G1CollectedHeap::heap();
+    G1MonitoringSupport *monitorSupport = g1gc->g1mm();
+
+    print_heap_info(out, "G1 Heap:",
+        g1gc->max_reserved_regions() * HeapRegion::GrainBytes,
+        g1gc->used_unlocked(),
+        g1gc->max_reserved_regions());
+
+    out->print_cr("G1 Young Generation:");
+    print_heap_info(out, "Eden Space:",
+        monitorSupport->eden_space_committed(),
+        monitorSupport->eden_space_used(),
+        monitorSupport->eden_space_used() / HeapRegion::GrainBytes);
+    print_heap_info(out, "Survivor Space:",
+        monitorSupport->survivor_space_committed(),
+        monitorSupport->survivor_space_used(),
+        monitorSupport->survivor_space_used() / HeapRegion::GrainBytes);
+    print_heap_info(out, "G1 Old Generation:", // HINT: this mismatch with jdk17, check again
+        monitorSupport->old_gen_committed(),
+        monitorSupport->old_gen_used(),
+        g1gc->old_regions_count() + g1gc->archive_regions_count() + g1gc->humongous_regions_count());
+  } else if (UseParallelGC) {
+    ParallelScavengeHeap *parallel = ParallelScavengeHeap::heap();
+    PSYoungGen *young_gen = parallel->young_gen();
+    PSOldGen *old_gen = parallel->old_gen();
+    out->print_cr("PS Young Generation");
+    print_heap_info(out, "Eden Space:",
+        young_gen->eden_space()->capacity_in_bytes(),
+        young_gen->eden_space()->used_in_bytes());
+    print_heap_info(out, "From Space:",
+        young_gen->from_space()->capacity_in_bytes(),
+        young_gen->from_space()->used_in_bytes());
+    print_heap_info(out, "To Space:",
+        young_gen->to_space()->capacity_in_bytes(),
+        young_gen->to_space()->used_in_bytes());
+    print_heap_info(out, "PS Old Generation",
+        old_gen->capacity_in_bytes(),
+        old_gen->used_in_bytes());
+  } else if (UseSerialGC) {
+    GenCollectedHeap *serial = GenCollectedHeap::heap();
+    DefNewGeneration *young = (DefNewGeneration*)(serial->young_gen());
+    Generation *old = serial->old_gen();
+    print_heap_info(out, "New Generation (Eden + 1 Survivor Space):",
+        young->capacity(),
+        young->used());
+    print_heap_info(out, "Eden Space:",
+        young->eden()->capacity(),
+        young->eden()->used());
+    print_heap_info(out, "From Space:",
+        young->from()->capacity(),
+        young->from()->used());
+    print_heap_info(out, "To Space:",
+        young->to()->capacity(),
+        young->to()->used());
+    print_heap_info(out, old->name(),
+        old->capacity(),
+        old->used());
+  } else if (UseShenandoahGC) {
+    ShenandoahHeap *shenando = ShenandoahHeap::heap();
+    out->print_cr("\tregions:    = %lu", shenando->num_regions());
+    out->print_cr("\tcapacity:   = %lu (%.3f MB)", shenando->num_regions() * ShenandoahHeapRegion::region_size_bytes(), (double) 1.0 * shenando->num_regions() * ShenandoahHeapRegion::region_size_bytes() / (1 << 20));
+    out->print_cr("\tused:       = %lu (%.3f MB)", shenando->used(), (double) 1.0 * shenando->used() / (1 << 20));
+    out->print_cr("\tcommitted   = %lu (%.3f MB)", shenando->committed(), (double) 1.0 * shenando->committed() / (1 << 20));
+  } else if (UseZGC) {
+    ZCollectedHeap *zgc = ZCollectedHeap::heap();
+    zgc->print_on(out);
+  }
+  return JNI_OK;
+}
+
+#endif
+
 // Table to map operation names to functions.
 
 // names must be of length <= AttachOperation::name_length_max
@@ -375,6 +521,9 @@ static AttachOperationFunctionInfo funcs[] = {
   { "setflag",          set_flag },
   { "printflag",        print_flag },
   { "jcmd",             jcmd },
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  { "heapsummary",      heap_summary},
+#endif
   { NULL,               NULL }
 };
 

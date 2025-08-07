@@ -107,7 +107,9 @@ public class JMap17 {
             executeCommandForPid(pid, "jcmd", "GC.finalizer_info");
         } else if (option.equals("-clstats")) {
             executeCommandForPid(pid, "jcmd", "VM.classloader_stats");
-        } else {
+        } else if (option.equals("-heap")) {
+            executeCommandForPid(pid, "heapsummary");
+	} else {
           usage(1);
         }
     }
@@ -143,6 +145,8 @@ public class JMap17 {
             return vm.heapHisto(args);
           case "dumpheap":
             return vm.dumpHeap(args);
+          case "heapsummary":
+            return vm.heapSummary();
           default:
             throw new IllegalArgumentException("Unexpected command: " + command);
         }
@@ -262,9 +266,6 @@ public class JMap17 {
                 SAOptionError("-F option used");
             }
 
-            if (s.equals("-heap")) {
-                SAOptionError("-heap option used");
-            }
 
             /* Reimplemented using jcmd, output format is different
                from original one
