@@ -223,6 +223,11 @@ public:
   size_t young_gen_committed()        { return _young_gen_committed; }
 
   size_t eden_space_used()            { return _eden_space_used; }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  size_t eden_space_committed()       { return _eden_space_committed; }
+  size_t survivor_space_committed()   { return _survivor_space_committed; }
+#endif
+
   size_t survivor_space_used()        { return _survivor_space_used; }
 
   size_t old_gen_committed()          { return _old_gen_committed; }
