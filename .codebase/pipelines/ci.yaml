@@ -1,0 +1,222 @@
+name: CVM Pipeline
+trigger:
+  change:
+    types: [submit]
+    branches: [jdk17u-target8*]
+  push:
+    types: [branch]
+  manual:
+
+jobs:
+  build_cvm8_fastdebug:
+    name: Build CVM8 fastdebug
+    image: hub.byted.org/compile/bytedance.lang.buildjdk17.multiarch:9801f8057d487c1cb6914f68a9257bdc
+    timeout: 30
+    steps:
+      - name: Build fastdebug
+        commands:
+          - make -f cvm.mk cvm8default17 MODE=fastdebug
+      - name: Upload artifacts
+        uses: actions/upload-artifact@1.0.0
+        inputs:
+          name: cvm8_fastdebug
+          path: cvm/build/jdk8
+
+  build_cvm8_release:
+    name: Build CVM8 release
+    image: hub.byted.org/compile/bytedance.lang.buildjdk17.multiarch:9801f8057d487c1cb6914f68a9257bdc
+    timeout: 30
+    steps:
+      - name: Build release
+        commands:
+          - make -f cvm.mk cvm8default17 MODE=release
+      - name: Upload artifacts
+        uses: actions/upload-artifact@1.0.0
+        inputs:
+          name: cvm8_release
+          path: cvm/build/jdk8
+
+  build_cvm8_slowdebug:
+    name: Build CVM8 slowdebug
+    image: hub.byted.org/compile/bytedance.lang.buildjdk17.multiarch:9801f8057d487c1cb6914f68a9257bdc
+    timeout: 30
+    steps:
+      - name: Build slowdebug
+        commands:
+          - make -f cvm.mk cvm8default17 MODE=slowdebug
+      - name: Upload artifacts
+        uses: actions/upload-artifact@1.0.0
+        inputs:
+          name: cvm8_slowdebug
+          path: cvm/build/jdk8
+
+  jtreg8-jdk_tier1-jdk_lang:
+    name: Test :jdk_tier1/:jdk_lang
+    image: hub.byted.org/compile/bytedance.lang.buildjdk17.multiarch:9801f8057d487c1cb6914f68a9257bdc
+    timeout: 30
+    depends: [build_cvm8_fastdebug]
+    steps:
+      - name: Install CVM8
+        uses: actions/download-artifact@1.0.0
+        inputs:
+          name: cvm8_fastdebug
+          path: ./cvm/build/
+      - name: Run
+        commands:
+          - make -f cvm.mk test_jtreg8_jdk MODE=fastdebug SKIP_BUILD=true JT_TEST=:jdk_lang
+
+  jtreg8-jdk_tier1-jdk_util:
+    name: Test :jdk_tier1/:jdk_util
+    image: hub.byted.org/compile/bytedance.lang.buildjdk17.multiarch:9801f8057d487c1cb6914f68a9257bdc
+    timeout: 60
+    depends: [build_cvm8_fastdebug]
+    steps:
+      - name: Install CVM8
+        uses: actions/download-artifact@1.0.0
+        inputs:
+          name: cvm8_fastdebug
+          path: ./cvm/build/
+      - name: Run
+        commands:
+          - make -f cvm.mk test_jtreg8_jdk MODE=fastdebug SKIP_BUILD=true JT_TEST=:jdk_util
+
+  jtreg8-jdk_tier1-jdk_math:
+    name: Test :jdk_tier1/:jdk_math
+    image: hub.byted.org/compile/bytedance.lang.buildjdk17.multiarch:9801f8057d487c1cb6914f68a9257bdc
+    timeout: 30
+    depends: [build_cvm8_fastdebug]
+    steps:
+      - name: Install CVM8
+        uses: actions/download-artifact@1.0.0
+        inputs:
+          name: cvm8_fastdebug
+          path: ./cvm/build/
+      - name: Run
+        commands:
+          - make -f cvm.mk test_jtreg8_jdk MODE=fastdebug SKIP_BUILD=true JT_TEST=:jdk_math
+
+  jtreg8-jdk_tier1-jdk_jdi:
+    name: Test :jdk_tier1/:jdk_jdi
+    image: hub.byted.org/compile/bytedance.lang.buildjdk17.multiarch:9801f8057d487c1cb6914f68a9257bdc
+    timeout: 30
+    depends: [build_cvm8_fastdebug]
+    steps:
+      - name: Install CVM8
+        uses: actions/download-artifact@1.0.0
+        inputs:
+          name: cvm8_fastdebug
+          path: ./cvm/build/
+      - name: Run
+        commands:
+          - make -f cvm.mk test_jtreg8_jdk MODE=fastdebug SKIP_BUILD=true JT_TEST=:jdk_jdi
+
+  jtreg8-jdk_svc-jdk_management:
+    name: Test :jdk_svc/:jdk_management
+    image: hub.byted.org/compile/bytedance.lang.buildjdk17.multiarch:9801f8057d487c1cb6914f68a9257bdc
+    timeout: 30
+    depends: [build_cvm8_fastdebug]
+    steps:
+      - name: Install CVM8
+        uses: actions/download-artifact@1.0.0
+        inputs:
+          name: cvm8_fastdebug
+          path: ./cvm/build/
+      - name: Run
+        commands:
+          - make -f cvm.mk test_jtreg8_jdk MODE=fastdebug SKIP_BUILD=true JT_TEST=:jdk_management
+
+  jtreg8-jdk_svc-jdk_instrument:
+    name: Test :jdk_svc/:jdk_instrument
+    image: hub.byted.org/compile/bytedance.lang.buildjdk17.multiarch:9801f8057d487c1cb6914f68a9257bdc
+    timeout: 30
+    depends: [build_cvm8_fastdebug]
+    steps:
+      - name: Install CVM8
+        uses: actions/download-artifact@1.0.0
+        inputs:
+          name: cvm8_fastdebug
+          path: ./cvm/build/
+      - name: Run
+        commands:
+          - make -f cvm.mk test_jtreg8_jdk MODE=fastdebug SKIP_BUILD=true JT_TEST=:jdk_instrument
+
+  jtreg8-jdk_svc-jdk_jmx:
+    name: Test :jdk_svc/:jdk_jmx
+    image: hub.byted.org/compile/bytedance.lang.buildjdk17.multiarch:9801f8057d487c1cb6914f68a9257bdc
+    timeout: 30
+    depends: [build_cvm8_fastdebug]
+    steps:
+      - name: Install CVM8
+        uses: actions/download-artifact@1.0.0
+        inputs:
+          name: cvm8_fastdebug
+          path: ./cvm/build/
+      - name: Run
+        commands:
+          - make -f cvm.mk test_jtreg8_jdk MODE=fastdebug SKIP_BUILD=true JT_TEST=:jdk_jmx
+
+  jtreg8-jdk_svc-svc_tools:
+    name: Test :jdk_svc/:svc_tools
+    image: hub.byted.org/compile/bytedance.lang.buildjdk17.multiarch:9801f8057d487c1cb6914f68a9257bdc
+    timeout: 30
+    depends: [build_cvm8_fastdebug]
+    steps:
+      - name: Install CVM8
+        uses: actions/download-artifact@1.0.0
+        inputs:
+          name: cvm8_fastdebug
+          path: ./cvm/build/
+      - name: Run
+        commands:
+          - make -f cvm.mk test_jtreg8_jdk MODE=fastdebug SKIP_BUILD=true JT_TEST=:svc_tools
+
+  test_jtreg8_hotspot:
+    name: Test hotspot sanity
+    depends: [build_cvm8_fastdebug]
+    runs-on:
+      spec: m1.2xlarge
+      env: online
+    image: hub.byted.org/compile/bytedance.lang.buildjdk17.multiarch:9801f8057d487c1cb6914f68a9257bdc
+    timeout: 360
+    steps:
+      - name: Install CVM8
+        uses: actions/download-artifact@1.0.0
+        inputs:
+          name: cvm8_fastdebug
+          path: ./cvm/build/
+      - name: Run
+        commands:
+          - make -f cvm.mk test_jtreg8_hotspot MODE=fastdebug SKIP_BUILD=true JT_TEST=sanity
+
+  test_jtreg8_langtools_tier1:
+    name: langtools_tier1
+    depends: [build_cvm8_fastdebug]
+    runs-on:
+      spec: m1.2xlarge
+      env: online
+    image: hub.byted.org/compile/bytedance.lang.buildjdk17.multiarch:9801f8057d487c1cb6914f68a9257bdc
+    timeout: 360
+    steps:
+      - name: Install CVM8
+        uses: actions/download-artifact@1.0.0
+        inputs:
+          name: cvm8_fastdebug
+          path: ./cvm/build/
+      - name: Run
+        commands:
+          - make -f cvm.mk test_jtreg8_langtools MODE=fastdebug SKIP_BUILD=true JT_TEST=:langtools_tier1
+
+  jtreg8-jdk_tier2:
+    name: Test :jdk_tier2
+    image: hub.byted.org/compile/bytedance.lang.buildjdk17.multiarch:9801f8057d487c1cb6914f68a9257bdc
+    timeout: 360
+    depends: [build_cvm8_fastdebug]
+    steps:
+      - name: Install CVM8
+        uses: actions/download-artifact@1.0.0
+        inputs:
+          name: cvm8_fastdebug
+          path: ./cvm/build/
+      - name: Run
+        commands:
+          - make test_jtreg8_jdk MODE=fastdebug SKIP_BUILD=true JT_TEST=:jdk_tier2
