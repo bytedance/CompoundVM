@@ -364,6 +364,11 @@ test_jtreg8_hotspot: -setup_jtreg8
 	$(eval JT_REPO = hotspot)
 	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
 
+test_jtreg8_hotspot_sanity: -setup_jtreg8
+	$(eval JT_REPO = hotspot)
+	$(eval JT_TEST = "sanity")
+	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
+
 test_jtreg8_langtools: -setup_jtreg8 -overlay-langtools8
 	$(eval JT_REPO = langtools)
 	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
