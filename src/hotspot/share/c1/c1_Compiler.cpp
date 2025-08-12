@@ -236,7 +236,6 @@ bool Compiler::is_intrinsic_supported(const methodHandle& method) {
   case vmIntrinsics::_getLong_raw:
   case vmIntrinsics::_getFloat_raw:
   case vmIntrinsics::_getDouble_raw:
-  case vmIntrinsics::_getAddress_raw:
   case vmIntrinsics::_putByte_raw:
   case vmIntrinsics::_putShort_raw:
   case vmIntrinsics::_putChar_raw:
@@ -244,7 +243,6 @@ bool Compiler::is_intrinsic_supported(const methodHandle& method) {
   case vmIntrinsics::_putLong_raw:
   case vmIntrinsics::_putFloat_raw:
   case vmIntrinsics::_putDouble_raw:
-  case vmIntrinsics::_putAddress_raw:
   case vmIntrinsics::_getObjectVolatile2:
   case vmIntrinsics::_getBooleanVolatile2:
   case vmIntrinsics::_getByteVolatile2:
