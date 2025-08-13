@@ -9,9 +9,10 @@ CompoundVM (CVM) is a project that aims to bring higher version JVM performance 
 lower version JDK. Now you can run your application with advanced JVM features with
 almost zero cost to upgrade your project.
 
-The current release is 8.0.0, which enables JVM 17 on JDK 8. We aim to keep up with
-the latest JVM. CVM has been used by a number of services in production environment.
-The current release supports linux/x86_64 platform only.
+The current release enables JVM 17 on JDK 8. We aim to keep up with
+the latest JVM. JVM 25 on JDK 8 is now under development.
+CVM has been used by a number of services in production environment.
+The current release supports x86_64/aarch64 on linux platforms.
 
 CVM is developed under the same licence as the upstream OpenJDK project.
 
@@ -45,7 +46,7 @@ package to your destination directory.
 
 ### Option 2: Build from source
 
-You can build CVM from source, by running the following command:
+Recommended GCC version: 8.x, 9.x. Run the following command:
 `make -f cvm.mk cvm8default17`
 
 For more options run `make -f cvm.mk help`
