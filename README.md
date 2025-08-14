@@ -1,6 +1,14 @@
-# Welcome to the CompoundVM!
+<div align="center">
+
+# Compound Virtual Machine
+
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/bytedance/CompoundVM/.github/workflows/main.yml?branch=jdk17u-target8) [![License](https://img.shields.io/github/license/bytedance/CompoundVM)](https://github.com/bytedance/CompoundVM/blob/main/LICENSE) [![GitHub downloads](https://img.shields.io/github/downloads/bytedance/CompoundVM/total)](https://github.com/bytedance/CompoundVM/releases)
 
 [中文版](README_cn.md)
+
+</div>
+
+## Introduction
 
 For many legacy Java applications (e.g. using Java 8), upgrading the application to
 higher version of JDK often requires costly and time-consuming project migration.
@@ -62,3 +70,9 @@ Notice the VM version, JVM 17 has been enabled in a JDK 8!
 ## Contributing to CVM
 
 See [CONTRIBUTING.md](CONTRIBUTING.md)
+
+## Contact Us
+
+Scan QR code to join discussion group
+
+![qr](cvm/conf/wechat-group.png)
