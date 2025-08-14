@@ -1,4 +1,13 @@
-# CompoundVM项目介绍
+<div align="center">
+
+# Compound Virtual Machine
+
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/bytedance/CompoundVM/.github/workflows/main.yml?branch=jdk17u-target8) [![License](https://img.shields.io/github/license/bytedance/CompoundVM)](https://github.com/bytedance/CompoundVM/blob/main/LICENSE) [![GitHub downloads](https://img.shields.io/github/downloads/bytedance/CompoundVM/total)](https://github.com/bytedance/CompoundVM/releases)
+
+</div>
+
+## 项目简介
+
 很多存量的Java业务仍然在使用老旧的 Java 版本（如 Java 8），对于这些存量业务，升级 JDK 往往需要付出较大成本。
 CompoundVM (CVM) 项目旨在解决这个痛点，通过将高版本 JVM 与低版本 JDK 组合，帮助业务用最小成本获得 Java 生态最新的性能收益。
 
@@ -16,7 +25,7 @@ CVM的主要特性如下：
 
 ## 性能数据
 
-CVM已经在多种应用场景上进行功能和性能测试，包括JMH, SPECjbb2015, Flink nexmark等。与jdk8u372相比,
+CVM已经在多种应用场景上进行功能和性能测试，包括JMH, SPECjbb2015, Flink nexmark等。与jdk8u372相比，
 一些性能数据如下：
 
 | 应用场景 | 性能提升 |
@@ -51,3 +60,9 @@ OpenJDK 64-Bit Server VM (CompoundVM 8.0.0) (build 17.0.8+0, mixed mode)
 ## 参与贡献
 
 参见[CONTRIBUTING.md](CONTRIBUTING.md)
+
+## 联系我们
+
+扫码加入交流群
+
+![qr](cvm/conf/wechat-group.png)
