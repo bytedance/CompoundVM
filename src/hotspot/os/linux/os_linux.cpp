@@ -567,6 +567,10 @@ void os::init_system_properties_values() {
   #define DEFAULT_LIBPATH OVERRIDE_LIBPATH
 #endif
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define ENDORSED_DIR "lib/endorsed"
+#endif
+
 // Base path of extensions installed on the system.
 #define SYS_EXT_DIR     "/usr/java/packages"
 #define EXTENSIONS_DIR  "/lib/ext"
@@ -604,6 +608,15 @@ void os::init_system_properties_values() {
       }
     }
     Arguments::set_dll_dir(buf);
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    if (pslash != NULL) {
+      pslash = strrchr(buf, '/');
+      if (pslash != NULL) {
+        *pslash = '\0';        // Get rid of /amd64.
+      }
+    }
+#endif
 
     // Get rid of /lib, if binary is libjvm.so,
     // or cut off /bin, if it is a statically linked binary.
@@ -647,6 +660,10 @@ void os::init_system_properties_values() {
   // Extensions directories.
   os::snprintf_checked(buf, bufsize, "%s" EXTENSIONS_DIR ":" SYS_EXT_DIR EXTENSIONS_DIR, Arguments::get_java_home());
   Arguments::set_ext_dirs(buf);
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  Arguments::set_endorsed_dirs(buf);
+#endif
 
   FREE_C_HEAP_ARRAY(char, buf);
 

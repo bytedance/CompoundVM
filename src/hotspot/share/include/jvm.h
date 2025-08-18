@@ -33,6 +33,10 @@
 #include "jvm_io.h"
 #include "jvm_md.h"
 
+#ifndef HOTSPOT_TARGET_CLASSLIB
+#define HOTSPOT_TARGET_CLASSLIB 8
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -1171,6 +1175,21 @@ typedef struct JDK1_1InitArgs {
     jint debugPort;
 } JDK1_1InitArgs;
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+/*
+ * JVM I/O error codes
+ */
+#define JVM_EEXIST       -100
+
+/*
+ * Open a file descriptor. This function returns a negative error code
+ * on error, and a non-negative integer that is the file descriptor on
+ * success.
+ */
+JNIEXPORT jint JNICALL
+JVM_Open(const char *fname, jint flags, jint mode);
+
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */

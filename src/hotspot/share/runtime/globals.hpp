@@ -112,6 +112,12 @@ const size_t minimumStringTableSize = 128;
 const size_t defaultSymbolTableSize = 32768; // 2^15
 const size_t minimumSymbolTableSize = 1024;
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define CHECKINTRINSICS false
+#else
+#define CHECKINTRINSICS true
+#endif
+
 #ifdef _LP64
 #define LP64_RUNTIME_FLAGS(develop,                                         \
                            develop_pd,                                      \
@@ -1881,7 +1887,7 @@ const int ObjectAlignmentInBytes = 8;
           "Logging (-Xlog:async).")                                         \
           range(DEBUG_ONLY(192) NOT_DEBUG(100*K), 50*M)                     \
                                                                             \
-  product(bool, CheckIntrinsics, true, DIAGNOSTIC,                          \
+  product(bool, CheckIntrinsics, CHECKINTRINSICS, DIAGNOSTIC,               \
              "When a class C is loaded, check that "                        \
              "(1) all intrinsics defined by the VM for class C are present "\
              "in the loaded class file and are marked with the "            \

@@ -50,6 +50,12 @@ class SerializeClosure;
 #define VM_SYMBOL_IGNORE(id, name)                       /*ignored*/
 #define VM_ALIAS_IGNORE(id, id2)                         /*ignored*/
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define WAIT_NAME "wait"
+#else
+#define WAIT_NAME "wait0"
+#endif
+
 // Mapping function names to values. New entries should be added below.
 
 #define VM_SYMBOLS_DO(template, do_alias)                                                         \
@@ -437,7 +443,7 @@ class SerializeClosure;
   template(getCause_name,                             "getCause")                                 \
   template(initCause_name,                            "initCause")                                \
   template(getProperty_name,                          "getProperty")                              \
-  template(wait_name,                                 "wait0")                                    \
+  template(wait_name,                                 WAIT_NAME)                                  \
   template(forName_name,                              "forName")                                  \
   template(forName0_name,                             "forName0")                                 \
   template(isJavaIdentifierStart_name,                "isJavaIdentifierStart")                    \

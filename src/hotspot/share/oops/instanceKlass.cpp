@@ -3151,6 +3151,7 @@ void InstanceKlass::set_package(ClassLoaderData* loader_data, PackageEntry* pkg_
 // classes are loaded by the boot loader) that at least one of the package's
 // classes has been loaded.
 void InstanceKlass::set_classpath_index(s2 path_index) {
+  _classpath_index = path_index;
   if (_package_entry != nullptr) {
     DEBUG_ONLY(PackageEntryTable* pkg_entry_tbl = ClassLoaderData::the_null_class_loader_data()->packages();)
     assert(pkg_entry_tbl->lookup_only(_package_entry->name()) == _package_entry, "Should be same");

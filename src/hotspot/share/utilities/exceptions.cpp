@@ -201,6 +201,8 @@ void Exceptions::_throw_msg_cause(JavaThread* thread, const char* file, int line
   if (special_exception(thread, file, line, Handle(), name, message)) return;
   // Create and throw exception and init cause
   Handle h_exception = new_exception(thread, name, message, h_cause, h_loader);
+  // used to debug, which should be removed after develop
+  DEBUG_ONLY(tty->print_cr("Exception::_throw_msg: sym=%s, file=%s:%d, msg=%s", name->as_C_string(), file, line, message));
   _throw(thread, file, line, h_exception, message);
 }
 

@@ -670,6 +670,12 @@ class os: AllStatic {
   static FILE* fdopen(int fd, const char* mode);
   static FILE* fopen(const char* path, const char* mode);
   static jlong lseek(int fd, jlong offset, int whence);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // Only for handling the `JVM_O_DELETE` flag used in
+  // jdk8u's Java_java_util_zip_ZipFile_open() at the
+  // JVM-interface-level instead of the os-call-level
+  static int unlink(const char *path);
+#endif
   static bool file_exists(const char* file);
 
   // read/store and print the release file of the image
@@ -896,6 +902,9 @@ class os: AllStatic {
 
   // Returns native Java library, loads if necessary
   static void*    native_java_library();
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static void*    native_java_library25();
+#endif
 
   // Fills in path to jvm.dll/libjvm.so (used by the Disassembler)
   static void     jvm_path(char *buf, jint buflen);
@@ -1089,6 +1098,9 @@ class os: AllStatic {
                                 char fileSep,
                                 char pathSep);
   static bool set_boot_path(char fileSep, char pathSep);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static bool set_boot_path8(char fileSep, char pathSep);
+#endif
 
   static bool pd_dll_unload(void* libhandle, char* ebuf, int ebuflen);
 };

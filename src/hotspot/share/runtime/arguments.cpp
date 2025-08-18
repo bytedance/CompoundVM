@@ -124,6 +124,12 @@ SystemProperty *Arguments::_java_class_path = nullptr;
 SystemProperty *Arguments::_jdk_boot_class_path_append = nullptr;
 SystemProperty *Arguments::_vm_info = nullptr;
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+SystemProperty *Arguments::_sun_boot_class_path = NULL;
+SystemProperty *Arguments::_java_ext_dirs = NULL;
+SystemProperty *Arguments::_java_endorsed_dirs = NULL;
+#endif
+
 GrowableArray<ModulePatchPath*> *Arguments::_patch_mod_prefix = nullptr;
 PathString *Arguments::_boot_class_path = nullptr;
 bool Arguments::_has_jimage = false;
@@ -403,6 +409,14 @@ void Arguments::init_system_properties() {
   // Properties values are set to nullptr and they are
   // os specific they are initialized in os::init_system_properties_values().
   _sun_boot_library_path = new SystemProperty("sun.boot.library.path", nullptr,  true);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  _sun_boot_class_path = new SystemProperty("sun.boot.class.path", NULL,  true);
+  _java_ext_dirs = new SystemProperty("java.ext.dirs", NULL,  true);
+  _java_endorsed_dirs = new SystemProperty("java.endorsed.dirs", NULL,  true);
+
+  PropertyList_add(&_system_properties, _java_ext_dirs);
+  PropertyList_add(&_system_properties, _java_endorsed_dirs);
+#endif
   _java_library_path = new SystemProperty("java.library.path", nullptr,  true);
   _java_home =  new SystemProperty("java.home", nullptr,  true);
   _java_class_path = new SystemProperty("java.class.path", "",  true);
@@ -419,6 +433,9 @@ void Arguments::init_system_properties() {
   PropertyList_add(&_system_properties, _java_class_path);
   PropertyList_add(&_system_properties, _jdk_boot_class_path_append);
   PropertyList_add(&_system_properties, _vm_info);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  PropertyList_add(&_system_properties, _sun_boot_class_path);
+#endif
 
   // Set OS specific system properties values
   os::init_system_properties_values();
@@ -2892,6 +2909,7 @@ jint Arguments::finalize_vm_init_args() {
   const char* fileSep = os::file_separator();
   jio_snprintf(path, JVM_MAXPATHLEN, "%s%slib%sendorsed", Arguments::get_java_home(), fileSep, fileSep);
 
+#if HOTSPOT_TARGET_CLASSLIB != 8
   DIR* dir = os::opendir(path);
   if (dir != nullptr) {
     jio_fprintf(defaultStream::output_stream(),
@@ -2910,6 +2928,7 @@ jint Arguments::finalize_vm_init_args() {
     os::closedir(dir);
     return JNI_ERR;
   }
+#endif
 
   // This must be done after all arguments have been processed
   // and the container support has been initialized since AggressiveHeap

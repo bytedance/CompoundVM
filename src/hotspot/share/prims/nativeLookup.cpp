@@ -249,6 +249,22 @@ static address lookup_special_native(const char* jni_name) {
   return nullptr;
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#include "classfile/classLoader.inline.hpp"
+static void* bootclass_lookup_lib(const methodHandle& method) {
+   {
+     ResourceMark rm;
+     const char* cp = ClassLoader::classpath_entry(method->method_holder()->classpath_index())->name();
+     if (strstr(cp, "/rt25.jar") != NULL) {
+       log_debug(library)("library25 %s for %s", cp, method->external_name());
+       return os::native_java_library25();
+     }
+     log_debug(library)("library8 %s for %s", cp, method->external_name());
+   }
+  return os::native_java_library();
+}
+#endif
+
 address NativeLookup::lookup_style(const methodHandle& method, char* pure_name, const char* long_name, int args_size, TRAPS) {
   address entry;
   const char* jni_name = compute_complete_jni_name(pure_name, long_name, args_size);
@@ -263,7 +279,11 @@ address NativeLookup::lookup_style(const methodHandle& method, char* pure_name, 
   if (loader.is_null()) {
     entry = lookup_special_native(jni_name);
     if (entry == nullptr) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+       entry = (address) os::dll_lookup(bootclass_lookup_lib(method), jni_name);
+#else
        entry = (address) os::dll_lookup(os::native_java_library(), jni_name);
+#endif
     }
     if (entry != nullptr) {
       return entry;
