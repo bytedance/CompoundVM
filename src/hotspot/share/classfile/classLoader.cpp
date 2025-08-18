@@ -613,8 +613,10 @@ void ClassLoader::setup_bootstrap_search_path_impl(JavaThread* current, const ch
       // The first time through the bootstrap_search setup, it must be determined
       // what the base or core piece of the boot loader search is.  Either a java runtime
       // image is present or this is an exploded module build situation.
+#if HOTSPOT_TARGET_CLASSLIB != 8
       assert(string_ends_with(path, MODULES_IMAGE_NAME) || string_ends_with(path, JAVA_BASE_NAME),
              "Incorrect boot loader search path, no java runtime image or " JAVA_BASE_NAME " exploded build");
+#endif
       struct stat st;
       if (os::stat(path, &st) == 0) {
         // Directory found
@@ -626,6 +628,12 @@ void ClassLoader::setup_bootstrap_search_path_impl(JavaThread* current, const ch
           _jrt_entry = new ClassPathImageEntry(JImage_file, canonical_path);
           assert(_jrt_entry != nullptr && _jrt_entry->is_modules_image(), "No java runtime image present");
           assert(_jrt_entry->jimage() != nullptr, "No java runtime image");
+        } else {
+          // It's an exploded build.
+#if HOTSPOT_TARGET_CLASSLIB == 8
+          ClassPathEntry* new_entry = create_class_path_entry(current, path, &st);
+          add_to_boot_append_entries(new_entry);
+#endif
         } // else it's an exploded build.
       } else {
         // If path does not exist, exit
@@ -844,7 +852,11 @@ void ClassLoader::load_java_library() {
     return;
   }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  void *javalib_handle = os::native_java_library25();
+#else
   void *javalib_handle = os::native_java_library();
+#endif
   if (javalib_handle == nullptr) {
     vm_exit_during_initialization("Unable to load java library", nullptr);
   }
@@ -870,9 +882,15 @@ void ClassLoader::load_jimage_library() {
   char path[JVM_MAXPATHLEN];
   char ebuf[1024];
   void* handle = nullptr;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  if (os::dll_locate_lib(path, sizeof(path), Arguments::get_dll_dir(), "jimage25")) {
+    handle = os::dll_load(path, ebuf, sizeof ebuf);
+  }
+#else
   if (os::dll_locate_lib(path, sizeof(path), Arguments::get_dll_dir(), "jimage")) {
     handle = os::dll_load(path, ebuf, sizeof ebuf);
   }
+#endif
   if (handle == nullptr) {
     vm_exit_during_initialization("Unable to load jimage library", path);
   }
@@ -1081,7 +1099,11 @@ InstanceKlass* ClassLoader::load_class(Symbol* name, PackageEntry* pkg_entry, bo
   }
 
   // Load Attempt #3: [-Xbootclasspath/a]; [jvmti appended entries]
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  if (nullptr == stream) {
+#else
   if (search_append_only && (nullptr == stream)) {
+#endif
     // For the boot loader append path search, the starting classpath_index
     // for the appended piece is always 1 to account for either the
     // _jrt_entry or the _exploded_entries.

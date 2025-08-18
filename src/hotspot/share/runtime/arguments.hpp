@@ -216,6 +216,12 @@ class Arguments : AllStatic {
   static SystemProperty *_jdk_boot_class_path_append;
   static SystemProperty *_vm_info;
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static SystemProperty *_java_ext_dirs;
+  static SystemProperty *_java_endorsed_dirs;
+  static SystemProperty *_sun_boot_class_path;
+#endif
+
   // --patch-module=module=<file>(<pathsep><file>)*
   // Each element contains the associated module name, path
   // string pair as specified to --patch-module.
@@ -479,7 +485,12 @@ class Arguments : AllStatic {
   static void set_dll_dir(const char *value) { _sun_boot_library_path->set_value(value); }
   static void set_java_home(const char *value) { _java_home->set_value(value); }
   static void set_library_path(const char *value) { _java_library_path->set_value(value); }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static void set_ext_dirs(const char *value) { _java_ext_dirs->set_value(value); }
+  static void set_endorsed_dirs(const char *value) { _java_endorsed_dirs->set_value(value); }
+#else
   static void set_ext_dirs(char *value)     { _ext_dirs = os::strdup_check_oom(value); }
+#endif
 
   // Set up the underlying pieces of the boot class path
   static void add_patch_mod_prefix(const char *module_name, const char *path);
@@ -488,14 +499,31 @@ class Arguments : AllStatic {
     assert(get_boot_class_path() == nullptr, "Boot class path previously set");
     _boot_class_path->set_value(value);
     _has_jimage = has_jimage;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    _sun_boot_class_path->set_value(value);
+#endif
   }
   static void append_sysclasspath(const char *value) {
     _boot_class_path->append_value(value);
     _jdk_boot_class_path_append->append_value(value);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    _sun_boot_class_path->append_value(value);
+#endif
   }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static void reset_sysclasspath(const char *value) {
+    _boot_class_path->set_value(value);
+    _sun_boot_class_path->set_value(value);
+  }
+#endif
   static GrowableArray<ModulePatchPath*>* get_patch_mod_prefix() { return _patch_mod_prefix; }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static char* get_boot_class_path() { return _sun_boot_class_path->value(); }
+#else
   static char* get_boot_class_path() { return _boot_class_path->value(); }
+#endif
+
   static bool has_jimage() { return _has_jimage; }
 
   static char* get_java_home()    { return _java_home->value(); }

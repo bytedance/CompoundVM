@@ -4076,6 +4076,7 @@ void ClassFileParser::check_super_class_access(const InstanceKlass* this_klass, 
       }
     }
 
+#if HOTSPOT_TARGET_CLASSLIB != 8
     Reflection::VerifyClassAccessResults vca_result =
       Reflection::verify_class_access(this_klass, InstanceKlass::cast(super), false);
     if (vca_result != Reflection::ACCESS_OK) {
@@ -4106,6 +4107,7 @@ void ClassFileParser::check_super_class_access(const InstanceKlass* this_klass, 
           msg);
       }
     }
+#endif
   }
 }
 

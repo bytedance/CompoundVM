@@ -3845,3 +3845,31 @@ JVM_END
 JVM_LEAF(jboolean, JVM_PrintWarningAtDynamicAgentLoad(void))
   return (EnableDynamicAgentLoading && !FLAG_IS_CMDLINE(EnableDynamicAgentLoading)) ? JNI_TRUE : JNI_FALSE;
 JVM_END
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+// This must match that definition in JDK8u
+#define JVM_O_DELETE 0x10000
+
+JVM_LEAF(jint, JVM_Open(const char *fname, jint flags, jint mode))
+  //%note jvm_r6
+  int o_delete = (flags & JVM_O_DELETE);
+  flags = flags & ~JVM_O_DELETE;
+
+  int result = os::open(fname, flags, mode);
+
+  if (result >= 0) {
+    if (o_delete != 0) {
+      os::unlink(fname);
+    }
+    return result;
+  } else {
+    switch(errno) {
+      case EEXIST:
+        return JVM_EEXIST;
+      default:
+        return -1;
+    }
+  }
+JVM_END
+
+#endif

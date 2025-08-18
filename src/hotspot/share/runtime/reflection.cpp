@@ -450,6 +450,9 @@ Reflection::VerifyClassAccessResults Reflection::verify_class_access(
 
   // module boundaries
   if (new_class->is_public()) {
+  #if HOTSPOT_TARGET_CLASSLIB == 8
+    return ACCESS_OK;
+  #endif
     // Find the module entry for current_class, the accessor
     ModuleEntry* module_from = current_class->module();
     // Find the module entry for new_class, the accessee

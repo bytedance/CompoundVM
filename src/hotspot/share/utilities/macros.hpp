@@ -643,4 +643,16 @@
 #define INCLUDE_ASAN 0
 #endif
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define CLASSLIB8_ONLY(code) code
+#define CLASSLIB25_ONLY(code)
+#define CLASSLIB8_EARLY_RETURN(ret) return ret
+#define CLASSLIB8_EARLY_RETURN_() return
+#else
+#define CLASSLIB8_ONLY(code)
+#define CLASSLIB25_ONLY(code) code
+#define CLASSLIB8_EARLY_RETURN(ret)
+#define CLASSLIB8_EARLY_RETURN_()
+#endif
+
 #endif // SHARE_UTILITIES_MACROS_HPP

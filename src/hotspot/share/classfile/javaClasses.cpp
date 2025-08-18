@@ -185,6 +185,7 @@ void JavaClasses::compute_offset(int& dest_offset, InstanceKlass* ik,
                                  bool is_static) {
   TempNewSymbol name = SymbolTable::probe(name_string, (int)strlen(name_string));
   if (name == nullptr) {
+    CLASSLIB8_EARLY_RETURN_();
     ResourceMark rm;
     log_error(class)("Name %s should be in the SymbolTable since its class is loaded", name_string);
     vm_exit_during_initialization("Invalid layout of well-known class", ik->external_name());
@@ -215,11 +216,19 @@ bool java_lang_String::test_and_set_flag(oop java_string, uint8_t flag_mask) {
   return true;                  // Flag bit is already 1.
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define STRING_FIELDS_DO(macro) \
+  macro(_value_offset, k, vmSymbols::value_name(), char_array_signature, false); \
+  macro(_hash_offset,  k, "hash",                  int_signature,        false); \
+  macro(_hashIsZero_offset, k, "hashIsZero",       bool_signature,       false); \
+  macro(_coder_offset, k, "coder",                 byte_signature,       false);
+#else
 #define STRING_FIELDS_DO(macro) \
   macro(_value_offset, k, vmSymbols::value_name(), byte_array_signature, false); \
   macro(_hash_offset,  k, "hash",                  int_signature,        false); \
   macro(_hashIsZero_offset, k, "hashIsZero",       bool_signature,       false); \
   macro(_coder_offset, k, "coder",                 byte_signature,       false);
+#endif
 
 void java_lang_String::compute_offsets() {
   if (_initialized) {
@@ -1509,6 +1518,16 @@ oop java_lang_Class::primitive_mirror(BasicType t) {
   return mirror;
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define CLASS_FIELDS_DO(macro) \
+  macro(_classRedefinedCount_offset, k, "classRedefinedCount", int_signature,         false); \
+  macro(_class_loader_offset,        k, "classLoader",         classloader_signature, false); \
+  macro(_component_mirror_offset,    k, "componentType",       class_signature,       false); \
+  macro(_module_offset,              k, "module",              module_signature,      false); \
+  macro(_name_offset,                k, "name",                string_signature,      false); \
+  macro(_classData_offset,           k, "classData",           object_signature,      false); \
+  macro(_signers_offset,             k, "signers",             object_array_signature, false);
+#else
 #define CLASS_FIELDS_DO(macro) \
   macro(_classRedefinedCount_offset, k, "classRedefinedCount", int_signature,          false); \
   macro(_class_loader_offset,        k, "classLoader",         classloader_signature,  false); \
@@ -1521,6 +1540,7 @@ oop java_lang_Class::primitive_mirror(BasicType t) {
   macro(_modifiers_offset,           k, vmSymbols::modifiers_name(), char_signature,    false); \
   macro(_protection_domain_offset,   k, "protectionDomain",    java_security_ProtectionDomain_signature,  false); \
   macro(_is_primitive_offset,        k, "primitive",           bool_signature,         false);
+#endif
 
 void java_lang_Class::compute_offsets() {
   if (_offsets_computed) {

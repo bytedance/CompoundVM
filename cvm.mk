@@ -138,7 +138,7 @@ clean:
 full-clean:
 	rm -fr $(BUILDDIR) $(JDK25_SRCROOT)/build $(JDK8_SRCROOT)/build
 
-jdk8vm25: -clean-jdk8vm25 -bootstrap build_jdk8u build_jdk25u altkernel
+jdk8vm25: -clean-jdk8vm25 -bootstrap build_jdk8u build_jdk25u
 	@echo
 	@echo "###### Composing CVM8 ######"
 	$(eval SRC_BUILDDIR_25=$(shell find $(JDK25_SRCROOT)/build -type f -name build.log | grep $(MODE) | xargs dirname))
@@ -146,8 +146,6 @@ jdk8vm25: -clean-jdk8vm25 -bootstrap build_jdk8u build_jdk25u altkernel
 	$(eval JDK8_IMAGEDIR=$(shell find $(JDK8_SRCROOT)/build -type d -name j2sdk-image | grep $(MODE)))
 	{ \
 		cp -Lfr $(JDK8_IMAGEDIR) $(CVM8DIR) && \
-		cp -f $(BUILDDIR)/rt25.jar $(CVM8_JARDIR)/ && \
-		cp -f $(BUILDDIR)/rt8.jar $(CVM8_JARDIR)/ && \
 		mkdir -p $(CVM8_LIBDIR)/server25 && \
 		cp -f $(SRC_BUILDDIR_25)/jdk/lib/server/libjvm.so $(CVM8_LIBDIR)/server25/libjvm.so && \
 		cp -f $(SRC_BUILDDIR_25)/jdk/lib/libjimage.so $(CVM8_LIBDIR)/libjimage25.so && \

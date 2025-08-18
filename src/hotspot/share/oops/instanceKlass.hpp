@@ -292,6 +292,7 @@ class InstanceKlass: public Klass {
   //     Itself: more than one implementors.
   //
 
+  s2 _classpath_index;
   friend class SystemDictionary;
 
   static bool _disable_method_binary_search;
@@ -488,6 +489,7 @@ public:
   // For packages whose classes are loaded from the boot loader class path, the
   // classpath_index indicates which entry on the boot loader class path.
   void set_classpath_index(s2 path_index);
+  s2 classpath_index() const { return _classpath_index; }
   bool is_same_class_package(const Klass* class2) const;
   bool is_same_class_package(oop other_class_loader, const Symbol* other_class_name) const;
 

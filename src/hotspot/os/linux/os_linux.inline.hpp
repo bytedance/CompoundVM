@@ -56,4 +56,9 @@ inline bool os::can_trim_native_heap() {
 #endif
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+inline int os::unlink(const char *path) {
+  return ::unlink(path);
+}
+#endif
 #endif // OS_LINUX_OS_LINUX_INLINE_HPP
