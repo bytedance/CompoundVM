@@ -5523,3 +5523,45 @@ bool os::pd_dll_unload(void* libhandle, char* ebuf, int ebuflen) {
 
   return res;
 } // end: os::pd_dll_unload()
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+int os::available(int fd, jlong *bytes) {
+  jlong cur, end;
+  int mode;
+  struct stat64 buf64;
+
+  if (::fstat64(fd, &buf64) >= 0) {
+    mode = buf64.st_mode;
+    if (S_ISCHR(mode) || S_ISFIFO(mode) || S_ISSOCK(mode)) {
+      /*
+      * XXX: is the following call interruptible? If so, this might
+      * need to go through the INTERRUPT_IO() wrapper as for other
+      * blocking, interruptible calls in this file.
+      */
+      int n;
+      if (::ioctl(fd, FIONREAD, &n) >= 0) {
+        *bytes = n;
+        return 1;
+      }
+    }
+  }
+  if ((cur = ::lseek64(fd, 0L, SEEK_CUR)) == -1) {
+    return 0;
+  } else if ((end = ::lseek64(fd, 0L, SEEK_END)) == -1) {
+    return 0;
+  } else if (::lseek64(fd, cur, SEEK_SET) == -1) {
+    return 0;
+  }
+  *bytes = end - cur;
+  return 1;
+}
+
+int os::socket_available(int fd, jint *pbytes) {
+  // Linux doc says EINTR not returned, unlike Solaris
+  int ret = ::ioctl(fd, FIONREAD, pbytes);
+
+  //%% note ioctl can return 0 when successful, JVM_SocketAvailable
+  // is expected to return 0 on failure and 1 on success to the jdk.
+  return (ret < 0) ? 0 : 1;
+}
+#endif

@@ -33,6 +33,93 @@
 
 #define VM_OP_ENUM(type)   VMOp_##type,
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define VM_OPS_DO(template)                       \
+  template(Halt)                                  \
+  template(ThreadStop)                            \
+  template(SafepointALot)                         \
+  template(ThreadDump)                            \
+  template(PrintThreads)                          \
+  template(FindDeadlocks)                         \
+  template(ClearICs)                              \
+  template(ForceSafepoint)                        \
+  template(DeoptimizeFrame)                       \
+  template(DeoptimizeAll)                         \
+  template(ZombieAll)                             \
+  template(Verify)                                \
+  template(HeapDumper)                            \
+  template(CollectForMetadataAllocation)          \
+  template(CollectForCodeCacheAllocation)         \
+  template(GC_HeapInspection)                     \
+  template(SerialCollectForAllocation)            \
+  template(SerialGCCollect)                       \
+  template(ParallelCollectForAllocation)          \
+  template(ParallelGCCollect)                     \
+  template(G1CollectForAllocation)                \
+  template(G1CollectFull)                         \
+  template(G1PauseRemark)                         \
+  template(G1PauseCleanup)                        \
+  template(G1TryInitiateConcMark)                 \
+  template(ZMarkEndOld)                           \
+  template(ZMarkEndYoung)                         \
+  template(ZMarkFlushOperation)                   \
+  template(ZMarkStartYoung)                       \
+  template(ZMarkStartYoungAndOld)                 \
+  template(ZRelocateStartOld)                     \
+  template(ZRelocateStartYoung)                   \
+  template(ZRendezvousGCThreads)                  \
+  template(ZVerifyOld)                            \
+  template(XMarkStart)                            \
+  template(XMarkEnd)                              \
+  template(XRelocateStart)                        \
+  template(XVerify)                               \
+  template(HandshakeAllThreads)                   \
+  template(PopulateDumpSharedSpace)               \
+  template(JNIFunctionTableCopier)                \
+  template(RedefineClasses)                       \
+  template(GetObjectMonitorUsage)                 \
+  template(GetAllStackTraces)                     \
+  template(GetThreadListStackTraces)              \
+  template(ChangeBreakpoints)                     \
+  template(GetOrSetLocal)                         \
+  template(VirtualThreadGetOrSetLocal)            \
+  template(ChangeSingleStep)                      \
+  template(SetNotifyJvmtiEventsMode)              \
+  template(HeapWalkOperation)                     \
+  template(HeapIterateOperation)                  \
+  template(ReportJavaOutOfMemory)                 \
+  template(JFRSafepointClear)                     \
+  template(JFRSafepointWrite)                     \
+  template(ShenandoahFullGC)                      \
+  template(ShenandoahInitMark)                    \
+  template(ShenandoahFinalMarkStartEvac)          \
+  template(ShenandoahInitUpdateRefs)              \
+  template(ShenandoahFinalUpdateRefs)             \
+  template(ShenandoahFinalRoots)                  \
+  template(ShenandoahDegeneratedGC)               \
+  template(Exit)                                  \
+  template(LinuxDllLoad)                          \
+  template(WhiteBoxOperation)                     \
+  template(JVMCIResizeCounters)                   \
+  template(ClassLoaderStatsOperation)             \
+  template(ClassLoaderHierarchyOperation)         \
+  template(DumpHashtable)                         \
+  template(CleanClassLoaderDataMetaspaces)        \
+  template(RehashStringTable)                     \
+  template(RehashSymbolTable)                     \
+  template(PrintCompileQueue)                     \
+  template(PrintClassHierarchy)                   \
+  template(PrintClasses)                          \
+  template(PrintMetadata)                         \
+  template(GTestExecuteAtSafepoint)               \
+  template(GTestStopSafepoint)                    \
+  template(JFROldObject)                          \
+  template(JvmtiPostObjectFree)                   \
+  template(RendezvousGCThreads)                   \
+  template(JFRInitializeCPUTimeSampler)       \
+  template(JFRTerminateCPUTimeSampler)        \
+  template(ReinitializeMDO)
+#else
 // Note: When new VM_XXX comes up, add 'XXX' to the template table.
 #define VM_OPS_DO(template)                       \
   template(Halt)                                  \
@@ -118,12 +205,22 @@
   template(JFRInitializeCPUTimeSampler)       \
   template(JFRTerminateCPUTimeSampler)        \
   template(ReinitializeMDO)
+#endif
 
 class Thread;
 class outputStream;
 
 class VM_Operation : public StackObj {
  public:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  enum Mode {
+    _safepoint,       // blocking,        safepoint, vm_op C-heap allocated
+    _no_safepoint,    // blocking,     no safepoint, vm_op C-Heap allocated
+    _concurrent,      // non-blocking, no safepoint, vm_op C-Heap allocated
+    _async_safepoint  // non-blocking,    safepoint, vm_op C-Heap allocated
+  };
+#endif
+
   enum VMOp_Type {
     VM_OPS_DO(VM_OP_ENUM)
     VMOp_Terminating

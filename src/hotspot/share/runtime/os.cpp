@@ -1553,8 +1553,8 @@ bool os::set_boot_path8(char fileSep, char pathSep) {
      // aligned with install/install/make/common/Pack.gmk. Note: boot class
      // path class JARs, are stripped for StackMapTable to reduce download size.
      static const char classpath_format[] =
-         //"%/lib/rt25.jar:"
-         //"%/lib/rt8.jar:"
+         "%/lib/rt25.jar:"
+         "%/lib/rt8.jar:"
          "%/lib/resources.jar:"
          "%/lib/rt.jar:"
          //"%/lib/sunrsasign.jar:"

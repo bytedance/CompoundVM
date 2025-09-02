@@ -1064,11 +1064,13 @@ void Universe::initialize_known_methods(JavaThread* current) {
                           "addClass",
                           vmSymbols::class_void_signature(), false);
 
+#if HOTSPOT_TARGET_CLASSLIB != 8
   // Set up method for stack walking
   _do_stack_walk_cache.init(current,
                           vmClasses::AbstractStackWalker_klass(),
                           "doStackWalk",
                           vmSymbols::doStackWalk_signature(), false);
+#endif
 }
 
 void universe2_init() {

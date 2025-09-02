@@ -405,6 +405,14 @@ extern "C" {                                                         \
     VM_Exit::block_if_vm_exited();                                   \
     VM_LEAF_BASE(result_type, header)
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define JVM_ENTRY_FROM_LEAF(env, result_type, header)                \
+  { {                                                                \
+    JavaThread* thread=JavaThread::thread_from_jni_environment(env); \
+    ThreadInVMfromNative __tiv(thread);                              \
+    DEBUG_ONLY(VMNativeEntryWrapper __vew;)                          \
+    VM_ENTRY_BASE_FROM_LEAF(result_type, header, thread)
+#endif
 
 #define JVM_END } }
 
