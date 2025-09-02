@@ -675,6 +675,7 @@ class os: AllStatic {
   // jdk8u's Java_java_util_zip_ZipFile_open() at the
   // JVM-interface-level instead of the os-call-level
   static int unlink(const char *path);
+  static int close(int fd);
 #endif
   static bool file_exists(const char* file);
 
@@ -947,6 +948,39 @@ class os: AllStatic {
   static ssize_t send(int fd, char* buf, size_t nBytes, uint flags);
   static ssize_t raw_send(int fd, char* buf, size_t nBytes, uint flags);
   static ssize_t connect(int fd, struct sockaddr* him, socklen_t len);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static int socket_shutdown(int fd, int howto);
+  static int timeout(int fd, long timeout);
+  static int listen(int fd, int count);
+  static int bind(int fd, struct sockaddr* him, socklen_t len);
+  static int accept(int fd, struct sockaddr* him, socklen_t* len);
+  static int recvfrom(int fd, char* buf, size_t nbytes, uint flags,
+                      struct sockaddr* from, socklen_t* fromlen);
+  static int get_sock_name(int fd, struct sockaddr* him, socklen_t* len);
+  static int sendto(int fd, char* buf, size_t len, uint flags,
+                    struct sockaddr* to, socklen_t tolen);
+  static int socket_available(int fd, jint* pbytes);
+
+  static int get_sock_opt(int fd, int level, int optname,
+                          char* optval, socklen_t* optlen);
+  static int set_sock_opt(int fd, int level, int optname,
+                          const char* optval, socklen_t optlen);
+  static int get_host_name(char* name, int namelen);
+  static void* thread_local_storage_at(int index);
+  static int    file_name_strcmp(const char* s1, const char* s2);
+  static bool obsolete_option(const JavaVMOption *option);
+  static bool allocate_stack_guard_pages();
+  static void   pd_split_reserved_memory(char *base, size_t size,
+                                      size_t split, bool realloc);
+  static void bang_stack_shadow_pages();
+  static const int default_file_open_flags();
+  static int fsync(int fd);
+  static bool   numa_has_static_binding();
+  static size_t restartable_read(int fd, void *buf, unsigned int nBytes);
+  static int socket(int domain, int type, int protocol);
+  static struct hostent* get_host_by_name(char* name);
+  static int available(int fd, jlong *bytes);
+#endif
 
   // Support for signals
   static void  initialize_jdk_signal_support(TRAPS);

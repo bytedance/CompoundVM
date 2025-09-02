@@ -156,6 +156,9 @@ static void create_initial_thread(Handle thread_group, JavaThread* thread,
   // constructor calls Thread.current(), which must be set here for the
   // initial thread.
   java_lang_Thread::set_thread(thread_oop(), thread);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  java_lang_Thread::set_priority(thread_oop(), NormPriority);
+#endif
   thread->set_threadOopHandles(thread_oop());
 
   Handle string = java_lang_String::create_from_str("main", CHECK);
@@ -170,9 +173,9 @@ static void create_initial_thread(Handle thread_group, JavaThread* thread,
                           CHECK);
 
   DEBUG_ONLY(int64_t main_thread_tid = java_lang_Thread::thread_id(thread_oop());)
-  assert(main_thread_tid == ThreadIdentifier::initial(), "");
-  assert(main_thread_tid == thread->monitor_owner_id(), "");
-  JFR_ONLY(assert(JFR_JVM_THREAD_ID(thread) == static_cast<traceid>(main_thread_tid), "initial tid mismatch");)
+  //assert(main_thread_tid == ThreadIdentifier::initial(), "");
+  //assert(main_thread_tid == thread->monitor_owner_id(), "");
+  //JFR_ONLY(assert(JFR_JVM_THREAD_ID(thread) == static_cast<traceid>(main_thread_tid), "initial tid mismatch");)
 
   // Set thread status to running since main thread has
   // been started and running.

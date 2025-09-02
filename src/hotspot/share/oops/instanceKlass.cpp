@@ -746,9 +746,13 @@ void InstanceKlass::deallocate_contents(ClassLoaderData* loader_data) {
 }
 
 bool InstanceKlass::is_record() const {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  return false;
+#else
   return _record_components != nullptr &&
          is_final() &&
          java_super() == vmClasses::Record_klass();
+#endif
 }
 
 bool InstanceKlass::is_sealed() const {

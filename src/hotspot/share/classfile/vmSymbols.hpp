@@ -56,9 +56,30 @@ class SerializeClosure;
 #define WAIT_NAME "wait0"
 #endif
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define VM_SYMBOLS_DO_BY_CLASSLIB(template, do_alias)                                             \
+  template(jdk_internal_reflect,                      "sun/reflect")                              \
+  template(reflect_ConstantPool,                      "sun/reflect/ConstantPool")                 \
+  template(reflect_MethodAccessorImpl,                "sun/reflect/MethodAccessorImpl")           \
+  template(reflect_CallerSensitive,                   "sun/reflect/CallerSensitive")              \
+  template(vmloader_name,                             "vmloader")                                 \
+  template(java_security_PrivilegedActionException,   "java/security/PrivilegedActionException")  \
+  template(exception_void_signature,                  "(Ljava/lang/Exception;)V")                 \
+  template(classloader_string_long_signature,         "(Ljava/lang/ClassLoader;Ljava/lang/String;)J")             \
+
+#else
+#define VM_SYMBOLS_DO_BY_CLASSLIB(template, do_alias)                                             \
+  template(jdk_internal_reflect,                      "jdk/internal/reflect")                     \
+  template(reflect_ConstantPool,                      "jdk/internal/reflect/ConstantPool")        \
+  template(reflect_MethodAccessorImpl,                "jdk/internal/reflect/MethodAccessorImpl")  \
+  template(reflect_CallerSensitive,                   "jdk/internal/reflect/CallerSensitive")     \
+
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
+
 // Mapping function names to values. New entries should be added below.
 
 #define VM_SYMBOLS_DO(template, do_alias)                                                         \
+  VM_SYMBOLS_DO_BY_CLASSLIB(template, do_alias)                                                   \
   /* commonly used class, package, module names */                                                \
   template(java_base,                                 "java.base")                                \
   template(java_lang_System,                          "java/lang/System")                         \
@@ -263,10 +284,7 @@ class SerializeClosure;
                                                                                                   \
   /* Support for reflection based on dynamic bytecode generation (JDK 1.4 and above) */           \
                                                                                                   \
-  template(jdk_internal_reflect,                      "jdk/internal/reflect")                     \
-  template(reflect_MethodAccessorImpl,                "jdk/internal/reflect/MethodAccessorImpl")      \
   template(reflect_Reflection,                        "jdk/internal/reflect/Reflection")              \
-  template(reflect_CallerSensitive,                   "jdk/internal/reflect/CallerSensitive")         \
   template(reflect_CallerSensitive_signature,         "Ljdk/internal/reflect/CallerSensitive;")       \
   template(reflect_DirectConstructorHandleAccessor_NativeAccessor,   "jdk/internal/reflect/DirectConstructorHandleAccessor$NativeAccessor") \
   template(clazz_name,                                "clazz")                                    \
@@ -295,7 +313,6 @@ class SerializeClosure;
   template(executable_name,                           "executable")                               \
   template(parameter_annotations_name,                "parameterAnnotations")                     \
   template(annotation_default_name,                   "annotationDefault")                        \
-  template(reflect_ConstantPool,                      "jdk/internal/reflect/ConstantPool")        \
   template(base_name,                                 "base")                                     \
   /* Type Annotations (JDK 8 and above) */                                                        \
   template(type_annotations_name,                     "typeAnnotations")                          \
