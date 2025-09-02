@@ -1620,6 +1620,7 @@ JVM_END
 // even if the class is not a record.
 JVM_ENTRY(jobjectArray, JVM_GetRecordComponents(JNIEnv* env, jclass ofClass))
 {
+#if HOTSPOT_TARGET_CLASSLIB != 8
   Klass* c = java_lang_Class::as_Klass(JNIHandles::resolve_non_null(ofClass));
   assert(c->is_instance_klass(), "must be");
   InstanceKlass* ik = InstanceKlass::cast(c);
@@ -1642,6 +1643,7 @@ JVM_ENTRY(jobjectArray, JVM_GetRecordComponents(JNIEnv* env, jclass ofClass))
     }
     return (jobjectArray)JNIHandles::make_local(THREAD, components_h());
   }
+#endif
 
   return nullptr;
 }
@@ -2916,7 +2918,11 @@ JVM_ENTRY(jobject, JVM_CurrentCarrierThread(JNIEnv* env, jclass threadClass))
 JVM_END
 
 JVM_ENTRY(jobject, JVM_CurrentThread(JNIEnv* env, jclass threadClass))
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  oop theThread = thread->threadObj();
+#else
   oop theThread = thread->vthread();
+#endif
   assert(theThread != (oop)nullptr, "no current thread!");
   return JNIHandles::make_local(THREAD, theThread);
 JVM_END
@@ -3871,5 +3877,70 @@ JVM_LEAF(jint, JVM_Open(const char *fname, jint flags, jint mode))
     }
   }
 JVM_END
+#endif // HOTSPOT_TARGET_CLASSLIB
+/*
+JVM_ENTRY(jstring, JVM_GetClassName(JNIEnv *env, jclass cls))
+  assert (cls != NULL, "illegal class");
+  JvmtiVMObjectAllocEventCollector oam;
+  ResourceMark rm(THREAD);
+  const char* name;
+  if (java_lang_Class::is_primitive(JNIHandles::resolve(cls))) {
+    name = type2name(java_lang_Class::primitive_type(JNIHandles::resolve(cls)));
+  } else {
+    // Consider caching interned string in Klass
+    Klass* k = java_lang_Class::as_Klass(JNIHandles::resolve(cls));
+    assert(k->is_klass(), "just checking");
+    name = k->external_name();
+  }
+  oop result = StringTable::intern((char*) name, CHECK_NULL);
+  return (jstring) JNIHandles::make_local(THREAD, result);
+JVM_END
 
-#endif
+JVM_ENTRY(jobjectArray, JVM_GetClassSigners(JNIEnv *env, jclass cls))
+  JvmtiVMObjectAllocEventCollector oam;
+  ResourceMark rm(THREAD);
+  if (java_lang_Class::is_primitive(JNIHandles::resolve_non_null(cls))) {
+    // There are no signers for primitive types
+    return NULL;
+  }
+
+  objArrayOop signers = java_lang_Class::signers(JNIHandles::resolve_non_null(cls));
+
+  // If there are no signers set in the class, or if the class
+  // is an array, return NULL.
+  if (signers == NULL) return NULL;
+
+  // copy of the signers array
+  Klass* element = ObjArrayKlass::cast(signers->klass())->element_klass();
+  objArrayOop signers_copy = oopFactory::new_objArray(element, signers->length(), CHECK_NULL);
+  for (int index = 0; index < signers->length(); index++) {
+    signers_copy->obj_at_put(index, signers->obj_at(index));
+  }
+
+  // return the copy
+  return (jobjectArray) JNIHandles::make_local(THREAD, signers_copy);
+JVM_END
+
+JVM_ENTRY(void, JVM_SetClassSigners(JNIEnv *env, jclass cls, jobjectArray signers))
+  oop mirror = JNIHandles::resolve_non_null(cls);
+  if (!java_lang_Class::is_primitive(mirror)) {
+    // This call is ignored for primitive types and arrays.
+    // Signers are only set once, ClassLoader.java, and thus shouldn't
+    // be called with an array.  Only the bootstrap loader creates arrays.
+    Klass* k = java_lang_Class::as_Klass(mirror);
+    if (k->is_instance_klass()) {
+      java_lang_Class::set_signers(k->java_mirror(), objArrayOop(JNIHandles::resolve(signers)));
+    }
+  }
+JVM_END
+
+JVM_ENTRY(jboolean, JVM_IsArrayClass(JNIEnv *env, jclass cls))
+  Klass* k = java_lang_Class::as_Klass(JNIHandles::resolve_non_null(cls));
+  return (k != NULL) && k->is_array_klass() ? true : false;
+JVM_END
+
+JVM_ENTRY(jboolean, JVM_IsPrimitiveClass(JNIEnv *env, jclass cls))
+  oop mirror = JNIHandles::resolve_non_null(cls);
+  return (jboolean) java_lang_Class::is_primitive(mirror);
+JVM_END
+#endif */

@@ -104,6 +104,9 @@ class java_lang_String : AllStatic {
   static oop    create_oop_from_str(const char* utf8_str, TRAPS);
   static Handle create_from_symbol(const Symbol* symbol, TRAPS);
   static Handle create_from_platform_dependent_str(const char* str, TRAPS);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static Handle char_converter(Handle java_string, jchar from_char, jchar to_char, TRAPS);
+#endif
 
   static void set_compact_strings(bool value);
 
@@ -206,6 +209,9 @@ class java_lang_String : AllStatic {
 
   // Conversion between '.' and '/' formats, and allocate a String from the result.
   static Handle externalize_classname(Symbol* java_name, TRAPS);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static Handle internalize_classname(Handle java_string, TRAPS) { return char_converter(java_string, '.', '/', THREAD); }
+#endif
 
   // Conversion
   static Symbol* as_symbol(oop java_string);
@@ -325,6 +331,9 @@ class java_lang_Class : AllStatic {
   static oop  component_mirror(oop java_class);
   static int component_mirror_offset() { return _component_mirror_offset; }
   static objArrayOop signers(oop java_class);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static void set_signers(oop java_class, objArrayOop signers);
+#endif
   static oop  class_data(oop java_class);
   static void set_class_data(oop java_class, oop classData);
   static void set_reflection_data(oop java_class, oop reflection_data);
@@ -383,6 +392,15 @@ class java_lang_Thread : AllStatic {
   static int _name_offset;
   static int _contextClassLoader_offset;
   static int _eetop_offset;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static int _stillborn_offset;
+  static int _group_offset;
+  static int _priority_offset;
+  static int _daemon_offset;
+  static int _stackSize_offset;
+  static int _thread_status_offset;
+  static int _park_event_offset;
+#endif
   static int _jvmti_thread_state_offset;
   static int _jvmti_VTMS_transition_disable_count_offset;
   static int _jvmti_is_in_VTMS_transition_offset;
@@ -397,6 +415,16 @@ class java_lang_Thread : AllStatic {
   static void compute_offsets();
 
  public:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // Stillborn
+  static bool is_stillborn(oop java_thread);
+  static void set_stillborn(oop java_thread);
+  // Pointer to type-stable park handler, encoded as jlong.
+  // Should be set when apparently null
+  // For details, see unsafe.cpp Unsafe_Unpark
+  static jlong park_event(oop java_thread);
+  static bool set_park_event(oop java_thread, jlong ptr);
+#endif
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
 
   // Returns the JavaThread associated with the thread obj
@@ -680,6 +708,9 @@ class java_lang_Throwable: AllStatic {
 
   // Programmatic access to stack trace
   static void get_stack_trace_elements(int depth, Handle backtrace, objArrayHandle stack_trace, TRAPS);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static oop  get_stack_trace_element(Handle throwable, int index, TRAPS);
+#endif
 
   // For recreating class initialization error exceptions.
   static Handle create_initialization_error(JavaThread* current, Handle throwable);
@@ -1292,9 +1323,15 @@ class java_lang_invoke_ResolvedMethodName : AllStatic {
   static bool is_instance(oop resolved_method);
 };
 
-
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define MEMBERNAME_INJECTED_FIELDS(macro)                               \
+  macro(java_lang_invoke_MemberName, vmloader, object_signature, false) \
+  macro(java_lang_invoke_MemberName, vmindex,  intptr_signature, false) \
+  macro(java_lang_invoke_MemberName, vmtarget, intptr_signature, false)
+#else
 #define MEMBERNAME_INJECTED_FIELDS(macro)                               \
   macro(java_lang_invoke_MemberName, vmindex,  intptr_signature, false)
+#endif
 
 
 class java_lang_invoke_MemberName: AllStatic {
@@ -1312,7 +1349,12 @@ class java_lang_invoke_MemberName: AllStatic {
   static int _name_offset;
   static int _type_offset;
   static int _flags_offset;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static int _vmtarget_offset;
+  static int _vmloader_offset;
+#else
   static int _method_offset;
+#endif
   static int _vmindex_offset;
 
   static void compute_offsets();
@@ -1334,7 +1376,12 @@ class java_lang_invoke_MemberName: AllStatic {
 
   // Link through ResolvedMethodName field to get Method*
   static Method*        vmtarget(oop mname);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static void       set_vmtarget(oop mname, Method* ref);
+#else
   static void       set_method(oop mname, oop method);
+#endif
+
 
   static intptr_t       vmindex(oop mname);
   static void       set_vmindex(oop mname, intptr_t index);
@@ -1372,7 +1419,11 @@ class java_lang_invoke_MemberName: AllStatic {
   static int clazz_offset()   { CHECK_INIT(_clazz_offset); }
   static int type_offset()    { CHECK_INIT(_type_offset); }
   static int flags_offset()   { CHECK_INIT(_flags_offset); }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static int vmtarget_offset() { CHECK_INIT(_vmtarget_offset); }
+#else
   static int method_offset()  { CHECK_INIT(_method_offset); }
+#endif
   static int vmindex_offset() { CHECK_INIT(_vmindex_offset); }
 };
 

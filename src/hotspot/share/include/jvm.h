@@ -37,6 +37,10 @@
 #define HOTSPOT_TARGET_CLASSLIB 8
 #endif
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#include "jvm8.h"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -1188,8 +1192,19 @@ typedef struct JDK1_1InitArgs {
  */
 JNIEXPORT jint JNICALL
 JVM_Open(const char *fname, jint flags, jint mode);
-
-#endif
+/*
+JNIEXPORT jstring JNICALL
+JVM_GetClassName(JNIEnv *env, jclass cls);
+JNIEXPORT jobjectArray JNICALL
+JVM_GetClassSigners(JNIEnv *env, jclass cls);
+JNIEXPORT void JNICALL
+JVM_SetClassSigners(JNIEnv *env, jclass cls, jobjectArray signers);
+JNIEXPORT jboolean JNICALL
+JVM_IsArrayClass(JNIEnv *env, jclass cls);
+JNIEXPORT jboolean JNICALL
+JVM_IsPrimitiveClass(JNIEnv *env, jclass cls);
+*/
+#endif // HOTSPOT_TARGET_CLASSLIB
 
 #ifdef __cplusplus
 } /* extern "C" */

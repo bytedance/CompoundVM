@@ -1172,3 +1172,36 @@ oop Reflection::invoke_constructor(oop constructor_mirror, objArrayHandle args, 
   invoke(klass, method, receiver, override, ptypes, T_VOID, args, false, CHECK_NULL);
   return receiver();
 }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+oop Reflection::array_component_type(oop mirror, TRAPS) {
+  if (java_lang_Class::is_primitive(mirror)) {
+    return NULL;
+  }
+
+  Klass* klass = java_lang_Class::as_Klass(mirror);
+  if (!klass->is_array_klass()) {
+    return NULL;
+  }
+
+  oop result = java_lang_Class::component_mirror(klass->java_mirror());
+#ifdef ASSERT
+/*
+  oop result2 = NULL;
+  if (ArrayKlass::cast(klass)->dimension() == 1) {
+    if (klass->is_typeArray_klass()) {
+      result2 = basic_type_arrayklass_to_mirror(klass, CHECK_NULL);
+    } else {
+      result2 = ObjArrayKlass::cast(klass)->element_klass()->java_mirror();
+    }
+  } else {
+    Klass* lower_dim = ArrayKlass::cast(klass)->lower_dimension();
+    assert(lower_dim->oop_is_array(), "just checking");
+    result2 = lower_dim->java_mirror();
+  }
+  assert(result == result2, "results must be consistent");
+*/
+#endif //ASSERT
+  return result;
+}
+#endif

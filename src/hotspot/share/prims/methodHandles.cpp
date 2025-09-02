@@ -338,7 +338,11 @@ oop MethodHandles::init_method_MemberName(Handle mname, CallInfo& info) {
 
   oop mname_oop = mname();
   java_lang_invoke_MemberName::set_flags  (mname_oop, flags);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  java_lang_invoke_MemberName::set_vmtarget(mname_oop, m());
+#else
   java_lang_invoke_MemberName::set_method (mname_oop, resolved_method());
+#endif
   java_lang_invoke_MemberName::set_vmindex(mname_oop, vmindex);   // vtable/itable index
   java_lang_invoke_MemberName::set_clazz  (mname_oop, m_klass->java_mirror());
   // Note:  name and type can be lazily computed by resolve_MemberName,
@@ -359,7 +363,11 @@ oop MethodHandles::init_field_MemberName(Handle mname, fieldDescriptor& fd, bool
 
   oop mname_oop = mname();
   java_lang_invoke_MemberName::set_flags  (mname_oop, flags);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  java_lang_invoke_MemberName::set_vmtarget(mname_oop, nullptr);
+#else
   java_lang_invoke_MemberName::set_method (mname_oop, nullptr);
+#endif
   java_lang_invoke_MemberName::set_vmindex(mname_oop, vmindex);
   java_lang_invoke_MemberName::set_clazz  (mname_oop, ik->java_mirror());
 

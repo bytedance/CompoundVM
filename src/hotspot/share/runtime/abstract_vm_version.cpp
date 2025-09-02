@@ -325,6 +325,14 @@ unsigned int Abstract_VM_Version::jvm_version() {
          (Abstract_VM_Version::vm_build_number() & 0xFF);
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+unsigned int Abstract_VM_Version::jvm_version_for_jdk8() {
+  return ((Abstract_VM_Version::vm_major_version() & 0xFF) << 24) |
+         ((Abstract_VM_Version::vm_minor_version() & 0xFFFF) << 8) |
+         (Abstract_VM_Version::vm_build_number() & 0xFF);
+}
+#endif
+
 const char* Abstract_VM_Version::extract_features_string(const char* cpu_info_string,
                                                          size_t cpu_info_string_len,
                                                          size_t features_offset) {

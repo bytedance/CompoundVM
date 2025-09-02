@@ -29,7 +29,7 @@ DISTRO_JVM_PATCH_NAME := CompoundVM_$(VERSION)_jvm_patch_linux_x64
 CVM8DIR := $(BUILDDIR)/jdk8
 CVM8_JARDIR := $(CVM8DIR)/jre/lib
 CVM8_LIBDIR := $(CVM8DIR)/jre/lib/amd64
-MODE ?= fastdebug
+MODE ?= slowdebug
 JAR ?= $(BOOTJDK25)/bin/jar
 JDK25_SRCROOT := $(WORKSPACE)
 CVM8_SRCROOT := $(WORKSPACE)/cvm
@@ -138,7 +138,7 @@ clean:
 full-clean:
 	rm -fr $(BUILDDIR) $(JDK25_SRCROOT)/build $(JDK8_SRCROOT)/build
 
-jdk8vm25: -clean-jdk8vm25 -bootstrap build_jdk8u build_jdk25u
+jdk8vm25: -clean-jdk8vm25 -bootstrap build_jdk8u build_jdk25u altkernel
 	@echo
 	@echo "###### Composing CVM8 ######"
 	$(eval SRC_BUILDDIR_25=$(shell find $(JDK25_SRCROOT)/build -type f -name build.log | grep $(MODE) | xargs dirname))
@@ -147,6 +147,8 @@ jdk8vm25: -clean-jdk8vm25 -bootstrap build_jdk8u build_jdk25u
 	{ \
 		cp -Lfr $(JDK8_IMAGEDIR) $(CVM8DIR) && \
 		mkdir -p $(CVM8_LIBDIR)/server25 && \
+		cp -f $(BUILDDIR)/rt8.jar $(CVM8_JARDIR)/ && \
+		cp -f $(BUILDDIR)/rt25.jar $(CVM8_JARDIR)/ && \
 		cp -f $(SRC_BUILDDIR_25)/jdk/lib/server/libjvm.so $(CVM8_LIBDIR)/server25/libjvm.so && \
 		cp -f $(SRC_BUILDDIR_25)/jdk/lib/libjimage.so $(CVM8_LIBDIR)/libjimage25.so && \
 		cp -f $(SRC_BUILDDIR_25)/jdk/lib/libjava.so $(CVM8_LIBDIR)/libjava25.so && \
@@ -209,10 +211,9 @@ build_jdk25u: -bootstrap
 # and tweak the code to fit into JDK8's boots.
 
 altkernel: -bootstrap
-	$(eval ALT_KERNEL_JAR=$(BUILDDIR)/rt25.jar)
-	$(eval ALT_KERNEL_BOOT_CP=$(BOOTJDK8)/jre/lib/rt.jar)
-	$(call compile_alt_classes,$(CVM8_SRCROOT)/alt_kernel/src25u,$(BUILDDIR)/alt_kernel/classes_25,$(ALT_KERNEL_JAR),$(ALT_KERNEL_BOOT_CP))
 	$(eval ALT_KERNEL_JAR=$(BUILDDIR)/rt8.jar)
-	$(eval ALT_KERNEL_BOOT_CP=$(BUILDDIR)/alt_kernel/classes_25:$(BOOTJDK8)/jre/lib/rt.jar)
+	$(eval ALT_KERNEL_BOOT_CP=$(BOOTJDK8)/jre/lib/rt.jar)
 	$(call compile_alt_classes,$(CVM8_SRCROOT)/alt_kernel/src8u,$(BUILDDIR)/alt_kernel/classes_8,$(ALT_KERNEL_JAR),$(ALT_KERNEL_BOOT_CP))
-
+	$(eval ALT_KERNEL_JAR=$(BUILDDIR)/rt25.jar)
+	$(eval ALT_KERNEL_BOOT_CP=$(BUILDDIR)/alt_kernel/classes_25:$(BOOTJDK8)/jre/lib/rt.jar)
+	$(call compile_alt_classes,$(CVM8_SRCROOT)/alt_kernel/src25u,$(BUILDDIR)/alt_kernel/classes_25,$(ALT_KERNEL_JAR),$(ALT_KERNEL_BOOT_CP))
