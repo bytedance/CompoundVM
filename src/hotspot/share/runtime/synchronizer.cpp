@@ -689,6 +689,14 @@ void ObjectSynchronizer::jni_enter(Handle obj, JavaThread* current) {
   current->set_current_pending_monitor_is_from_java(true);
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+// NOTE: must use heavy weight monitor to handle jni monitor enter
+bool ObjectSynchronizer::jni_try_enter(Handle obj, JavaThread* current) {
+  ObjectMonitor* monitor = inflate(current, obj(), inflate_cause_jni_enter);
+  return monitor->try_enter(current);
+}
+#endif
+
 // NOTE: must use heavy weight monitor to handle jni monitor exit
 void ObjectSynchronizer::jni_exit(oop obj, TRAPS) {
   JavaThread* current = THREAD;

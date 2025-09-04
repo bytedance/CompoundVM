@@ -30,7 +30,11 @@
 JNIEXPORT jclass JNICALL
 Java_jdk_internal_reflect_Reflection_getCallerClass(JNIEnv *env, jclass unused)
 {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    return JVM_GetCallerClass17(env);
+#else
     return JVM_GetCallerClass(env);
+#endif
 }
 
 JNIEXPORT jint JNICALL

@@ -414,8 +414,15 @@ JVM_NewMultiArray(JNIEnv *env, jclass eltClass, jintArray dim);
  * jdk.internal.reflect.CallerSensitive. The JVM will throw an
  * error if it is not marked properly.
  */
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JNIEXPORT jclass JNICALL
+JVM_GetCallerClass(JNIEnv *env, int depth);
+JNIEXPORT jclass JNICALL
+JVM_GetCallerClass17(JNIEnv *env);
+#else
 JNIEXPORT jclass JNICALL
 JVM_GetCallerClass(JNIEnv *env);
+#endif
 
 
 /*

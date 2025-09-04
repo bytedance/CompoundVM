@@ -116,6 +116,9 @@ public:
   // Used only to handle jni locks or other unmatched monitor enter/exit
   // Internally they will use heavy weight monitor.
   static void jni_enter(Handle obj, JavaThread* current);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static bool jni_try_enter(Handle obj, JavaThread* current); // Implements Unsafe.tryMonitorEnter
+#endif
   static void jni_exit(oop obj, TRAPS);
 
   // Handle all interpreter, compiler and jni cases

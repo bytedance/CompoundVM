@@ -720,8 +720,59 @@ JVM_END
 
 // Misc. class handling ///////////////////////////////////////////////////////////
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(jclass, JVM_GetCallerClass(JNIEnv* env, int depth))
+  // Pre-JDK 8 and early builds of JDK 8 don't have a CallerSensitive annotation; or
+  // sun.reflect.Reflection.getCallerClass with a depth parameter is provided
+  // temporarily for existing code to use until a replacement API is defined.
+  if (vmClasses::reflect_CallerSensitive_klass() == NULL || depth != JVM_CALLER_DEPTH) {
+    Klass* k = thread->security_get_caller_class(depth);
+    return (k == NULL) ? NULL : (jclass) JNIHandles::make_local(THREAD, k->java_mirror());
+  }
 
+  // Getting the class of the caller frame.
+  //
+  // The call stack at this point looks something like this:
+  //
+  // [0] [ @CallerSensitive public sun.reflect.Reflection.getCallerClass ]
+  // [1] [ @CallerSensitive API.method                                   ]
+  // [.] [ (skipped intermediate frames)                                 ]
+  // [n] [ caller                                                        ]
+  vframeStream vfst(thread);
+  // Cf. LibraryCallKit::inline_native_Reflection_getCallerClass
+  for (int n = 0; !vfst.at_end(); vfst.security_next(), n++) {
+    Method* m = vfst.method();
+    assert(m != NULL, "sanity");
+    switch (n) {
+    case 0:
+      // This must only be called from Reflection.getCallerClass
+      // TODO: this check is for jdk/internal/reflect/Reflection; but may also be sun/reflect/Reflection
+      if (m->intrinsic_id() != vmIntrinsics::_getCallerClass) {
+        THROW_MSG_NULL(vmSymbols::java_lang_InternalError(), "JVM_GetCallerClass must only be called from Reflection.getCallerClass");
+      }
+      // fall-through
+    case 1:
+      // Frame 0 and 1 must be caller sensitive.
+      // TODO: this check is for jdk/internal/reflect/Reflection; but may also be sun/reflect/Reflection
+      if (!m->caller_sensitive()) {
+        THROW_MSG_NULL(vmSymbols::java_lang_InternalError(), err_msg("CallerSensitive annotation expected at frame %d", n));
+      }
+      break;
+    default:
+      if (!m->is_ignored_by_security_stack_walk()) {
+        // We have reached the desired frame; return the holder class.
+        return (jclass) JNIHandles::make_local(THREAD, m->method_holder()->java_mirror());
+      }
+      break;
+    }
+  }
+  return NULL;
+JVM_END
+
+JVM_ENTRY(jclass, JVM_GetCallerClass17(JNIEnv* env))
+#else
 JVM_ENTRY(jclass, JVM_GetCallerClass(JNIEnv* env))
+#endif // HOTSPOT_TARGET_CLASSLIB
   // Getting the class of the caller frame.
   //
   // The call stack at this point looks something like this:
