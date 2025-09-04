@@ -16,7 +16,6 @@
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include "precompiled.hpp"
 #include "jni.h"
 #include "jvm.h"
 #include "classfile/classFileStream.hpp"
@@ -54,7 +53,6 @@
 #include "utilities/copy.hpp"
 #include "utilities/dtrace.hpp"
 #include "utilities/macros.hpp"
-#include "prims/unsafe.inline.hpp"
 
 
 /// JVM_RegisterUnsafeMethods
@@ -70,6 +68,9 @@
 
 #define UnsafeWrapper(arg) /*nothing, for the present*/
 
+#define UNSAFE_ENTRY(result_type, header) \
+  JVM_ENTRY(result_type, header)
+#define UNSAFE_END JVM_END
 
 inline jint invocation_key_from_method_slot(jint slot) {
   return slot;
@@ -187,10 +188,7 @@ UNSAFE_ENTRY(void, Unsafe_StoreFence(JNIEnv *env, jobject unsafe))
   OrderAccess::release();
 UNSAFE_END
 
-UNSAFE_ENTRY(void, Unsafe_FullFence(JNIEnv *env, jobject unsafe))
-  UnsafeWrapper("Unsafe_FullFence");
-  OrderAccess::fence();
-UNSAFE_END
+extern "C" void Unsafe_FullFence(JNIEnv *env, jobject unsafe);
 
 ////// Data in the C heap.
 
@@ -654,7 +652,7 @@ UNSAFE_ENTRY(jclass, Unsafe_DefineAnonymousClass(JNIEnv *env, jobject unsafe, jc
   // this point.   The mirror and any instances of this class have to keep
   // it alive afterwards.
   if (anon_klass != NULL) {
-    anon_klass->class_loader_data()->dec_keep_alive();
+    anon_klass->class_loader_data()->dec_keep_alive_ref_count();
   }
 
   // let caller initialize it as needed...
