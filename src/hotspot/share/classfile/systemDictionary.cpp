@@ -899,6 +899,44 @@ InstanceKlass* SystemDictionary::resolve_class_from_stream(
   return k;
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+
+// Note: this method is much like resolve_from_stream, but
+// updates no supplemental data structures.
+Klass* SystemDictionary::parse_stream(Symbol* class_name,
+                                      Handle class_loader,
+                                      Handle protection_domain,
+                                      ClassFileStream* st,
+                                      Klass* host_klass,
+                                      GrowableArray<Handle>* cp_patches,
+                                      TRAPS) {
+  InstanceKlass* k;
+  {
+    // Callers are expected to declare a ResourceMark to determine
+    // the lifetime of any updated (resource) allocated under
+    // this call to parseClassFile
+    ResourceMark rm(THREAD);
+
+    // Critical part of making java/lang/invoke to work
+    ClassLoadInfo cli(protection_domain, (InstanceKlass*)(host_klass), Handle(), true, true, true);
+    k = resolve_from_stream(st, class_name, class_loader, cli, THREAD);
+  }
+
+  if (k != NULL) {
+    k->set_is_hidden();
+
+    // Rewrite and patch constant pool here.
+    k->link_class(CHECK_NULL);
+    if (cp_patches != NULL) {
+      k->constants()->patch_resolved_references(cp_patches);
+    }
+  }
+
+  return k;
+}
+
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
+
 InstanceKlass* SystemDictionary::resolve_from_stream(ClassFileStream* st,
                                                      Symbol* class_name,
                                                      Handle class_loader,

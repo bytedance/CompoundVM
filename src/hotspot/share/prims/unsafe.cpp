@@ -66,6 +66,13 @@
  */
 
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define UNSAFE_ENTRY(result_type, header) \
+  JVM_ENTRY(result_type, header)
+
+#define UNSAFE_LEAF(result_type, header) \
+  JVM_LEAF(result_type, header)
+#else
 #define MAX_OBJECT_SIZE \
   ( arrayOopDesc::base_offset_in_bytes(T_DOUBLE) \
     + ((julong)max_jint * sizeof(double)) )
@@ -75,6 +82,7 @@
 
 #define UNSAFE_LEAF(result_type, header) \
   JVM_LEAF(static result_type, header)
+#endif // HOTSPOT_TARGET_CLASSLIB
 
 // All memory access methods (e.g. getInt, copyMemory) must use this macro.
 // We call these methods "scoped" methods, as access to these methods is
@@ -96,13 +104,19 @@
 // Corollary: as threads in native state are considered to be at a safepoint,
 // scoped methods must NOT be executed while in the native thread state.
 // Because of this, there can be no UNSAFE_LEAF_SCOPED.
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define UNSAFE_ENTRY_SCOPED(result_type, header) \
+  JVM_ENTRY(result_type, header) \
+  if (thread->has_async_exception_condition()) {return (result_type)0;}
+#else
 #define UNSAFE_ENTRY_SCOPED(result_type, header) \
   JVM_ENTRY(static result_type, header) \
   if (thread->has_async_exception_condition()) {return (result_type)0;}
+#endif
 
 #define UNSAFE_END JVM_END
 
-
+#if HOTSPOT_TARGET_CLASSLIB != 8 // moved to unsafe.hpp
 static inline void* addr_from_java(jlong addr) {
   // This assert fails in a variety of ways on 32-bit systems.
   // It is impossible to predict whether native code that converts
@@ -115,6 +129,7 @@ static inline jlong addr_to_java(void* p) {
   assert(p == (void*)(uintptr_t)p, "must not be odd high bits");
   return (uintptr_t)p;
 }
+#endif
 
 
 // Note: The VM's obj_field and related accessors use byte-scaled
@@ -127,6 +142,7 @@ static inline jlong addr_to_java(void* p) {
 // through conversion functions when going between the VM and the Unsafe API.
 // The conversion functions just happen to be no-ops at present.
 
+#if HOTSPOT_TARGET_CLASSLIB != 8 // moved to unsafe.hpp
 static inline jlong field_offset_to_byte_offset(jlong field_offset) {
   return field_offset;
 }
@@ -158,6 +174,7 @@ static inline void* index_oop_from_field_offset_long(oop p, jlong field_offset) 
   uintptr_t byte_offset  = (uintptr_t)field_offset_to_byte_offset(field_offset);
   return (void*)(base_address + byte_offset);
 }
+#endif
 
 // Externally callable versions:
 // (Use these in compiler intrinsics which emulate unsafe primitives.)
@@ -171,6 +188,7 @@ jlong Unsafe_field_offset_from_byte_offset(jlong byte_offset) {
 
 ///// Data read/writes on the Java heap and in native (off-heap) memory
 
+#if HOTSPOT_TARGET_CLASSLIB != 8 // moved to unsafe.hpp
 /**
  * Helper class to wrap memory accesses in JavaThread::doing_unsafe_access()
  */
@@ -262,6 +280,7 @@ public:
     RawAccess<MO_SEQ_CST>::store(addr(), normalize_for_write(x));
   }
 };
+#endif // HOTSPOT_TARGET_CLASSLIB
 
 // These functions allow a null base pointer with an arbitrary address.
 // But if the base pointer is non-null, the offset should make some sense.

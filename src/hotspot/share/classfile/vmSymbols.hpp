@@ -59,9 +59,11 @@ class SerializeClosure;
 #if HOTSPOT_TARGET_CLASSLIB == 8
 #define VM_SYMBOLS_DO_BY_CLASSLIB(template, do_alias)                                             \
   template(jdk_internal_reflect,                      "sun/reflect")                              \
+  template(reflect_Reflection,                        "sun/reflect/Reflection")                   \
   template(reflect_ConstantPool,                      "sun/reflect/ConstantPool")                 \
   template(reflect_MethodAccessorImpl,                "sun/reflect/MethodAccessorImpl")           \
   template(reflect_CallerSensitive,                   "sun/reflect/CallerSensitive")              \
+  template(reflect_CallerSensitive_signature,         "Lsun/reflect/CallerSensitive;")            \
   template(vmloader_name,                             "vmloader")                                 \
   template(java_security_PrivilegedActionException,   "java/security/PrivilegedActionException")  \
   template(exception_void_signature,                  "(Ljava/lang/Exception;)V")                 \
@@ -70,9 +72,12 @@ class SerializeClosure;
 #else
 #define VM_SYMBOLS_DO_BY_CLASSLIB(template, do_alias)                                             \
   template(jdk_internal_reflect,                      "jdk/internal/reflect")                     \
+  template(reflect_Reflection,                        "jdk/internal/reflect/Reflection")          \
   template(reflect_ConstantPool,                      "jdk/internal/reflect/ConstantPool")        \
   template(reflect_MethodAccessorImpl,                "jdk/internal/reflect/MethodAccessorImpl")  \
   template(reflect_CallerSensitive,                   "jdk/internal/reflect/CallerSensitive")     \
+  template(reflect_CallerSensitive_signature,         "Ljdk/internal/reflect/CallerSensitive;")   \
+
 
 #endif // HOTSPOT_TARGET_CLASSLIB == 8
 
@@ -284,8 +289,6 @@ class SerializeClosure;
                                                                                                   \
   /* Support for reflection based on dynamic bytecode generation (JDK 1.4 and above) */           \
                                                                                                   \
-  template(reflect_Reflection,                        "jdk/internal/reflect/Reflection")              \
-  template(reflect_CallerSensitive_signature,         "Ljdk/internal/reflect/CallerSensitive;")       \
   template(reflect_DirectConstructorHandleAccessor_NativeAccessor,   "jdk/internal/reflect/DirectConstructorHandleAccessor$NativeAccessor") \
   template(clazz_name,                                "clazz")                                    \
   template(exceptionTypes_name,                       "exceptionTypes")                           \

@@ -212,6 +212,9 @@ extern "C" {
   jlong    JNICALL JVM_ReadSystemPropertiesInfo(JNIEnv *env, jclass c, jintArray offsets);
   void     JNICALL JVM_RegisterJVMCINatives(JNIEnv *env, jclass compilerToVMClass);
 #endif
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  void     JNICALL JVM_RegisterSunMiscUnsafeMethods(JNIEnv *env, jclass unsafeclass);
+#endif
 }
 
 #define CC (char*)  /* cast a literal from (const char*) */
