@@ -3512,6 +3512,14 @@ jint Arguments::parse(const JavaVMInitArgs* initial_cmd_args) {
   assert(verify_special_jvm_flags(false), "deprecated and obsolete flag table inconsistent");
   JVMFlag::check_all_flag_declarations();
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  FLAG_SET_DEFAULT(IgnoreUnrecognizedVMOptions, true);
+  // forcefully disable vector support for JDK8
+  FLAG_SET_DEFAULT(EnableVectorSupport, false);
+  FLAG_SET_DEFAULT(CompactStrings, false);
+  FLAG_SET_DEFAULT(AllowRedefinitionToAddDeleteMethods, true);
+#endif
+
   // If flag "-XX:Flags=flags-file" is used it will be the first option to be processed.
   const char* hotspotrc = ".hotspotrc";
   bool settings_file_specified = false;

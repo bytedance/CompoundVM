@@ -341,7 +341,11 @@ void java_lang_String::set_compact_strings(bool value) {
 
 Handle java_lang_String::basic_create(int length, bool is_latin1, TRAPS) {
   assert(_initialized, "Must be initialized");
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings && !is_latin1, "Must be UTF16 and no CompactStrings");
+#else
   assert(CompactStrings || !is_latin1, "Must be UTF16 without CompactStrings");
+#endif
 
   // Create the String object first, so there's a chance that the String
   // and the char array it points to end up in the same cache line.
@@ -351,18 +355,35 @@ Handle java_lang_String::basic_create(int length, bool is_latin1, TRAPS) {
   // Create the char array.  The String object must be handlized here
   // because GC can happen as a result of the allocation attempt.
   Handle h_obj(THREAD, obj);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  typeArrayOop buffer = oopFactory::new_charArray(length, CHECK_NH);;
+#else
   int arr_length = is_latin1 ? length : length << 1; // 2 bytes per UTF16.
   typeArrayOop buffer = oopFactory::new_byteArray(arr_length, CHECK_NH);;
+#endif
 
   // Point the String at the char array
   obj = h_obj();
   set_value(obj, buffer);
   // No need to zero the offset, allocation zero'ed the entire String object
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  set_coder(obj, CODER_UTF16);
+#else
   set_coder(obj, is_latin1 ? CODER_LATIN1 : CODER_UTF16);
+#endif
   return h_obj;
 }
 
 Handle java_lang_String::create_from_unicode(const jchar* unicode, int length, TRAPS) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  Handle h_obj = basic_create(length, false, CHECK_NH);
+  typeArrayOop buffer = value(h_obj());
+  assert(TypeArrayKlass::cast(buffer->klass())->element_type() == T_CHAR, "classlib8 has only char[]");
+  for (int index = 0; index < length; index++) {
+    buffer->char_at_put(index, unicode[index]);
+  }
+#else
   bool is_latin1 = CompactStrings && UNICODE::is_latin1(unicode, length);
   Handle h_obj = basic_create(length, is_latin1, CHECK_NH);
   typeArrayOop buffer = value(h_obj());
@@ -376,6 +397,7 @@ Handle java_lang_String::create_from_unicode(const jchar* unicode, int length, T
       buffer->char_at_put(index, unicode[index]);
     }
   }
+#endif
 
 #ifdef ASSERT
   {
@@ -401,6 +423,17 @@ Handle java_lang_String::create_from_str(const char* utf8_str, TRAPS) {
   if (utf8_str == nullptr) {
     return Handle();
   }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  bool has_multibyte, is_latin1;
+  int length = UTF8::unicode_length(utf8_str, is_latin1, has_multibyte);
+  has_multibyte = true;
+  is_latin1 = false;
+  Handle h_obj = basic_create(length, is_latin1, CHECK_NH);
+  if (length > 0) {
+    UTF8::convert_to_unicode(utf8_str, value(h_obj())->char_at_addr(0), length);
+  }
+#else
   bool has_multibyte, is_latin1;
   int length = UTF8::unicode_length(utf8_str, is_latin1, has_multibyte);
   if (!CompactStrings) {
@@ -419,6 +452,7 @@ Handle java_lang_String::create_from_str(const char* utf8_str, TRAPS) {
       UTF8::convert_to_unicode(utf8_str, value(h_obj())->char_at_addr(0), length);
     }
   }
+#endif
 
 #ifdef ASSERT
   // This check is too strict when the input string is not a valid UTF8.
@@ -445,6 +479,17 @@ Handle java_lang_String::create_from_symbol(const Symbol* symbol, TRAPS) {
   const char* utf8_str = (char*)symbol->bytes();
   int utf8_len = symbol->utf8_length();
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  bool has_multibyte, is_latin1;
+  int length = UTF8::unicode_length(utf8_str, utf8_len, is_latin1, has_multibyte);
+  has_multibyte = true;
+  is_latin1 = false;
+  Handle h_obj = basic_create(length, false, CHECK_NH);
+  if (length > 0) {
+    UTF8::convert_to_unicode(utf8_str, value(h_obj())->char_at_addr(0), length);
+  }
+#else
   bool has_multibyte, is_latin1;
   int length = UTF8::unicode_length(utf8_str, utf8_len, is_latin1, has_multibyte);
   if (!CompactStrings) {
@@ -463,6 +508,7 @@ Handle java_lang_String::create_from_symbol(const Symbol* symbol, TRAPS) {
       UTF8::convert_to_unicode(utf8_str, value(h_obj())->char_at_addr(0), length);
     }
   }
+#endif
 
 #ifdef ASSERT
   // This check is too strict on older classfile versions
@@ -589,6 +635,10 @@ inline unsigned int java_lang_String::hash_code_impl(oop java_string, bool updat
 
   typeArrayOop value = java_lang_String::value(java_string);
   int         length = java_lang_String::length(java_string, value);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  unsigned int hash = java_lang_String::hash_code(value->char_at_addr(0), length);
+#else
   bool     is_latin1 = java_lang_String::is_latin1(java_string);
 
   unsigned int hash = 0;
@@ -599,6 +649,7 @@ inline unsigned int java_lang_String::hash_code_impl(oop java_string, bool updat
       hash = java_lang_String::hash_code(value->char_at_addr(0), length);
     }
   }
+#endif
 
   if (update) {
     if (hash != 0) {
@@ -622,6 +673,13 @@ unsigned int java_lang_String::hash_code_noupdate(oop java_string) {
 char* java_lang_String::as_quoted_ascii(oop java_string) {
   typeArrayOop value  = java_lang_String::value(java_string);
   int          length = java_lang_String::length(java_string, value);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  jchar* base = value->char_at_addr(0);
+  int result_length = UNICODE::quoted_ascii_length(base, length) + 1;
+  char *result = NEW_RESOURCE_ARRAY(char, result_length);
+  UNICODE::as_quoted_ascii(base, length, result, result_length);
+#else
   bool      is_latin1 = java_lang_String::is_latin1(java_string);
 
   if (length == 0) return nullptr;
@@ -639,6 +697,7 @@ char* java_lang_String::as_quoted_ascii(oop java_string) {
     result = NEW_RESOURCE_ARRAY(char, result_length);
     UNICODE::as_quoted_ascii(base, length, result, result_length);
   }
+#endif
   assert(result_length >= (size_t)length + 1, "must not be shorter");
   assert(result_length == strlen(result) + 1, "must match");
   return result;
@@ -647,6 +706,12 @@ char* java_lang_String::as_quoted_ascii(oop java_string) {
 Symbol* java_lang_String::as_symbol(oop java_string) {
   typeArrayOop value  = java_lang_String::value(java_string);
   int          length = java_lang_String::length(java_string, value);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  jchar* base = (length == 0) ? NULL : value->char_at_addr(0);
+  Symbol* sym = SymbolTable::new_symbol(base, length);
+  return sym;
+#else
   bool      is_latin1 = java_lang_String::is_latin1(java_string);
   if (!is_latin1) {
     jchar* base = (length == 0) ? nullptr : value->char_at_addr(0);
@@ -660,11 +725,17 @@ Symbol* java_lang_String::as_symbol(oop java_string) {
     Symbol* sym = SymbolTable::new_symbol(base, checked_cast<int>(utf8_len));
     return sym;
   }
+#endif
 }
 
 Symbol* java_lang_String::as_symbol_or_null(oop java_string) {
   typeArrayOop value  = java_lang_String::value(java_string);
   int          length = java_lang_String::length(java_string, value);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  jchar* base = (length == 0) ? NULL : value->char_at_addr(0);
+  return SymbolTable::probe_unicode(base, length);
+#else
   bool      is_latin1 = java_lang_String::is_latin1(java_string);
   if (!is_latin1) {
     jchar* base = (length == 0) ? nullptr : value->char_at_addr(0);
@@ -676,6 +747,7 @@ Symbol* java_lang_String::as_symbol_or_null(oop java_string) {
     const char* base = UNICODE::as_utf8(position, utf8_len);
     return SymbolTable::probe(base, checked_cast<int>(utf8_len));
   }
+#endif
 }
 
 size_t java_lang_String::utf8_length(oop java_string, typeArrayOop value) {
@@ -726,6 +798,11 @@ char* java_lang_String::as_utf8_string(oop java_string, size_t& length) {
   // `length` is used as the incoming number of characters to
   // convert, and then set as the number of bytes in the UTF8 sequence.
   length             = java_lang_String::length(java_string, value);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  jchar* position = (length == 0) ? NULL : value->char_at_addr(0);
+  return UNICODE::as_utf8(position, length);
+#else
   bool     is_latin1 = java_lang_String::is_latin1(java_string);
   if (!is_latin1) {
     jchar* position = (length == 0) ? nullptr : value->char_at_addr(0);
@@ -734,6 +811,7 @@ char* java_lang_String::as_utf8_string(oop java_string, size_t& length) {
     jbyte* position = (length == 0) ? nullptr : value->byte_at_addr(0);
     return UNICODE::as_utf8(position, length);
   }
+#endif
 }
 
 // Uses a provided buffer if it's sufficiently large, otherwise allocates
@@ -741,6 +819,15 @@ char* java_lang_String::as_utf8_string(oop java_string, size_t& length) {
 char* java_lang_String::as_utf8_string_full(oop java_string, char* buf, size_t buflen, size_t& utf8_len) {
   typeArrayOop value = java_lang_String::value(java_string);
   int            len = java_lang_String::length(java_string, value);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  jchar *position = (len == 0) ? NULL : value->char_at_addr(0);
+  utf8_len = UNICODE::utf8_length(position, len);
+  if (utf8_len >= buflen) {
+    buf = NEW_RESOURCE_ARRAY(char, utf8_len + 1);
+  }
+  return UNICODE::as_utf8(position, len, buf, utf8_len + 1);
+#else
   bool     is_latin1 = java_lang_String::is_latin1(java_string);
   if (!is_latin1) {
     jchar *position = (len == 0) ? nullptr : value->char_at_addr(0);
@@ -757,12 +844,18 @@ char* java_lang_String::as_utf8_string_full(oop java_string, char* buf, size_t b
     }
     return UNICODE::as_utf8(position, len, buf, utf8_len + 1);
   }
+#endif
 }
 
 char* java_lang_String::as_utf8_string(oop java_string, typeArrayOop value, char* buf, size_t buflen) {
   assert(value_equals(value, java_lang_String::value(java_string)),
          "value must be same as java_lang_String::value(java_string)");
   int     length = java_lang_String::length(java_string, value);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  jchar* position = (length == 0) ? NULL : value->char_at_addr(0);
+  return UNICODE::as_utf8(position, length, buf, buflen);
+#else
   bool is_latin1 = java_lang_String::is_latin1(java_string);
   if (!is_latin1) {
     jchar* position = (length == 0) ? nullptr : value->char_at_addr(0);
@@ -771,6 +864,7 @@ char* java_lang_String::as_utf8_string(oop java_string, typeArrayOop value, char
     jbyte* position = (length == 0) ? nullptr : value->byte_at_addr(0);
     return UNICODE::as_utf8(position, length, buf, buflen);
   }
+#endif
 }
 
 char* java_lang_String::as_utf8_string(oop java_string, char* buf, size_t buflen) {
@@ -783,6 +877,12 @@ char* java_lang_String::as_utf8_string(oop java_string, int start, int len) {
   // convert, and then set as the number of bytes in the UTF8 sequence.
   size_t  length = static_cast<size_t>(len);
   typeArrayOop value  = java_lang_String::value(java_string);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  assert(start + len <= java_lang_String::length(java_string), "just checking");
+  jchar* position = value->char_at_addr(start);
+  return UNICODE::as_utf8(position, length);
+#else
   bool      is_latin1 = java_lang_String::is_latin1(java_string);
   assert(start + len <= java_lang_String::length(java_string), "just checking");
   if (!is_latin1) {
@@ -792,12 +892,18 @@ char* java_lang_String::as_utf8_string(oop java_string, int start, int len) {
     jbyte* position = value->byte_at_addr(start);
     return UNICODE::as_utf8(position, length);
   }
+#endif
 }
 
 char* java_lang_String::as_utf8_string(oop java_string, typeArrayOop value, int start, int len, char* buf, size_t buflen) {
   assert(value_equals(value, java_lang_String::value(java_string)),
          "value must be same as java_lang_String::value(java_string)");
   assert(start + len <= java_lang_String::length(java_string), "just checking");
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  jchar* position = value->char_at_addr(start);
+  return UNICODE::as_utf8(position, len, buf, buflen);
+#else
   bool is_latin1 = java_lang_String::is_latin1(java_string);
   if (!is_latin1) {
     jchar* position = value->char_at_addr(start);
@@ -806,6 +912,7 @@ char* java_lang_String::as_utf8_string(oop java_string, typeArrayOop value, int 
     jbyte* position = value->byte_at_addr(start);
     return UNICODE::as_utf8(position, len, buf, buflen);
   }
+#endif
 }
 
 bool java_lang_String::equals(oop java_string, const jchar* chars, int len) {
@@ -816,6 +923,14 @@ bool java_lang_String::equals(oop java_string, const jchar* chars, int len) {
   if (length != len) {
     return false;
   }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  for (int i = 0; i < len; i++) {
+    if (value->char_at(i) != chars[i]) {
+      return false;
+    }
+  }
+#else
   bool is_latin1 = java_lang_String::is_latin1(java_string);
   if (!is_latin1) {
     for (int i = 0; i < len; i++) {
@@ -830,6 +945,7 @@ bool java_lang_String::equals(oop java_string, const jchar* chars, int len) {
       }
     }
   }
+#endif
   return true;
 }
 
@@ -1776,32 +1892,19 @@ int java_lang_Thread::_tid_offset;
 int java_lang_Thread::_continuation_offset;
 int java_lang_Thread::_park_blocker_offset;
 int java_lang_Thread::_scopedValueBindings_offset;
-#if HOTSPOT_TARGET_CLASSLIB == 8
-int java_lang_Thread::_stillborn_offset = 0;
-int java_lang_Thread::_group_offset = 0;
-int java_lang_Thread::_priority_offset = 0;
-int java_lang_Thread::_daemon_offset = 0;
-int java_lang_Thread::_stackSize_offset = 0;
-int java_lang_Thread::_thread_status_offset = 0;
-int java_lang_Thread::_park_event_offset = 0;
-#endif
 JFR_ONLY(int java_lang_Thread::_jfr_epoch_offset;)
 
 #if HOTSPOT_TARGET_CLASSLIB == 8
 #define THREAD_FIELDS_DO(macro) \
+  macro(_holder_offset,        k, "holder", thread_fieldholder_signature, false); \
   macro(_name_offset,          k, vmSymbols::name_name(), string_signature, false); \
-  macro(_group_offset,         k, "group", threadgroup_signature, false); \
   macro(_contextClassLoader_offset, k, "contextClassLoader", classloader_signature, false); \
-  macro(_priority_offset,      k, "priority", int_signature, false); \
-  macro(_daemon_offset,        k, "daemon", bool_signature, false); \
   macro(_eetop_offset,         k, "eetop", long_signature, false); \
-  macro(_stillborn_offset,     k, "stillborn", bool_signature, false); \
-  macro(_stackSize_offset,     k, "stacksize", long_signature, false); \
+  macro(_interrupted_offset,   k, "interrupted", bool_signature, false); \
+  macro(_interruptLock_offset, k, "interruptLock", object_signature, false); \
   macro(_tid_offset,           k, "tid", long_signature, false); \
-  macro(_thread_status_offset, k, "threadStatus", int_signature, false); \
   macro(_park_blocker_offset,  k, "parkBlocker", object_signature, false); \
-  macro(_park_event_offset,    k, "nativeParkEventPointer", long_signature, false); \
-  macro(_holder_offset,        k, "holder", thread_fieldholder_signature, false);
+  macro(_scopedValueBindings_offset, k, "scopedValueBindings", object_signature, false);
 #else
 #define THREAD_FIELDS_DO(macro) \
   macro(_holder_offset,        k, "holder", thread_fieldholder_signature, false); \
@@ -1950,20 +2053,6 @@ void java_lang_Thread::set_name(oop java_thread, oop name) {
     java_lang_Thread_FieldHolder::set_##field(holder, value);   \
   }
 
-#if HOTSPOT_TARGET_CLASSLIB == 8
-ThreadPriority java_lang_Thread::priority(oop java_thread) {
-  return (ThreadPriority)java_thread->int_field(_priority_offset);
-}
-
-
-void java_lang_Thread::set_priority(oop java_thread, ThreadPriority priority) {
-  java_thread->int_field_put(_priority_offset, priority);
-}
-
-oop java_lang_Thread::threadGroup(oop java_thread) {
-  return java_thread->obj_field(_group_offset);
-}
-#else
 ThreadPriority java_lang_Thread::priority(oop java_thread) {
   GET_FIELDHOLDER_FIELD(java_thread, priority, (ThreadPriority)0);
 }
@@ -1977,14 +2066,6 @@ void java_lang_Thread::set_priority(oop java_thread, ThreadPriority priority) {
 oop java_lang_Thread::threadGroup(oop java_thread) {
   GET_FIELDHOLDER_FIELD(java_thread, threadGroup, nullptr);
 }
-#endif
-
-#if HOTSPOT_TARGET_CLASSLIB == 8
-// We never have reason to turn the stillborn bit off
-void java_lang_Thread::set_stillborn(oop java_thread) {
-  java_thread->bool_field_put(_stillborn_offset, true);
-}
-#endif
 
 bool java_lang_Thread::is_alive(oop java_thread) {
   JavaThread* thr = java_lang_Thread::thread(java_thread);
@@ -1992,16 +2073,6 @@ bool java_lang_Thread::is_alive(oop java_thread) {
 }
 
 
-#if HOTSPOT_TARGET_CLASSLIB == 8
-bool java_lang_Thread::is_daemon(oop java_thread) {
-  return java_thread->bool_field(_daemon_offset) != 0;
-}
-
-
-void java_lang_Thread::set_daemon(oop java_thread) {
-  java_thread->bool_field_put(_daemon_offset, true);
-}
-#else
 bool java_lang_Thread::is_daemon(oop java_thread) {
   GET_FIELDHOLDER_FIELD(java_thread, is_daemon, false);
 }
@@ -2010,55 +2081,11 @@ bool java_lang_Thread::is_daemon(oop java_thread) {
 void java_lang_Thread::set_daemon(oop java_thread) {
   SET_FIELDHOLDER_FIELD(java_thread, daemon, true);
 }
-#endif
 
 oop java_lang_Thread::context_class_loader(oop java_thread) {
   return java_thread->obj_field(_contextClassLoader_offset);
 }
 
-
-#if HOTSPOT_TARGET_CLASSLIB == 8
-jlong java_lang_Thread::stackSize(oop java_thread) {
-  // The stackSize field is only present starting in 1.4
-  if (_stackSize_offset > 0) {
-    return java_thread->long_field(_stackSize_offset);
-  } else {
-    return 0;
-  }
-}
-
-// Write the thread status value to threadStatus field in java.lang.Thread java class.
-void java_lang_Thread::set_thread_status(oop java_thread,
-                                         JavaThreadStatus status) {
-  // The threadStatus is only present starting in 1.5
-  if (_thread_status_offset > 0) {
-    java_thread->int_field_put(_thread_status_offset, static_cast<int>(status));
-  }
-}
-
-// Read thread status value from threadStatus field in java.lang.Thread java class.
-JavaThreadStatus java_lang_Thread::get_thread_status(oop java_thread) {
-  assert(Threads_lock->owned_by_self() || Thread::current()->is_Watcher_thread() ||
-         Thread::current()->is_VM_thread() ||
-         JavaThread::current()->thread_state() == _thread_in_vm,
-         "Java Thread is not running in vm");
-  // The threadStatus is only present starting in 1.5
-  if (_thread_status_offset > 0) {
-    return (JavaThreadStatus)java_thread->int_field(_thread_status_offset);
-  } else {
-    // All we can easily figure out is if it is alive, but that is
-    // enough info for a valid unknown status.
-    // These aren't restricted to valid set ThreadStatus values, so
-    // use JVMTI values and cast.
-    JavaThread* thr = java_lang_Thread::thread(java_thread);
-    if (thr == NULL) {
-      // the thread hasn't run yet or is in the process of exiting
-      return JavaThreadStatus::NEW;
-    }
-    return (JavaThreadStatus)JVMTI_THREAD_STATE_ALIVE;
-  }
-}
-#else
 jlong java_lang_Thread::stackSize(oop java_thread) {
   GET_FIELDHOLDER_FIELD(java_thread, stackSize, 0);
 }
@@ -2077,7 +2104,6 @@ JavaThreadStatus java_lang_Thread::get_thread_status(oop java_thread) {
          "Java Thread is not running in vm");
   GET_FIELDHOLDER_FIELD(java_thread, get_thread_status, JavaThreadStatus::NEW /* not initialized */);
 }
-#endif
 
 ByteSize java_lang_Thread::thread_id_offset() {
   return in_ByteSize(_tid_offset);
@@ -2086,23 +2112,6 @@ ByteSize java_lang_Thread::thread_id_offset() {
 oop java_lang_Thread::park_blocker(oop java_thread) {
   return java_thread->obj_field_access<MO_RELAXED>(_park_blocker_offset);
 }
-
-#if HOTSPOT_TARGET_CLASSLIB == 8
-jlong java_lang_Thread::park_event(oop java_thread) {
-  if (_park_event_offset > 0) {
-    return java_thread->long_field(_park_event_offset);
-  }
-  return 0;
-}
-
-bool java_lang_Thread::set_park_event(oop java_thread, jlong ptr) {
-  if (_park_event_offset > 0) {
-    java_thread->long_field_put(_park_event_offset, ptr);
-    return true;
-  }
-  return false;
-}
-#endif
 
 oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
   ThreadsListHandle tlh(JavaThread::current());
