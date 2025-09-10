@@ -211,9 +211,9 @@ build_jdk25u: -bootstrap
 # and tweak the code to fit into JDK8's boots.
 
 altkernel: -bootstrap
-	$(eval ALT_KERNEL_JAR=$(BUILDDIR)/rt8.jar)
-	$(eval ALT_KERNEL_BOOT_CP=$(BOOTJDK8)/jre/lib/rt.jar)
-	$(call compile_alt_classes,$(CVM8_SRCROOT)/alt_kernel/src8u,$(BUILDDIR)/alt_kernel/classes_8,$(ALT_KERNEL_JAR),$(ALT_KERNEL_BOOT_CP))
 	$(eval ALT_KERNEL_JAR=$(BUILDDIR)/rt25.jar)
-	$(eval ALT_KERNEL_BOOT_CP=$(BUILDDIR)/alt_kernel/classes_25:$(BOOTJDK8)/jre/lib/rt.jar)
+	$(eval ALT_KERNEL_BOOT_CP=$(BOOTJDK8)/jre/lib/rt.jar)
 	$(call compile_alt_classes,$(CVM8_SRCROOT)/alt_kernel/src25u,$(BUILDDIR)/alt_kernel/classes_25,$(ALT_KERNEL_JAR),$(ALT_KERNEL_BOOT_CP))
+	$(eval ALT_KERNEL_JAR=$(BUILDDIR)/rt8.jar)
+	$(eval ALT_KERNEL_BOOT_CP=$(BUILDDIR)/alt_kernel/classes_25:$(BOOTJDK8)/jre/lib/rt.jar)
+	$(call compile_alt_classes,$(CVM8_SRCROOT)/alt_kernel/src8u,$(BUILDDIR)/alt_kernel/classes_8,$(ALT_KERNEL_JAR),$(ALT_KERNEL_BOOT_CP))

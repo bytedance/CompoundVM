@@ -393,7 +393,7 @@ JVM_ENTRY(void, JVM_StopThread(JNIEnv* env, jobject jthread, jobject throwable))
     // but that is overkill as it doesn't matter. We must set the
     // stillborn flag for the first case, and if the thread has already
     // exited setting this flag has no affect
-    java_lang_Thread::set_stillborn(java_thread);
+    //java_lang_Thread::set_stillborn(java_thread); // no reference to this field
   }
 JVM_END
 
@@ -513,6 +513,10 @@ JVM_ENTRY(jboolean, JVM_IsInterrupted(JNIEnv* env, jobject jthread, jboolean cle
   } else {
     return JNI_FALSE;
   }
+JVM_END
+
+JVM_LEAF(jboolean, JVM_SupportsCX8())
+  return VM_Version::supports_cx8();
 JVM_END
 
 // IO functions ////////////////////////////////////////////////////////////////////////////////////////

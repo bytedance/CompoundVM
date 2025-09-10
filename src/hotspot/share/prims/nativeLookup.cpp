@@ -287,7 +287,11 @@ address NativeLookup::lookup_style(const methodHandle& method, char* pure_name, 
     entry = lookup_special_native(jni_name);
     if (entry == nullptr) {
 #if HOTSPOT_TARGET_CLASSLIB == 8
-       entry = (address) os::dll_lookup(bootclass_lookup_lib(method), jni_name);
+      entry = (address) os::dll_lookup(bootclass_lookup_lib(method), jni_name);
+      // Find symbols in libjava.so if doesn't exist in libjava25.so
+      if (entry == nullptr) {
+        entry = (address) os::dll_lookup(os::native_java_library(), jni_name);
+      }
 #else
        entry = (address) os::dll_lookup(os::native_java_library(), jni_name);
 #endif

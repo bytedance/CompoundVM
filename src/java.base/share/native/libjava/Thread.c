@@ -38,21 +38,27 @@
 #if HOTSPOT_TARGET_CLASSLIB == 8
 static JNINativeMethod methods[] = {
     {"start0",           "()V",        (void *)&JVM_StartThread},
+    {"setPriority0",     "(I)V",       (void *)&JVM_SetThreadPriority},
     {"stop0",            "(" OBJ ")V", (void *)&JVM_StopThread},
-    {"isAlive",          "()Z",        (void *)&JVM_IsThreadAlive},
     {"suspend0",         "()V",        (void *)&JVM_SuspendThread},
     {"resume0",          "()V",        (void *)&JVM_ResumeThread},
-    {"setPriority0",     "(I)V",       (void *)&JVM_SetThreadPriority},
-    {"yield",            "()V",        (void *)&JVM_Yield},
+    {"yield0",           "()V",        (void *)&JVM_Yield},
     {"sleep",            "(J)V",       (void *)&JVM_Sleep},
+    {"currentCarrierThread", "()" THD, (void *)&JVM_CurrentCarrierThread},
     {"currentThread",    "()" THD,     (void *)&JVM_CurrentThread},
-    {"countStackFrames", "()I",        (void *)&JVM_CountStackFrames},
+    {"setCurrentThread", "(" THD ")V", (void *)&JVM_SetCurrentThread},
     {"interrupt0",       "()V",        (void *)&JVM_Interrupt},
-    {"isInterrupted",    "(Z)Z",       (void *)&JVM_IsInterrupted},
     {"holdsLock",        "(" OBJ ")Z", (void *)&JVM_HoldsLock},
-    {"getThreads",        "()[" THD,   (void *)&JVM_GetAllThreads},
+    {"getThreads",       "()[" THD,    (void *)&JVM_GetAllThreads},
     {"dumpThreads",      "([" THD ")[[" STE, (void *)&JVM_DumpThreads},
+    {"getStackTrace0",   "()" OBJ,     (void *)&JVM_GetStackTrace},
     {"setNativeName",    "(" STR ")V", (void *)&JVM_SetNativeThreadName},
+    {"scopedValueCache", "()[" OBJ,    (void *)&JVM_ScopedValueCache},
+    {"setScopedValueCache", "([" OBJ ")V",(void *)&JVM_SetScopedValueCache},
+    {"getNextThreadIdOffset", "()J",   (void *)&JVM_GetNextThreadIdOffset},
+    {"findScopedValueBindings", "()" OBJ, (void *)&JVM_FindScopedValueBindings},
+    {"ensureMaterializedForStackWalk",
+                         "(" OBJ ")V", (void*)&JVM_EnsureMaterializedForStackWalk_func},
 };
 #else
 static JNINativeMethod methods[] = {

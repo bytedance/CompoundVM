@@ -76,6 +76,12 @@ typedef struct {
     unsigned int : 32;
 } jvm_version_info;
 
+/*
+ * java.util.concurrent.atomic.AtomicLong
+ */
+JNIEXPORT jboolean JNICALL
+JVM_SupportsCX8(void);
+
 JNIEXPORT void JNICALL
 JVM_GetVersionInfo(JNIEnv* env, jvm_version_info* info, size_t info_size);
 
