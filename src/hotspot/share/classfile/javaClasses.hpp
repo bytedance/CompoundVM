@@ -392,15 +392,6 @@ class java_lang_Thread : AllStatic {
   static int _name_offset;
   static int _contextClassLoader_offset;
   static int _eetop_offset;
-#if HOTSPOT_TARGET_CLASSLIB == 8
-  static int _stillborn_offset;
-  static int _group_offset;
-  static int _priority_offset;
-  static int _daemon_offset;
-  static int _stackSize_offset;
-  static int _thread_status_offset;
-  static int _park_event_offset;
-#endif
   static int _jvmti_thread_state_offset;
   static int _jvmti_VTMS_transition_disable_count_offset;
   static int _jvmti_is_in_VTMS_transition_offset;
@@ -415,16 +406,6 @@ class java_lang_Thread : AllStatic {
   static void compute_offsets();
 
  public:
-#if HOTSPOT_TARGET_CLASSLIB == 8
-  // Stillborn
-  static bool is_stillborn(oop java_thread);
-  static void set_stillborn(oop java_thread);
-  // Pointer to type-stable park handler, encoded as jlong.
-  // Should be set when apparently null
-  // For details, see unsafe.cpp Unsafe_Unpark
-  static jlong park_event(oop java_thread);
-  static bool set_park_event(oop java_thread, jlong ptr);
-#endif
   static void serialize_offsets(SerializeClosure* f) NOT_CDS_RETURN;
 
   // Returns the JavaThread associated with the thread obj

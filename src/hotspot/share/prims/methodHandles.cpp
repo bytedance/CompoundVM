@@ -400,8 +400,12 @@ bool MethodHandles::is_method_handle_invoke_name(Klass* klass, Symbol* name) {
   // The following test will fail spuriously during bootstrap of MethodHandle itself:
   //    if (klass != vmClasses::MethodHandle_klass())
   // Test the name instead:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  if (klass->name() != vmSymbols::java_lang_invoke_MethodHandle()) {
+#else
   if (klass->name() != vmSymbols::java_lang_invoke_MethodHandle() &&
       klass->name() != vmSymbols::java_lang_invoke_VarHandle()) {
+#endif
     return false;
   }
 
@@ -495,11 +499,13 @@ vmIntrinsics::ID MethodHandles::signature_polymorphic_name_id(Symbol* name) {
     return vmIntrinsics::_invokeGeneric;
   }
 
+#if HOTSPOT_TARGET_CLASSLIB != 8
   // Cover the case of methods on VarHandle.
   Klass* vh_klass = vmClasses::klass_at(VM_CLASS_ID(VarHandle_klass));
   if (vh_klass != nullptr && is_method_handle_invoke_name(vh_klass, name)) {
     return vmIntrinsics::_invokeGeneric;
   }
+#endif
 
   // Note: The pseudo-intrinsic _compiledLambdaForm is never linked against.
   // Instead it is used to mark lambda forms bound to invokehandle or invokedynamic.
@@ -508,8 +514,12 @@ vmIntrinsics::ID MethodHandles::signature_polymorphic_name_id(Symbol* name) {
 
 vmIntrinsics::ID MethodHandles::signature_polymorphic_name_id(Klass* klass, Symbol* name) {
   if (klass != nullptr &&
+#if HOTSPOT_TARGET_CLASSLIB == 8
+      (klass->name() == vmSymbols::java_lang_invoke_MethodHandle())) {
+#else
       (klass->name() == vmSymbols::java_lang_invoke_MethodHandle() ||
        klass->name() == vmSymbols::java_lang_invoke_VarHandle())) {
+#endif
     vmIntrinsics::ID iid = signature_polymorphic_name_id(name);
     if (iid != vmIntrinsics::_none)
       return iid;
@@ -742,7 +752,11 @@ Handle MethodHandles::resolve_MemberName(Handle mname, Klass* caller, int lookup
 
   vmIntrinsics::ID mh_invoke_id = vmIntrinsics::_none;
   if ((flags & ALL_KINDS) == IS_METHOD &&
+#if HOTSPOT_TARGET_CLASSLIB == 8
+      (defc == vmClasses::MethodHandle_klass()) &&
+#else
       (defc == vmClasses::MethodHandle_klass() || defc == vmClasses::VarHandle_klass()) &&
+#endif
       (ref_kind == JVM_REF_invokeVirtual ||
        ref_kind == JVM_REF_invokeSpecial ||
        // static invocation mode is required for _linkToVirtual, etc.:
@@ -1081,8 +1095,14 @@ JVM_ENTRY(void, MHN_expand_Mem(JNIEnv *env, jobject igcls, jobject mname_jh)) {
 JVM_END
 
 // void resolve(MemberName self, Class<?> caller)
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(jobject, MHN_resolve_Mem(JNIEnv *env, jobject igcls, jobject mname_jh, jclass caller_jh)) {
+  jint lookup_mode = LM_TRUSTED;
+  jboolean speculative_resolve = JNI_FALSE;
+#else
 JVM_ENTRY(jobject, MHN_resolve_Mem(JNIEnv *env, jobject igcls, jobject mname_jh, jclass caller_jh,
     jint lookup_mode, jboolean speculative_resolve)) {
+#endif
   if (mname_jh == nullptr) { THROW_MSG_NULL(vmSymbols::java_lang_InternalError(), "mname is null"); }
   Handle mname(THREAD, JNIHandles::resolve_non_null(mname_jh));
 
@@ -1313,7 +1333,68 @@ JVM_END
 
 
 /// JVM_RegisterMethodHandleMethods
+#if HOTSPOT_TARGET_CLASSLIB == 8
+//
+// Here are the native methods in java.lang.invoke.MethodHandleNatives
+// They are the private interface between this JVM and the HotSpot-specific
+// Java code that implements JSR 292 method handles.
+//
+// Note:  We use a JVM_ENTRY macro to define each of these, for this is the way
+// that intrinsic (non-JNI) native methods are defined in HotSpot.
+//
 
+JVM_ENTRY(jint, MHN_getConstant(JNIEnv *env, jobject igcls, jint which)) {
+//  switch (which) {
+//  case MethodHandles::GC_COUNT_GWT:
+//#ifdef COMPILER2
+//    return true;
+//#else
+//    return false;
+//#endif
+//  }
+  return 0;
+}
+JVM_END
+
+#define LANG "Ljava/lang/"
+#define JLINV "Ljava/lang/invoke/"
+
+#define OBJ   LANG "Object;"
+#define CLS   LANG "Class;"
+#define STRG  LANG "String;"
+#define CS    JLINV "CallSite;"
+#define MT    JLINV "MethodType;"
+#define MH    JLINV "MethodHandle;"
+#define MEM   JLINV "MemberName;"
+
+#define CC (char*)  /*cast a literal from (const char*)*/
+#define FN_PTR(f) CAST_FROM_FN_PTR(void*, &f)
+
+// These are the native methods on java.lang.invoke.MethodHandleNatives.
+static JNINativeMethod MHN_methods[] = {
+  {CC "init",                      CC "(" MEM "" OBJ ")V",                     FN_PTR(MHN_init_Mem)},
+  {CC"expand",                     CC "(" MEM ")V",                          FN_PTR(MHN_expand_Mem)},
+  {CC "resolve",                   CC "(" MEM "" CLS ")" MEM,                   FN_PTR(MHN_resolve_Mem)},
+  {CC "getConstant",               CC "(I)I",                              FN_PTR(MHN_getConstant)},
+  //  static native int getNamedCon(int which, Object[] name)
+  {CC "getNamedCon",               CC "(I[" OBJ ")I",                        FN_PTR(MHN_getNamedCon)},
+  //  static native int getMembers(Class<?> defc, String matchName, String matchSig,
+  //          int matchFlags, Class<?> caller, int skip, MemberName[] results);
+  //{CC "getMembers",                CC "(" CLS "" STRG "" STRG "I" CLS "I[" MEM ")I", FN_PTR(MHN_getMembers)},
+  {CC "objectFieldOffset",         CC "(" MEM ")J",                          FN_PTR(MHN_objectFieldOffset)},
+  {CC "setCallSiteTargetNormal",   CC "(" CS "" MH ")V",                       FN_PTR(MHN_setCallSiteTargetNormal)},
+  {CC "setCallSiteTargetVolatile", CC "(" CS "" MH ")V",                       FN_PTR(MHN_setCallSiteTargetVolatile)},
+  {CC "staticFieldOffset",         CC "(" MEM ")J",                          FN_PTR(MHN_staticFieldOffset)},
+  {CC "staticFieldBase",           CC "(" MEM ")" OBJ,                        FN_PTR(MHN_staticFieldBase)},
+  {CC "getMemberVMInfo",           CC "(" MEM ")" OBJ,                        FN_PTR(MHN_getMemberVMInfo)}
+};
+
+static JNINativeMethod MH_methods[] = {
+  // UnsupportedOperationException throwers
+  {CC "invoke",                    CC "([" OBJ ")" OBJ,                       FN_PTR(MH_invoke_UOE)},
+  {CC "invokeExact",               CC "([" OBJ ")" OBJ,                       FN_PTR(MH_invokeExact_UOE)}
+};
+#else // HOTSPOT_TARGET_CLASSLIB
 #define LANG "Ljava/lang/"
 #define JLINV "Ljava/lang/invoke/"
 
@@ -1349,6 +1430,7 @@ static JNINativeMethod MH_methods[] = {
   {CC "invoke",                    CC "([" OBJ ")" OBJ,                       FN_PTR(MH_invoke_UOE)},
   {CC "invokeExact",               CC "([" OBJ ")" OBJ,                       FN_PTR(MH_invokeExact_UOE)}
 };
+#endif // HOTSPOT_TARGET_CLASSLIB
 static JNINativeMethod VH_methods[] = {
   // UnsupportedOperationException throwers
   {CC "get",                        CC "([" OBJ ")" OBJ,    FN_PTR(VH_UOE)},
@@ -1408,9 +1490,11 @@ JVM_ENTRY(void, JVM_RegisterMethodHandleMethods(JNIEnv *env, jclass MHN_class)) 
     guarantee(status == JNI_OK && !env->ExceptionCheck(),
               "register java.lang.invoke.MethodHandle natives");
 
+#if HOTSPOT_TARGET_CLASSLIB != 8
     status = env->RegisterNatives(VH_class, VH_methods, sizeof(VH_methods)/sizeof(JNINativeMethod));
     guarantee(status == JNI_OK && !env->ExceptionCheck(),
               "register java.lang.invoke.VarHandle natives");
+#endif
   }
 
   log_debug(methodhandles, indy)("MethodHandle support loaded (using LambdaForms)");

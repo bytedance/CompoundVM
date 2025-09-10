@@ -68,6 +68,9 @@ class SerializeClosure;
   template(java_security_PrivilegedActionException,   "java/security/PrivilegedActionException")  \
   template(exception_void_signature,                  "(Ljava/lang/Exception;)V")                 \
   template(classloader_string_long_signature,         "(Ljava/lang/ClassLoader;Ljava/lang/String;)J")             \
+  template(sun_misc_PostVMInitHook,                   "sun/misc/PostVMInitHook")                  \
+  template(sun_misc_Launcher_AppClassLoader,          "sun/misc/Launcher$AppClassLoader")         \
+  template(sun_misc_Launcher_ExtClassLoader,          "sun/misc/Launcher$ExtClassLoader")         \
 
 #else
 #define VM_SYMBOLS_DO_BY_CLASSLIB(template, do_alias)                                             \

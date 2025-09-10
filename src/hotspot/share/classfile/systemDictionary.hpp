@@ -372,6 +372,9 @@ public:
            is_platform_class_loader(class_loader)  ||
            is_system_class_loader(class_loader);
   }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static bool is_ext_class_loader(Handle class_loader);
+#endif
   // Returns TRUE if the method is a non-public member of class java.lang.Object.
   static bool is_nonpublic_Object_method(Method* m);
 

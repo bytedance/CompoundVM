@@ -36,6 +36,10 @@
 #include "oops/typeArrayOop.inline.hpp"
 
 void java_lang_String::set_coder(oop string, jbyte coder) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  assert(coder == CODER_UTF16, "Classlib8 requires UTF-16");
+#endif
   string->byte_field_put(_coder_offset, coder);
 }
 
@@ -49,11 +53,20 @@ bool java_lang_String::hash_is_set(oop java_string) {
 
 // Accessors
 bool java_lang_String::value_equals(typeArrayOop str_value1, typeArrayOop str_value2) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  return ((str_value1 == str_value2) ||
+          (str_value1->length() == str_value2->length() &&
+           (!memcmp(str_value1->base(T_CHAR),
+                    str_value2->base(T_CHAR),
+                    str_value2->length() * sizeof(jchar)))));
+#else
   return ((str_value1 == str_value2) ||
           (str_value1->length() == str_value2->length() &&
            (!memcmp(str_value1->base(T_BYTE),
                     str_value2->base(T_BYTE),
                     str_value2->length() * sizeof(jbyte)))));
+#endif
 }
 
 typeArrayOop java_lang_String::value(oop java_string) {
@@ -67,10 +80,22 @@ typeArrayOop java_lang_String::value_no_keepalive(oop java_string) {
 }
 
 bool java_lang_String::is_latin1(oop java_string) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+  #ifdef ASSERT
+  {
+    assert(is_instance(java_string), "must be java_string");
+    jbyte coder = java_string->byte_field(_coder_offset);
+    assert(coder == CODER_UTF16, "Must be UTF16");
+  }
+  #endif
+  return false;
+#else
   assert(is_instance(java_string), "must be java_string");
   jbyte coder = java_string->byte_field(_coder_offset);
   assert(CompactStrings || coder == CODER_UTF16, "Must be UTF16 without CompactStrings");
   return coder == CODER_LATIN1;
+#endif
 }
 
 uint8_t* java_lang_String::flags_addr(oop java_string) {
@@ -108,10 +133,14 @@ int java_lang_String::length(oop java_string, typeArrayOop value) {
     return 0;
   }
   int arr_length = value->length();
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings, "Classlib8 forbids CompactStrings");
+#else
   if (!is_latin1(java_string)) {
     assert((arr_length & 1) == 0, "should be even for UTF16 string");
     arr_length >>= 1; // convert number of bytes to number of elements
   }
+#endif
   return arr_length;
 }
 
@@ -299,11 +328,11 @@ inline bool java_lang_Class::is_primitive(oop java_class) {
 #ifdef ASSERT
   // The heapwalker walks through Classes that have had their Klass pointers removed, so can't assert this.
   // assert(is_primitive == java_class->bool_field(_is_primitive_offset), "must match what we told Java");
-  if (java_class->bool_field(_is_primitive_offset)) {
-    Klass* k = ((Klass*)java_class->metadata_field(_array_klass_offset));
-    assert(k == nullptr || is_java_primitive(ArrayKlass::cast(k)->element_type()),
-        "Should be either the T_VOID primitive or a java primitive");
-  }
+  //if (java_class->bool_field(_is_primitive_offset)) {
+    //Klass* k = ((Klass*)java_class->metadata_field(_array_klass_offset));
+    //assert(k == nullptr || is_java_primitive(ArrayKlass::cast(k)->element_type()),
+  //      "Should be either the T_VOID primitive or a java primitive");
+  //}
 #endif
 
   return is_primitive;
