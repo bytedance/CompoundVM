@@ -1724,6 +1724,7 @@ oop java_lang_Class::primitive_mirror(BasicType t) {
   macro(_component_mirror_offset,    k, "componentType",       class_signature,       false); \
   macro(_module_offset,              k, "module",              module_signature,      false); \
   macro(_name_offset,                k, "name",                string_signature,      false); \
+  macro(_modifiers_offset,           k, vmSymbols::modifiers_name(), char_signature,    false); \
   macro(_classData_offset,           k, "classData",           object_signature,      false);
 #else
 #define CLASS_FIELDS_DO(macro) \
@@ -1772,10 +1773,6 @@ void java_lang_Class::set_classRedefinedCount(oop the_class_mirror, int value) {
   the_class_mirror->int_field_put(_classRedefinedCount_offset, value);
 }
 
-#if HOTSPOT_TARGET_CLASSLIB == 8
-int java_lang_Class::modifiers(oop the_class_mirror) { return 0; }
-void java_lang_Class::set_modifiers(oop the_class_mirror, u2 value) {}
-#else
 int java_lang_Class::modifiers(oop the_class_mirror) {
   assert(_modifiers_offset != 0, "offsets should have been initialized");
   return the_class_mirror->char_field(_modifiers_offset);
@@ -1785,7 +1782,6 @@ void java_lang_Class::set_modifiers(oop the_class_mirror, u2 value) {
   assert(_modifiers_offset != 0, "offsets should have been initialized");
   the_class_mirror->char_field_put(_modifiers_offset, value);
 }
-#endif
 
 // Note: JDK1.1 and before had a privateInfo_offset field which was used for the
 //       platform thread structure, and a eetop offset which was used for thread
