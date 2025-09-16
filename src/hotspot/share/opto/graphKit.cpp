@@ -4209,7 +4209,11 @@ void GraphKit::store_String_value(Node* str, Node* value) {
   const TypePtr* value_field_type = string_type->add_offset(value_offset);
 
   access_store_at(str,  basic_plus_adr(str, value_offset), value_field_type,
+#if HOTSPOT_TARGET_CLASSLIB == 8
+                  value, TypeAryPtr::CHARS, T_OBJECT, IN_HEAP | MO_UNORDERED);
+#else
                   value, TypeAryPtr::BYTES, T_OBJECT, IN_HEAP | MO_UNORDERED);
+#endif
 }
 
 void GraphKit::store_String_coder(Node* str, Node* value) {

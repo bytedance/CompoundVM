@@ -346,7 +346,7 @@ JT_OPTS_EXCLUDE=-exclude:$(JDK8_SRCROOT)/jdk/test/ProblemList.txt -exclude:$(CVM
 test_jtreg8: -setup_jtreg8 -overlay-jdk8  -overlay-langtools8
 	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST))
 
-test_cvm8: -setup_jtreg8
+test_jtreg8_cvm8: -setup_jtreg8
 	$(call run_jtreg8_test,$(CVM8_SRCROOT)/test,$(JT_TEST))
 
 test_jtreg8_jdk: -setup_jtreg8 -overlay-jdk8

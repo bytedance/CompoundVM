@@ -75,7 +75,11 @@ class StrIntrinsicNode: public Node {
   }
 
   virtual bool depends_only_on_test() const { return false; }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  virtual const TypePtr* adr_type() const { return TypeAryPtr::CHARS; }
+#else
   virtual const TypePtr* adr_type() const { return TypeAryPtr::BYTES; }
+#endif
   virtual uint match_edge(uint idx) const;
   virtual uint ideal_reg() const { return Op_RegI; }
   virtual Node* Ideal(PhaseGVN* phase, bool can_reshape);
