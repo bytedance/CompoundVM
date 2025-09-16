@@ -1006,6 +1006,8 @@ Node* LibraryCallKit::make_string_method_node(int opcode, Node* str1_start, Node
                              str1_start, cnt1, str2_start, cnt2, ae);
 #endif
     break;
+  // This call is made from StringLatin1.java/StringUTF16.java, which does not exist in cvm8,
+  // so no change is needed in this branch
   case Op_StrEquals:
     // We already know that cnt1 == cnt2 here (checked in 'inline_string_equals').
     // Use the constant length if there is one because optimized match rule may exist.
@@ -1057,6 +1059,7 @@ bool LibraryCallKit::inline_string_compareTo(StrIntrinsicNode::ArgEnc ae) {
 
 //------------------------------inline_string_equals------------------------
 bool LibraryCallKit::inline_string_equals(StrIntrinsicNode::ArgEnc ae) {
+  CLASSLIB8_ONLY(ShouldNotReachHere());
   Node* arg1 = argument(0);
   Node* arg2 = argument(1);
 
@@ -1396,7 +1399,11 @@ bool LibraryCallKit::inline_string_indexOfChar(StrIntrinsicNode::ArgEnc ae) {
   RegionNode* region = new RegionNode(3);
   Node* phi = new PhiNode(region, TypeInt::INT);
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  Node* result = new StrIndexOfCharNode(control(), memory(TypeAryPtr::CHARS), src_start, src_count, int_ch, ae);
+#else
   Node* result = new StrIndexOfCharNode(control(), memory(TypeAryPtr::BYTES), src_start, src_count, int_ch, ae);
+#endif
   C->set_has_split_ifs(true); // Has chance for split-if optimization
   _gvn.transform(result);
 

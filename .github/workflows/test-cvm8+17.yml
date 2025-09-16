@@ -54,6 +54,7 @@ jobs:
         test-name:
           - 'jdk/tier1'
           - 'langtools'
+          - 'cvm8'
 
         include:
           - test-name: 'jdk/tier1'
@@ -61,6 +62,9 @@ jobs:
 
           - test-name: 'langtools'
             test-suite: 'langtools'
+
+          - test-name: 'cvm8'
+            test-suite: 'cvm8'
 
     steps:
       - name: 'Checkout the JDK source'
