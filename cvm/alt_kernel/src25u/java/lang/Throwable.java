@@ -210,6 +210,11 @@ public class Throwable implements Serializable {
      */
     private StackTraceElement[] stackTrace = UNASSIGNED_STACK;
 
+    /**
+     * The JVM code sets the depth of the backtrace for later retrieval
+     */
+    private transient int depth;
+
     // Setting this static field introduces an acceptable
     // initialization dependency on a few java.util classes.
     private static final List<Throwable> SUPPRESSED_SENTINEL =

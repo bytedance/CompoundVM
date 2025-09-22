@@ -2480,14 +2480,6 @@ int java_lang_Throwable::_depth_offset;
 int java_lang_Throwable::_cause_offset;
 int java_lang_Throwable::_static_unassigned_stacktrace_offset;
 
-#if HOTSPOT_TARGET_CLASSLIB == 8
-#define THROWABLE_FIELDS_DO(macro) \
-  macro(_backtrace_offset,     k, "backtrace",     object_signature,                  false); \
-  macro(_detailMessage_offset, k, "detailMessage", string_signature,                  false); \
-  macro(_stackTrace_offset,    k, "stackTrace",    java_lang_StackTraceElement_array, false); \
-  macro(_cause_offset,         k, "cause",         throwable_signature,               false); \
-  macro(_static_unassigned_stacktrace_offset, k, "UNASSIGNED_STACK", java_lang_StackTraceElement_array, true)
-#else
 #define THROWABLE_FIELDS_DO(macro) \
   macro(_backtrace_offset,     k, "backtrace",     object_signature,                  false); \
   macro(_detailMessage_offset, k, "detailMessage", string_signature,                  false); \
@@ -2495,7 +2487,6 @@ int java_lang_Throwable::_static_unassigned_stacktrace_offset;
   macro(_depth_offset,         k, "depth",         int_signature,                     false); \
   macro(_cause_offset,         k, "cause",         throwable_signature,               false); \
   macro(_static_unassigned_stacktrace_offset, k, "UNASSIGNED_STACK", java_lang_StackTraceElement_array, true)
-#endif
 
 void java_lang_Throwable::compute_offsets() {
   InstanceKlass* k = vmClasses::Throwable_klass();
@@ -3356,12 +3347,14 @@ void java_lang_StackTraceElement::fill_in(Handle element,
   java_lang_StackTraceElement::set_declaringClass(element(), classname);
   java_lang_StackTraceElement::set_declaringClassObject(element(), java_class());
 
+#if HOTSPOT_TARGET_CLASSLIB != 8
   oop loader = holder->class_loader();
   if (loader != nullptr) {
     oop loader_name = java_lang_ClassLoader::name(loader);
     if (loader_name != nullptr)
       java_lang_StackTraceElement::set_classLoaderName(element(), loader_name);
   }
+#endif
 
   // Fill in method name
   oop methodname = StringTable::intern(name, CHECK);
@@ -5088,12 +5081,21 @@ void java_lang_invoke_ConstantCallSite::serialize_offsets(SerializeClosure* f) {
 
 // Support for java_lang_ClassLoader
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+int  java_lang_ClassLoader::_loader_data_offset = 0;
+int  java_lang_ClassLoader::_parallelCapable_offset = 0;
+int  java_lang_ClassLoader::_name_offset = 0;
+int  java_lang_ClassLoader::_nameAndId_offset = 0;
+int  java_lang_ClassLoader::_unnamedModule_offset = 0;
+int  java_lang_ClassLoader::_parent_offset = 0;
+#else
 int  java_lang_ClassLoader::_loader_data_offset;
 int  java_lang_ClassLoader::_parallelCapable_offset;
 int  java_lang_ClassLoader::_name_offset;
 int  java_lang_ClassLoader::_nameAndId_offset;
 int  java_lang_ClassLoader::_unnamedModule_offset;
 int  java_lang_ClassLoader::_parent_offset;
+#endif
 
 ClassLoaderData* java_lang_ClassLoader::loader_data_acquire(oop loader) {
   assert(loader != nullptr, "loader must not be null");
@@ -5153,6 +5155,7 @@ oop java_lang_ClassLoader::parent_no_keepalive(oop loader) {
 // Returns the name field of this class loader.  If the name field has not
 // been set, null will be returned.
 oop java_lang_ClassLoader::name(oop loader) {
+  CLASSLIB8_ONLY(Unimplemented());
   assert(is_instance(loader), "loader must be oop");
   return loader->obj_field(_name_offset);
 }
@@ -5164,6 +5167,7 @@ oop java_lang_ClassLoader::name(oop loader) {
 //   If built-in loader, then omit '@<id>' as there is only one instance.
 // Use ClassLoader::loader_name_id() to obtain this String as a char*.
 oop java_lang_ClassLoader::nameAndId(oop loader) {
+  CLASSLIB8_ONLY(Unimplemented());
   assert(is_instance(loader), "loader must be oop");
   return loader->obj_field(_nameAndId_offset);
 }
@@ -5207,6 +5211,7 @@ bool java_lang_ClassLoader::is_trusted_loader(oop loader) {
 }
 
 oop java_lang_ClassLoader::unnamedModule(oop loader) {
+  CLASSLIB8_ONLY(Unimplemented());
   assert(is_instance(loader), "loader must be oop");
   return loader->obj_field(_unnamedModule_offset);
 }
