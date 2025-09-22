@@ -2149,6 +2149,21 @@ jint Arguments::parse_xss(const JavaVMOption* option, const char* tail, intx* ou
   return JNI_OK;
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+// append to c-heap string
+// will overwrite the old buffer variable
+static void sappend(char*& buf, const char* s) {
+  if (buf == NULL || s == NULL) {
+    return;
+  }
+  size_t cap = strlen(buf) + strlen(s) + 1;
+  char* nbuf = NEW_C_HEAP_ARRAY(char, cap, mtArguments);
+  jio_snprintf(nbuf, cap, "%s%s", buf, s);
+  FREE_C_HEAP_ARRAY(char, buf);
+  buf = nbuf;
+}
+#endif
+
 jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, JVMFlagOrigin origin) {
   // For match_option to return remaining or value part of option string
   const char* tail;
@@ -2234,6 +2249,12 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, JVMFlagOrigin
           return JNI_ERR;
         }
 #endif // !INCLUDE_JVMTI
+#if HOTSPOT_TARGET_CLASSLIB == 8
+        // convert jdwp arguments to jdwp17 agent
+        if (strcmp(name, "jdwp") == 0) {
+          sappend(name, "25");
+        }
+#endif
         JvmtiAgentList::add_xrun(name, options, false);
         FREE_C_HEAP_ARRAY(char, name);
         FREE_C_HEAP_ARRAY(char, options);

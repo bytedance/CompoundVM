@@ -152,6 +152,7 @@ jdk8vm25: -clean-jdk8vm25 -bootstrap build_jdk8u build_jdk25u altkernel
 		cp -f $(SRC_BUILDDIR_25)/jdk/lib/server/libjvm.so $(CVM8_LIBDIR)/server25/libjvm.so && \
 		cp -f $(SRC_BUILDDIR_25)/jdk/lib/libjimage.so $(CVM8_LIBDIR)/libjimage25.so && \
 		cp -f $(SRC_BUILDDIR_25)/jdk/lib/libjava.so $(CVM8_LIBDIR)/libjava25.so && \
+		patchelf --set-soname libjava25.so $(CVM8_LIBDIR)/libjava25.so && \
 		cp -f $(SRC_BUILDDIR_25)/jdk/lib/libjdwp.so $(CVM8_LIBDIR)/libjdwp25.so && \
 		cp -f $(SRC_BUILDDIR_25)/jdk/lib/libjimage.debuginfo $(CVM8_LIBDIR)/libjimage25.debuginfo && \
 		cp -f $(SRC_BUILDDIR_25)/jdk/lib/libjava.debuginfo $(CVM8_LIBDIR)/libjava25.debuginfo && \
@@ -217,3 +218,122 @@ altkernel: -bootstrap
 	$(eval ALT_KERNEL_JAR=$(BUILDDIR)/rt8.jar)
 	$(eval ALT_KERNEL_BOOT_CP=$(BUILDDIR)/alt_kernel/classes_25:$(BOOTJDK8)/jre/lib/rt.jar)
 	$(call compile_alt_classes,$(CVM8_SRCROOT)/alt_kernel/src8u,$(BUILDDIR)/alt_kernel/classes_8,$(ALT_KERNEL_JAR),$(ALT_KERNEL_BOOT_CP))
+
+############### Test ##################
+
+JT8_WORKDIR=${BUILDDIR}/jtreg8/JTwork
+JT8_REPORTDIR=${BUILDDIR}/jtreg8/JTreport
+JT8_RERUNDIR=${BUILDDIR}/jtreg8/rerun
+JT_TEST ?= .
+JT_REPO ?= jdk
+
+# using local JTreg installation instead of system's
+MY_JT_HOME := $(WORKSPACE)/.jtreg
+JTREG := $(MY_JT_HOME)/bin/jtreg
+
+$(JTREG):
+	$(eval JTREG_URL := https://builds.shipilev.net/jtreg/jtreg5.1-b01.zip)
+	$(eval JTREG_ZIP := $(shell basename $(JTREG_URL)))
+	@echo "Installing jtreg5.1 to $(MY_JT_HOME)"
+	{ \
+		rm -f $(JTREG_ZIP);\
+		wget -q $(JTREG_URL); \
+		unzip -o -q $(JTREG_ZIP) && mv jtreg .jtreg && rm -fr $(JTREG_ZIP); \
+	}
+
+# minimize the effort to download source code
+ifeq ($(SKIP_BUILD), true)
+-setup_jtreg8: -init-dirs $(JTREG) jdk8u/jdk/src
+else
+-setup_jtreg8: $(JTREG) jdk8vm25
+endif
+	$(eval JT8_OPTS=-jdk:${CVM8DIR} -w:${JT8_WORKDIR} -r:${JT8_REPORTDIR} -a -ea -esa -ignore:quiet -ovm -v:fail,error,time -javaoption:-server25 ${JT8_OPTS})
+
+# Setup bootstrap JDK from a given URL
+# $1  root directory of jtreg
+# $2  pattern to match testcase names
+define run_jtreg8_test
+	$(eval JT8_DIR = $(1))
+	$(eval JT_TEST = $(2))
+	$(eval JT_EXTRA_OPTS = $(3))
+	$(eval CUR_CMD=JTREG_JAVA=${CVM8DIR}/bin/java $(JTREG) ${JT8_OPTS} ${JT_EXTRA_OPTS} ${JT_TEST})
+	@echo
+	@echo "Running JTreg8 \"${JT_TEST}\" in dir ${JT8_DIR}"
+	@echo "  Report directory: ${JT8_REPORTDIR}"
+	@echo "  Working directory: ${JT8_WORKDIR}"
+	@echo "  Command: ${CUR_CMD}"
+	@echo
+	@{ cd ${JT8_DIR} && ${CUR_CMD}; }
+endef
+
+# Overwrite upstream source file with the modified version shipped in CompoundVM repo
+# $1   repository name from within cvm/overlay
+# $2   filepath relative to $1
+# $3   destination repo directory
+define overlay_single
+	$(eval REPO=$(1))
+	$(eval FILEPATH=$(2))
+	$(eval DESTDIR=$(3))
+	@{ test -e $(DESTDIR)/$(FILEPATH)_origin || cp -f $(DESTDIR)/$(FILEPATH) $(DESTDIR)/$(FILEPATH)_origin; }
+	@{ cd cvm/overlay/$(REPO) && cp -f --parents $(FILEPATH) $(DESTDIR)/; }
+endef
+
+JT_OPTS_EXCLUDE=-exclude:$(JDK8_SRCROOT)/jdk/test/ProblemList.txt -exclude:$(CVM8_SRCROOT)/conf/jtreg_jdk8_excludes.list
+
+-overlay-jdk8:
+	$(call overlay_single,jdk8u,jdk/test/com/sun/jdi/BreakpointWithFullGC.sh,$(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,jdk/test/com/sun/jdi/RedefineCrossEvent.java,$(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,jdk/test/java/lang/System/Versions.java,$(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,jdk/test/sun/misc/Version/Version.java,$(JDK8_SRCROOT))
+
+-overlay-langtools8:
+	$(call overlay_single,jdk8u,langtools/test/tools/javac/annotations/8218152/MalformedAnnotationProcessorTests.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,langtools/test/tools/javac/6508981/TestInferBinaryName.java, $(JDK8_SRCROOT))
+
+test_jtreg8: -setup_jtreg8 -overlay-jdk8  -overlay-langtools8
+	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST))
+
+test_cvm8: -setup_jtreg8
+	$(call run_jtreg8_test,$(CVM8_SRCROOT)/test,$(JT_TEST))
+
+test_jtreg8_jdk: -setup_jtreg8 -overlay-jdk8
+	$(call run_jtreg8_test,$(JDK8_SRCROOT)/jdk/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
+
+test_jtreg8_jdk_tier1: -setup_jtreg8 -overlay-jdk8
+	$(eval JT_TEST = ":jdk_tier1")
+	$(call run_jtreg8_test,$(JDK8_SRCROOT)/jdk/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
+
+test_jtreg8_jdk_core: -setup_jtreg8 -overlay-jdk8
+	$(eval JT_TEST = ":jdk_core")
+	$(call run_jtreg8_test,$(JDK8_SRCROOT)/jdk/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
+
+test_jtreg8_hotspot: -setup_jtreg8
+	$(eval JT_REPO = hotspot)
+	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
+
+test_jtreg8_langtools: -setup_jtreg8 -overlay-langtools8
+	$(eval JT_REPO = langtools)
+	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
+
+################# Help ########################
+help:
+	@echo "Makefile for CVM project"
+	@echo ""
+	@echo "Build & Clean:"
+	@echo "  make jdk8vm25      Build CVM8 with optional jvm-17"
+	@echo "  make cvm8          Same as target jdk8vm25"
+	@echo "  make cvm8default25 Same as target cvm8, but with jvm25 as default"
+	@echo "  make full-clean    Delete all artifacts, including sub-modules"
+	@echo "  make clean         Delete artifacts from directory build/"
+	@echo ""
+	@echo "Test:"
+	@echo "  make test_jtreg8 JT_TEST=<test selection> JT_REPO=<repo dir>"
+	@echo "                     Run CVM8 jtreg8 test with given selection"
+	@echo "  make test_jtreg8_jdk JT_TEST=<test selection>"
+	@echo "                     Run CVM8 jtreg8 tests in directory jdk8u/jdk/test"
+	@echo "  make test_jtreg8_langtools JT_TEST=<test selection>"
+	@echo "                     Run CVM8 jtreg8 tests in directory jdk8u/langtools/test"
+	@echo "  make test_jtreg8_hotspot JT_TEST=<test selection>"
+	@echo "                     Run CVM8 jtreg8 tests in directory jdk8u/hotspot/test"
+	@echo "  make test_cvm8 JT_TEST=<test selection>"
+	@echo "                     Run additional jtreg8 tests for CVM8 in directory test"
