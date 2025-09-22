@@ -293,7 +293,7 @@ address NativeLookup::lookup_style(const methodHandle& method, char* pure_name, 
         entry = (address) os::dll_lookup(os::native_java_library(), jni_name);
       }
 #else
-       entry = (address) os::dll_lookup(os::native_java_library(), jni_name);
+      entry = (address) os::dll_lookup(os::native_java_library(), jni_name);
 #endif
     }
     if (entry != nullptr) {

@@ -63,7 +63,11 @@ static char* jstr_to_utf(JNIEnv *env, jstring str, TRAPS) {
   return utfstr;
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+PERF_ENTRY(jobject, Perf_Attach(JNIEnv *env, jobject unused, jstring user, int vmid, int mode))
+#else
 PERF_ENTRY(jobject, Perf_Attach(JNIEnv *env, jobject unused, int vmid))
+#endif
 
   PerfWrapper("Perf_Attach");
 
@@ -284,7 +288,11 @@ PERF_END
 
 static JNINativeMethod perfmethods[] = {
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  {CC "attach",              CC "(" JLS "II)" BB, FN_PTR(Perf_Attach)},
+#else
   {CC "attach0",             CC "(I)" BB,         FN_PTR(Perf_Attach)},
+#endif
   {CC "detach",              CC "(" BB ")V",      FN_PTR(Perf_Detach)},
   {CC "createLong",          CL_ARGS,             FN_PTR(Perf_CreateLong)},
   {CC "createByteArray",     CBA_ARGS,            FN_PTR(Perf_CreateByteArray)},
