@@ -636,6 +636,8 @@ inline unsigned int java_lang_String::hash_code_impl(oop java_string, bool updat
   typeArrayOop value = java_lang_String::value(java_string);
   int         length = java_lang_String::length(java_string, value);
 #if HOTSPOT_TARGET_CLASSLIB == 8
+  // Zero length string will hash to zero with String.hashCode() function.
+  if (length == 0) return 0;
   assert(!CompactStrings, "Classlib8 forbids CompactStrings");
   unsigned int hash = java_lang_String::hash_code(value->char_at_addr(0), length);
 #else
