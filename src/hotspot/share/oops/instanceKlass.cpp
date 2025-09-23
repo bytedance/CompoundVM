@@ -3679,11 +3679,7 @@ void InstanceKlass::print_class_load_logging(ClassLoaderData* loader_data,
   // Source
   if (cfs != NULL) {
     if (cfs->source() != NULL) {
-#if HOTSPOT_TARGET_CLASSLIB == 8
-      const char* module_name = UNNAMED_MODULE;
-#else
       const char* module_name = (module_entry->name() == NULL) ? UNNAMED_MODULE : module_entry->name()->as_C_string();
-#endif
       if (module_name != NULL) {
         // When the boot loader created the stream, it didn't know the module name
         // yet. Let's format it now.

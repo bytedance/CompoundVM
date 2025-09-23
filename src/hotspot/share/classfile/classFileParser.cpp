@@ -5436,7 +5436,7 @@ void ClassFileParser::fill_instance_klass(InstanceKlass* ik,
 
 #if HOTSPOT_TARGET_CLASSLIB == 8
   // module is null if classlib v8
-  ModuleEntry* module_entry = NULL;
+  ModuleEntry* module_entry = _loader_data->unnamed_module();
   Handle module_handle;
 #else
   // Obtain this_klass' module entry
