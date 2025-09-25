@@ -305,7 +305,9 @@ class ConstantPool : public Metadata {
   }
 
   void unresolved_string_at_put(int cp_index, Symbol* s) {
+#if HOTSPOT_TARGET_CLASSLIB != 8
     assert(s->refcount() != 0, "should have nonzero refcount");
+#endif
     // Note that release_tag_at_put is not needed here because this is called only
     // when constructing a ConstantPool in a single thread, with no possibility
     // of concurrent access.
