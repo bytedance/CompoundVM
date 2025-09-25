@@ -37,13 +37,45 @@ Higher version of JVM brings enhancements in garbage colleciton, JIT, etc.
 CVM has been throughly tested on various application scenarios, including Java Microbenchmark Harness (JMH),
 SPECjbb2015, Flink nexmark, etc. Compared to jdk8u372, some of the performance results are as follows:
 
-| Application | Performance Improvement |
-| ----------- | ----------------------- |
-| JMH java.util all cases average           | 30% |
-| JMH java.util.stream all cases average    | 45% |
-| SPECjbb2015 critical-jOPS                 | 90% |
-| SPECjbb2015 max-jOPS                      | 5%  |
-| Flink nexmark all queries average         | 10% |
+<table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; text-align: center;">
+  <thead>
+    <tr>
+      <th rowspan="2">Application</th>
+      <th colspan="2">Performance Improvement</th>
+    </tr>
+    <tr>
+      <th>x86_64</th>
+      <th>aarch64</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>JMH java.util all cases average</td>
+      <td>30%</td>
+      <td>44%</td>
+    </tr>
+    <tr>
+      <td>JMH java.util.stream all cases average</td>
+      <td>45%</td>
+      <td>56%</td>
+    </tr>
+    <tr>
+      <td>SPECjbb2015 critical-jOPS</td>
+      <td>90%</td>
+      <td>35%</td>
+    </tr>
+    <tr>
+      <td>SPECjbb2015 max-jOPS</td>
+      <td>5%</td>
+      <td>1%</td>
+    </tr>
+    <tr>
+      <td>Flink nexmark all queries average</td>
+      <td>10%</td>
+      <td>-</td>
+    </tr>
+  </tbody>
+</table>
 
 ## Using CVM
 
