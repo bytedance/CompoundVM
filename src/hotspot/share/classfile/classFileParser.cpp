@@ -5538,6 +5538,14 @@ void ClassFileParser::parse_stream(const ClassFileStream* const stream,
                        CHECK);
   }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  if (_is_hidden) {
+    if (_class_name == vmSymbols::unknown_class_name()) {
+      update_class_name(class_name_in_cp);
+    }
+  }
+#endif
+
 #ifdef ASSERT
   // Basic sanity checks
   if (_is_hidden) {

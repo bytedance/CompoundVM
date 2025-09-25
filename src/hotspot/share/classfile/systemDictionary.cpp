@@ -964,8 +964,6 @@ Klass* SystemDictionary::parse_stream(Symbol* class_name,
   }
 
   if (k != NULL) {
-    k->set_is_hidden();
-
     // Rewrite and patch constant pool here.
     k->link_class(CHECK_NULL);
     if (cp_patches != NULL) {
