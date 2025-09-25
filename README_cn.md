@@ -28,13 +28,45 @@ CVM的主要特性如下：
 CVM已经在多种应用场景上进行功能和性能测试，包括JMH, SPECjbb2015, Flink nexmark等。与jdk8u372相比，
 一些性能数据如下：
 
-| 应用场景 | 性能提升 |
-| -------- | -------- |
-| JMH java.util 所有case平均          | 30% |
-| JMH java.util.stream 所有case平均   | 45% |
-| SPECjbb2015 critical-jOPS           | 90% |
-| SPECjbb2015 max-jOPS                | 5%  |
-| Flink nexmark 所有query平均         | 10% |
+<table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; text-align: center;">
+  <thead>
+    <tr>
+      <th rowspan="2">应用场景</th>
+      <th colspan="2">性能提升</th>
+    </tr>
+    <tr>
+      <th>x86_64</th>
+      <th>aarch64</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>JMH java.util 所有case平均</td>
+      <td>30%</td>
+      <td>44%</td>
+    </tr>
+    <tr>
+      <td>JMH java.util.stream 所有case平均</td>
+      <td>45%</td>
+      <td>56%</td>
+    </tr>
+    <tr>
+      <td>SPECjbb2015 critical-jOPS</td>
+      <td>90%</td>
+      <td>35%</td>
+    </tr>
+    <tr>
+      <td>SPECjbb2015 max-jOPS</td>
+      <td>5%</td>
+      <td>1%</td>
+    </tr>
+    <tr>
+      <td>Flink nexmark 所有query平均</td>
+      <td>10%</td>
+      <td>-</td>
+    </tr>
+  </tbody>
+</table>
 
 ## 如何使用
 
