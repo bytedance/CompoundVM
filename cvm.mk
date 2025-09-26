@@ -343,7 +343,10 @@ JT_OPTS_EXCLUDE=-exclude:$(JDK8_SRCROOT)/jdk/test/ProblemList.txt -exclude:$(CVM
 	$(call overlay_single,jdk8u,langtools/test/tools/javac/annotations/8218152/MalformedAnnotationProcessorTests.java, $(JDK8_SRCROOT))
 	$(call overlay_single,jdk8u,langtools/test/tools/javac/6508981/TestInferBinaryName.java, $(JDK8_SRCROOT))
 
-test_jtreg8: -setup_jtreg8 -overlay-jdk8  -overlay-langtools8
+-overlay-jtreg:
+	$(call overlay_single,jdk8u,test/jtreg-ext/requires/VMProps.java, $(JDK8_SRCROOT))
+
+test_jtreg8: -setup_jtreg8 -overlay-jdk8  -overlay-langtools8 -overlay-jtreg
 	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST))
 
 test_jtreg8_cvm8: -setup_jtreg8
@@ -360,7 +363,7 @@ test_jtreg8_jdk_core: -setup_jtreg8 -overlay-jdk8
 	$(eval JT_TEST = ":jdk_core")
 	$(call run_jtreg8_test,$(JDK8_SRCROOT)/jdk/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
 
-test_jtreg8_hotspot: -setup_jtreg8
+test_jtreg8_hotspot: -setup_jtreg8 -overlay-jtreg
 	$(eval JT_REPO = hotspot)
 	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
 

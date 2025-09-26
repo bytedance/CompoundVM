@@ -69,7 +69,7 @@ public class VMProps implements Callable<Map<String, String>> {
 
         Pattern startP = Pattern.compile(".* (\\S+) VM");
         Matcher m = startP.matcher(vmName);
-        if (m.matches()) {
+        if (m.find()) {
             return m.group(1).toLowerCase();
         }
         return null;
