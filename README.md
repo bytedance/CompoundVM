@@ -1,6 +1,6 @@
 <div align="center">
 
-# Compound Virtual Machine
+# CompoundVM
 
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/bytedance/CompoundVM/.github/workflows/main.yml?branch=jdk17u-target8) [![License](https://img.shields.io/github/license/bytedance/CompoundVM)](https://github.com/bytedance/CompoundVM/blob/main/LICENSE) [![GitHub downloads](https://img.shields.io/github/downloads/bytedance/CompoundVM/total)](https://github.com/bytedance/CompoundVM/releases)
 
