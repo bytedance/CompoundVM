@@ -28,6 +28,48 @@
 #include "runtime/reflectionUtils.hpp"
 
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+KlassStream::KlassStream(InstanceKlass* klass, bool local_only,
+                         bool classes_only, bool walk_defaults) {
+  _klass = _base_klass = klass;
+  _base_class_search_defaults = false;
+  _defaults_checked = false;
+  if (classes_only) {
+    _interfaces = Universe::the_empty_instance_klass_array();
+  } else {
+    _interfaces = klass->transitive_interfaces();
+  }
+  _interface_index = _interfaces->length();
+  _local_only = local_only;
+  _classes_only = classes_only;
+  _walk_defaults = walk_defaults;
+}
+
+bool KlassStream::eos() {
+  if (index() >= 0) return false;
+  if (_local_only) return true;
+  if (!_klass->is_interface() && _klass->super() != NULL) {
+    // go up superclass chain (not for interfaces)
+    _klass = _klass->java_super();
+  // Next for method walks, walk default methods
+  } else if (_walk_defaults && (_defaults_checked == false)  && (_base_klass->default_methods() != NULL)) {
+      _base_class_search_defaults = true;
+      _klass = _base_klass;
+      _defaults_checked = true;
+  } else {
+    // Next walk transitive interfaces
+    if (_interface_index > 0) {
+      _klass = _interfaces->at(--_interface_index);
+    } else {
+      return true;
+    }
+  }
+  _index = length();
+  next();
+  return eos();
+}
+#endif
+
 GrowableArray<FilteredField*> *FilteredFieldsMap::_filtered_fields =
   new (mtServiceability) GrowableArray<FilteredField*>(3, mtServiceability);
 
