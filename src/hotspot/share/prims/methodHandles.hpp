@@ -71,6 +71,11 @@ class MethodHandles: AllStatic {
   static oop init_field_MemberName(Handle mname_h, fieldDescriptor& fd, bool is_setter = false);
   static oop init_method_MemberName(Handle mname_h, CallInfo& info);
   static Handle resolve_MemberName_type(Handle mname, Klass* caller, TRAPS);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static int find_MemberNames(Klass* k, Symbol* name, Symbol* sig,
+                              int mflags, Klass* caller,
+                              int skip, objArrayHandle results, TRAPS);
+#endif
 
   // bit values for suppress argument to expand_MemberName:
   enum { _suppress_defc = 1, _suppress_name = 2, _suppress_type = 4 };
@@ -121,9 +126,14 @@ class MethodHandles: AllStatic {
             iid <= vmIntrinsics::_linkToNative);
   }
   static bool has_member_arg(Symbol* klass, Symbol* name) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    if (klass == vmSymbols::java_lang_invoke_MethodHandle() &&
+        is_signature_polymorphic_name(name)) {
+#else
     if ((klass == vmSymbols::java_lang_invoke_MethodHandle() ||
          klass == vmSymbols::java_lang_invoke_VarHandle()) &&
         is_signature_polymorphic_name(name)) {
+#endif
       vmIntrinsics::ID iid = signature_polymorphic_name_id(name);
       return has_member_arg(iid);
     }
