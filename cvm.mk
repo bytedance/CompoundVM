@@ -36,7 +36,6 @@ else ifeq ($(CVM_ARCH),aarch64)
 else
 	ARCH_ERROR := 1
 endif
-CVM8_LIBDIR := $(WORKSPACE)/build/jdk8/jre/lib/$(ARCH_DIR)
 BUILDDIR := $(WORKSPACE)/cvm/build
 VERSION := $(shell cat $(WORKSPACE)/cvm/conf/version)
 OUTPUTDIR := $(WORKSPACE)/output
