@@ -33,6 +33,118 @@
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/growableArray.hpp"
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+// A KlassStream is an abstract stream for streaming over self, superclasses
+// and (super)interfaces. Streaming is done in reverse order (subclasses first,
+// interfaces last).
+//
+//    for (KlassStream st(k, false, false, false); !st.eos(); st.next()) {
+//      Klass* k = st.klass();
+//      ...
+//    }
+
+class KlassStream {
+ protected:
+  InstanceKlass*      _klass;           // current klass/interface iterated over
+  InstanceKlass*      _base_klass;      // initial klass/interface to iterate over
+  Array<InstanceKlass*>*_interfaces;    // transitive interfaces for initial class
+  int                 _interface_index; // current interface being processed
+  bool                _local_only;      // process initial class/interface only
+  bool                _classes_only;    // process classes only (no interfaces)
+  bool                _walk_defaults;   // process default methods
+  bool                _base_class_search_defaults; // time to process default methods
+  bool                _defaults_checked; // already checked for default methods
+  int                 _index;
+
+  virtual int length() = 0;
+
+ public:
+  // constructor
+  KlassStream(InstanceKlass* klass, bool local_only, bool classes_only, bool walk_defaults);
+
+  // testing
+  bool eos();
+
+  // iterating
+  virtual void next() = 0;
+
+  // accessors
+  InstanceKlass* klass() const      { return _klass; }
+  int index() const                 { return _index; }
+  bool base_class_search_defaults() const { return _base_class_search_defaults; }
+  void base_class_search_defaults(bool b) { _base_class_search_defaults = b; }
+};
+
+// A MethodStream streams over all methods in a class, superclasses and (super)interfaces.
+// Streaming is done in reverse order (subclasses first, methods in reverse order)
+// Usage:
+//
+//    for (MethodStream st(k, false, false); !st.eos(); st.next()) {
+//      Method* m = st.method();
+//      ...
+//    }
+
+class MethodStream : public KlassStream {
+ private:
+  int length()                    { return methods()->length(); }
+  Array<Method*>* methods() {
+    if (base_class_search_defaults()) {
+      base_class_search_defaults(false);
+      return _klass->default_methods();
+    } else {
+      return _klass->methods();
+    }
+  }
+ public:
+  MethodStream(InstanceKlass* klass, bool local_only, bool classes_only)
+    : KlassStream(klass, local_only, classes_only, true) {
+    _index = length();
+    next();
+  }
+
+  void next() { _index--; }
+  Method* method() { return methods()->at(index()); }
+};
+
+class FieldStream : public KlassStream {
+ private:
+  int length() { return _klass->java_fields_count(); }
+
+  fieldDescriptor _fd_buf;
+
+ public:
+  FieldStream(InstanceKlass* klass, bool local_only, bool classes_only)
+    : KlassStream(klass, local_only, classes_only, false) {
+    _index = length();
+    next();
+  }
+
+  void next() { _index -= 1; }
+
+  // Accessors for current field
+  AccessFlags access_flags() const {
+    AccessFlags flags;
+    flags.set_flags(_klass->field_access_flags(_index));
+    return flags;
+  }
+  Symbol* name() const {
+    return _klass->field_name(_index);
+  }
+  Symbol* signature() const {
+    return _klass->field_signature(_index);
+  }
+  // missing: initval()
+  int offset() const {
+    return _klass->field_offset( index() );
+  }
+  // bridge to a heavier API:
+  fieldDescriptor& field_descriptor() const {
+    fieldDescriptor& field = const_cast<fieldDescriptor&>(_fd_buf);
+    field.reinitialize(_klass, _index);
+    return field;
+  }
+};
+#endif
 class FilteredField : public CHeapObj<mtInternal>  {
  private:
   Klass* _klass;

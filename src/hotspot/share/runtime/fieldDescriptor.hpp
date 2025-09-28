@@ -103,6 +103,9 @@ class fieldDescriptor {
 
   // Initialization
   void reinitialize(InstanceKlass* ik, const FieldInfo& fieldinfo);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  void reinitialize(InstanceKlass* ik, int index) { reinitialize(ik, ik->field(index)); }
+#endif
 
   // Print
   void print() const;
