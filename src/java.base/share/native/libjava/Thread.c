@@ -43,7 +43,7 @@ static JNINativeMethod methods[] = {
     {"suspend0",         "()V",        (void *)&JVM_SuspendThread},
     {"resume0",          "()V",        (void *)&JVM_ResumeThread},
     {"yield0",           "()V",        (void *)&JVM_Yield},
-    {"sleep",            "(J)V",       (void *)&JVM_Sleep},
+    {"sleepNanos0",      "(J)V",       (void *)&JVM_SleepNanos},
     {"currentCarrierThread", "()" THD, (void *)&JVM_CurrentCarrierThread},
     {"currentThread",    "()" THD,     (void *)&JVM_CurrentThread},
     {"setCurrentThread", "(" THD ")V", (void *)&JVM_SetCurrentThread},

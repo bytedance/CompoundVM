@@ -549,7 +549,14 @@ public class Thread implements Runnable {
      *          <i>interrupted status</i> of the current thread is
      *          cleared when this exception is thrown.
      */
-    public static native void sleep(long millis) throws InterruptedException;
+    public static void sleep(long millis) throws InterruptedException {
+        if (millis < 0) {
+            throw new IllegalArgumentException("timeout value is negative");
+        }
+        long nanos = MILLISECONDS.toNanos(millis);
+        sleepNanos0(nanos);
+    }
+    private static native void sleepNanos0(long nanos) throws InterruptedException;
 
     /**
      * Indicates that the caller is momentarily unable to progress, until the
