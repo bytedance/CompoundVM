@@ -363,86 +363,59 @@ JVM_END
 // JVM_Stop is implemented using a VM_Operation, so threads are forced to safepoints
 // before the quasi-asynchronous exception is delivered.  This is a little obtrusive,
 // but is thought to be reliable and simple. In the case, where the receiver is the
-// same thread as the sender, no safepoint is needed.
+// same thread as the sender, no VM_Operation is needed.
 JVM_ENTRY(void, JVM_StopThread(JNIEnv* env, jobject jthread, jobject throwable))
+  ThreadsListHandle tlh(thread);
   oop java_throwable = JNIHandles::resolve(throwable);
   if (java_throwable == NULL) {
     THROW(vmSymbols::java_lang_NullPointerException());
   }
-  oop java_thread = JNIHandles::resolve_non_null(jthread);
-  JavaThread* receiver = java_lang_Thread::thread(java_thread);
-  Events::log_exception(JavaThread::current(),
+  oop java_thread = NULL;
+  JavaThread* receiver = NULL;
+  bool is_alive = tlh.cv_internal_thread_to_JavaThread(jthread, &receiver, &java_thread);
+  Events::log_exception(thread,
                         "JVM_StopThread thread JavaThread " INTPTR_FORMAT " as oop " INTPTR_FORMAT " [exception " INTPTR_FORMAT "]",
                         p2i(receiver), p2i(java_thread), p2i(throwable));
-  // First check if thread is alive
-  if (receiver != NULL) {
-    // Check if exception is getting thrown at self (use oop equality, since the
-    // target object might exit)
-    if (java_thread == thread->threadObj()) {
+
+  if (is_alive) {
+    // jthread refers to a live JavaThread.
+    if (thread == receiver) {
+      // Exception is getting thrown at self so no VM_Operation needed.
       THROW_OOP(java_throwable);
     } else {
-      // Enques a VM_Operation to stop all threads and then deliver the exception...
-      JavaThread::send_async_exception(receiver, JNIHandles::resolve(throwable));
+      // Use a VM_Operation to throw the exception.
+      JavaThread::send_async_exception(receiver, java_throwable);
     }
-  }
-  else {
+  } else {
     // Either:
     // - target thread has not been started before being stopped, or
     // - target thread already terminated
     // We could read the threadStatus to determine which case it is
     // but that is overkill as it doesn't matter. We must set the
     // stillborn flag for the first case, and if the thread has already
-    // exited setting this flag has no affect
+    // exited setting this flag has no effect.
     //java_lang_Thread::set_stillborn(java_thread); // no reference to this field
   }
 JVM_END
 
 JVM_ENTRY(void, JVM_SuspendThread(JNIEnv* env, jobject jthread))
-  oop java_thread = JNIHandles::resolve_non_null(jthread);
-  JavaThread* receiver = java_lang_Thread::thread(java_thread);
-
-  if (receiver != NULL) {
-    // thread has run and has not exited (still on threads list)
-
-    {
-      MutexLocker ml(receiver->SR_lock(), Mutex::_no_safepoint_check_flag);
-      if (receiver->is_external_suspend()) {
-        // Don't allow nested external suspend requests. We can't return
-        // an error from this interface so just ignore the problem.
-        return;
-      }
-      if (receiver->is_exiting()) { // thread is in the process of exiting
-        return;
-      }
-      receiver->set_external_suspend();
-    }
-
-    // java_suspend() will catch threads in the process of exiting
-    // and will ignore them.
+  ThreadsListHandle tlh(thread);
+  JavaThread* receiver = NULL;
+  bool is_alive = tlh.cv_internal_thread_to_JavaThread(jthread, &receiver, NULL);
+  if (is_alive) {
+    // jthread refers to a live JavaThread, but java_suspend() will
+    // detect a thread that has started to exit and will ignore it.
     receiver->java_suspend(false);
-
-    // It would be nice to have the following assertion in all the
-    // time, but it is possible for a racing resume request to have
-    // resumed this thread right after we suspended it. Temporarily
-    // enable this assertion if you are chasing a different kind of
-    // bug.
-    //
-    // assert(java_lang_Thread::thread(receiver->threadObj()) == NULL ||
-    //   receiver->is_being_ext_suspended(), "thread is not suspended");
   }
 JVM_END
 
 JVM_ENTRY(void, JVM_ResumeThread(JNIEnv* env, jobject jthread))
-  // Ensure that the C++ Thread and OSThread structures aren't freed before we operate.
-  // We need to *always* get the threads lock here, since this operation cannot be allowed during
-  // a safepoint. The safepoint code relies on suspending a thread to examine its state. If other
-  // threads randomly resumes threads, then a thread might not be suspended when the safepoint code
-  // looks at it.
-  MutexLocker ml(Threads_lock);
-  JavaThread* thr = java_lang_Thread::thread(JNIHandles::resolve_non_null(jthread));
-  if (thr != NULL) {
-    // the thread has run and is not in the process of exiting
-    thr->java_resume(false);
+  ThreadsListHandle tlh(thread);
+  JavaThread* receiver = NULL;
+  bool is_alive = tlh.cv_internal_thread_to_JavaThread(jthread, &receiver, NULL);
+  if (is_alive) {
+    // jthread refers to a live JavaThread.
+    receiver->java_resume(false);
   }
 JVM_END
 
