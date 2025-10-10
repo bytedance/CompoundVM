@@ -42,9 +42,6 @@
 #include "runtime/orderAccess.hpp"
 #include "runtime/safepoint.hpp"
 
-#if HOTSPOT_TARGET_CLASSLIB == 8
-inline void JavaThread::set_external_suspend() { set_suspend_flag  (_external_suspend); }
-#endif
 
 inline void JavaThread::set_suspend_flag(SuspendFlags f) {
   uint32_t flags;
