@@ -316,6 +316,8 @@ public abstract class Reference<T> {
 
     static {
         runtimeSetup();
+        // start the reference handler thread.
+        SharedSecrets.getJavaLangRefAccess().startThreads();
     }
 
     // Also called from JVM when loading an AOT cache
