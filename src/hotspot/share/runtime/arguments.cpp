@@ -2250,7 +2250,7 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, JVMFlagOrigin
         }
 #endif // !INCLUDE_JVMTI
 #if HOTSPOT_TARGET_CLASSLIB == 8
-        // convert jdwp arguments to jdwp17 agent
+        // convert jdwp arguments to jdwp25 agent
         if (strcmp(name, "jdwp") == 0) {
           sappend(name, "25");
         }
@@ -2340,6 +2340,11 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, JVMFlagOrigin
           name = NEW_C_HEAP_ARRAY(char, len + 1, mtArguments);
           memcpy(name, tail, len);
           name[len] = '\0';
+#if HOTSPOT_TARGET_CLASSLIB == 8
+          if (!is_absolute_path && strcmp(name, "jdwp") == 0) {
+            sappend(name, "25");
+          }
+#endif
         }
 
         char *options = nullptr;
