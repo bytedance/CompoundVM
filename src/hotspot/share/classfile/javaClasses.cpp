@@ -3189,7 +3189,8 @@ oop java_lang_Throwable::get_stack_trace_element(Handle throwable, int index, TR
   // this should work as long as JVM does not embed an object into another.
   ObjArrayKlass* arrayKlass = ObjArrayKlass::cast(vmClasses::Object_klass()->array_klass(n, THREAD));
   objArrayHandle arrh(THREAD, arrayKlass->allocate(n, THREAD));
-  get_stack_trace_elements(arrh->length(), Handle(THREAD, backtrace(throwable())), arrh, THREAD);
+  objArrayHandle backtraceh(THREAD, (objArrayOop)java_lang_Throwable::backtrace(throwable()));
+  get_stack_trace_elements(arrh->length(), backtraceh, arrh, THREAD);
   return arrh->obj_at(index);
 }
 #endif
