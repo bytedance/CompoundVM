@@ -135,6 +135,9 @@ void Management::init() {
     _optional_support.isOtherThreadCpuTimeSupported = 0;
   }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  _optional_support.isBootClassPathSupported = 1;
+#endif
   _optional_support.isObjectMonitorUsageSupported = 1;
 #if INCLUDE_SERVICES
   // This depends on the heap inspector
@@ -1173,8 +1176,8 @@ JVM_END
 //    locked_monitors - if true, dump locked object monitors
 //    locked_synchronizers - if true, dump locked JSR-166 synchronizers
 //
-JVM_ENTRY(jobjectArray, jmm_DumpThreads(JNIEnv *env, jlongArray thread_ids, jboolean locked_monitors,
-                                        jboolean locked_synchronizers, jint maxDepth))
+jobjectArray dump_threads_common(JNIEnv *env, jlongArray thread_ids, jboolean locked_monitors,
+                                        jboolean locked_synchronizers, jint maxDepth, TRAPS) {
   ResourceMark rm(THREAD);
 
   typeArrayOop ta = typeArrayOop(JNIHandles::resolve(thread_ids));
@@ -1303,6 +1306,11 @@ JVM_ENTRY(jobjectArray, jmm_DumpThreads(JNIEnv *env, jlongArray thread_ids, jboo
   }
 
   return (jobjectArray) JNIHandles::make_local(THREAD, result_h());
+}
+
+JVM_ENTRY(jobjectArray, jmm_DumpThreads(JNIEnv *env, jlongArray thread_ids, jboolean locked_monitors,
+                                        jboolean locked_synchronizers, jint maxDepth))
+  return dump_threads_common(env, thread_ids, locked_monitors, locked_synchronizers, maxDepth, THREAD);
 JVM_END
 
 // Reset statistic.  Return true if the requested statistic is reset.
@@ -2298,13 +2306,72 @@ const struct jmmInterface_1_ jmm_interface = {
   jmm_ExecuteDiagnosticCommand,
   jmm_SetDiagnosticFrameworkNotificationEnabled
 };
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+
+extern "C" jobjectArray jmm_DumpThreads_JDK8(JNIEnv *env, jlongArray thread_ids, jboolean locked_monitors,
+                                             jboolean locked_synchronizers);
+extern "C" jobjectArray jmm_GetInputArgumentArray(JNIEnv *env);
+extern "C" jobject jmm_GetInputArguments(JNIEnv *env);
+extern "C" void  jmm_GetDiagnosticCommandArgumentsInfo_JDK8(JNIEnv *env, jstring command, dcmdArgInfo* infoArray);
+
+const struct jmmInterface_1_2_3_ jmm_interface_1_2_3 = {
+  jmm_GetTotalThreadAllocatedMemory,
+  jmm_GetOneThreadAllocatedMemory,
+  jmm_GetVersion,
+  jmm_GetOptionalSupport,
+  jmm_GetInputArguments,
+  jmm_GetThreadInfo,
+  jmm_GetInputArgumentArray,
+  jmm_GetMemoryPools,
+  jmm_GetMemoryManagers,
+  jmm_GetMemoryPoolUsage,
+  jmm_GetPeakMemoryPoolUsage,
+  jmm_GetThreadAllocatedMemory,
+  jmm_GetMemoryUsage,
+  jmm_GetLongAttribute,
+  jmm_GetBoolAttribute,
+  jmm_SetBoolAttribute,
+  jmm_GetLongAttributes,
+  jmm_FindMonitorDeadlockedThreads,
+  jmm_GetThreadCpuTime,
+  jmm_GetVMGlobalNames,
+  jmm_GetVMGlobals,
+  jmm_GetInternalThreadTimes,
+  jmm_ResetStatistic,
+  jmm_SetPoolSensor,
+  jmm_SetPoolThreshold,
+  jmm_GetPoolCollectionUsage,
+  jmm_GetGCExtAttributeInfo,
+  jmm_GetLastGCStat,
+  jmm_GetThreadCpuTimeWithKind,
+  jmm_GetThreadCpuTimesWithKind,
+  jmm_DumpHeap0,
+  jmm_FindDeadlockedThreads,
+  jmm_SetVMGlobal,
+  jmm_DumpThreads,
+  jmm_DumpThreads_JDK8,
+  jmm_SetGCNotificationEnabled,
+  jmm_GetDiagnosticCommands,
+  jmm_GetDiagnosticCommandInfo,
+  jmm_GetDiagnosticCommandArgumentsInfo_JDK8,
+  jmm_ExecuteDiagnosticCommand,
+  jmm_SetDiagnosticFrameworkNotificationEnabled
+};
+#endif
 #endif // INCLUDE_MANAGEMENT
 
 void* Management::get_jmm_interface(int version) {
 #if INCLUDE_MANAGEMENT
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  if (version == JMM_VERSION_1_0) {
+    return (void*) &jmm_interface_1_2_3;
+  }
+#else
   if (version == JMM_VERSION) {
     return (void*) &jmm_interface;
   }
+#endif
 #endif // INCLUDE_MANAGEMENT
   return nullptr;
 }
