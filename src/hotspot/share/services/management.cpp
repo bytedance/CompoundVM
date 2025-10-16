@@ -135,6 +135,9 @@ void Management::init() {
     _optional_support.isOtherThreadCpuTimeSupported = 0;
   }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  _optional_support.isBootClassPathSupported = 1;
+#endif
   _optional_support.isObjectMonitorUsageSupported = 1;
 #if INCLUDE_SERVICES
   // This depends on the heap inspector
@@ -482,7 +485,11 @@ static MemoryManager* get_memory_manager_from_jobject(jobject obj, TRAPS) {
 // Returns a version string and sets major and minor version if
 // the input parameters are non-null.
 JVM_LEAF(jint, jmm_GetVersion(JNIEnv *env))
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  return JMM_VERSION_CVM8;
+#else
   return JMM_VERSION;
+#endif
 JVM_END
 
 // Gets the list of VM monitoring and management optional supports
@@ -1173,8 +1180,8 @@ JVM_END
 //    locked_monitors - if true, dump locked object monitors
 //    locked_synchronizers - if true, dump locked JSR-166 synchronizers
 //
-JVM_ENTRY(jobjectArray, jmm_DumpThreads(JNIEnv *env, jlongArray thread_ids, jboolean locked_monitors,
-                                        jboolean locked_synchronizers, jint maxDepth))
+static jobjectArray dump_threads_common(JNIEnv *env, jlongArray thread_ids, jboolean locked_monitors,
+                                        jboolean locked_synchronizers, jint maxDepth, TRAPS) {
   ResourceMark rm(THREAD);
 
   typeArrayOop ta = typeArrayOop(JNIHandles::resolve(thread_ids));
@@ -1303,6 +1310,11 @@ JVM_ENTRY(jobjectArray, jmm_DumpThreads(JNIEnv *env, jlongArray thread_ids, jboo
   }
 
   return (jobjectArray) JNIHandles::make_local(THREAD, result_h());
+}
+
+JVM_ENTRY(jobjectArray, jmm_DumpThreads(JNIEnv *env, jlongArray thread_ids, jboolean locked_monitors,
+                                        jboolean locked_synchronizers, jint maxDepth))
+  return dump_threads_common(env, thread_ids, locked_monitors, locked_synchronizers, maxDepth, THREAD);
 JVM_END
 
 // Reset statistic.  Return true if the requested statistic is reset.
@@ -2060,6 +2072,47 @@ JVM_ENTRY(void, jmm_GetDiagnosticCommandArgumentsInfo(JNIEnv *env,
   return;
 JVM_END
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(void, jmm_GetDiagnosticCommandArgumentsInfo_JDK8(JNIEnv *env,
+          jstring command, dcmdArgInfo* infoArray))
+  ResourceMark rm(THREAD);
+  oop cmd = JNIHandles::resolve_external_guard(command);
+  if (cmd == nullptr) {
+    THROW_MSG(vmSymbols::java_lang_NullPointerException(),
+              "Command line cannot be null.");
+  }
+  char* cmd_name = java_lang_String::as_utf8_string(cmd);
+  if (cmd_name == nullptr) {
+    THROW_MSG(vmSymbols::java_lang_NullPointerException(),
+              "Command line content cannot be null.");
+  }
+  DCmd* dcmd = nullptr;
+  DCmdFactory*factory = DCmdFactory::factory(DCmd_Source_MBean, cmd_name,
+                                             strlen(cmd_name));
+  if (factory != nullptr) {
+    dcmd = factory->create_resource_instance(nullptr);
+  }
+  if (dcmd == nullptr) {
+    THROW_MSG(vmSymbols::java_lang_IllegalArgumentException(),
+              "Unknown diagnostic command");
+  }
+  DCmdMark mark(dcmd);
+  GrowableArray<DCmdArgumentInfo*>* array = dcmd->argument_info_array();
+  const int num_args = array->length();
+  for (int i = 0; i < num_args; i++) {
+    infoArray[i].name = array->at(i)->name();
+    infoArray[i].description = array->at(i)->description();
+    infoArray[i].type = array->at(i)->type();
+    infoArray[i].default_string = array->at(i)->default_string();
+    infoArray[i].mandatory = array->at(i)->is_mandatory();
+    infoArray[i].option = array->at(i)->is_option();
+    infoArray[i].multiple = array->at(i)->is_multiple();
+    infoArray[i].position = array->at(i)->position();
+  }
+  return;
+JVM_END
+#endif
+
 JVM_ENTRY(jstring, jmm_ExecuteDiagnosticCommand(JNIEnv *env, jstring commandline))
   ResourceMark rm(THREAD);
   oop cmd = JNIHandles::resolve_external_guard(commandline);
@@ -2298,13 +2351,168 @@ const struct jmmInterface_1_ jmm_interface = {
   jmm_ExecuteDiagnosticCommand,
   jmm_SetDiagnosticFrameworkNotificationEnabled
 };
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+// Returns a java.lang.String object containing the input arguments to the VM.
+JVM_ENTRY(jobject, jmm_GetInputArguments(JNIEnv *env))
+  ResourceMark rm(THREAD);
+
+  if (Arguments::num_jvm_args() == 0 && Arguments::num_jvm_flags() == 0) {
+    return NULL;
+  }
+
+  char** vm_flags = Arguments::jvm_flags_array();
+  char** vm_args  = Arguments::jvm_args_array();
+  int num_flags   = Arguments::num_jvm_flags();
+  int num_args    = Arguments::num_jvm_args();
+
+  size_t length = 1; // null terminator
+  int i;
+  for (i = 0; i < num_flags; i++) {
+    length += strlen(vm_flags[i]);
+  }
+  for (i = 0; i < num_args; i++) {
+    length += strlen(vm_args[i]);
+  }
+  // add a space between each argument
+  length += num_flags + num_args - 1;
+
+  // Return the list of input arguments passed to the VM
+  // and preserve the order that the VM processes.
+  char* args = NEW_RESOURCE_ARRAY(char, length);
+  args[0] = '\0';
+  // concatenate all jvm_flags
+  if (num_flags > 0) {
+    strcat(args, vm_flags[0]);
+    for (i = 1; i < num_flags; i++) {
+      strcat(args, " ");
+      strcat(args, vm_flags[i]);
+    }
+  }
+
+  if (num_args > 0 && num_flags > 0) {
+    // append a space if args already contains one or more jvm_flags
+    strcat(args, " ");
+  }
+
+  // concatenate all jvm_args
+  if (num_args > 0) {
+    strcat(args, vm_args[0]);
+    for (i = 1; i < num_args; i++) {
+      strcat(args, " ");
+      strcat(args, vm_args[i]);
+    }
+  }
+
+  Handle hargs = java_lang_String::create_from_platform_dependent_str(args, CHECK_NULL);
+  return JNIHandles::make_local(THREAD, hargs());
+JVM_END
+
+// Returns an array of java.lang.String object containing the input arguments to the VM.
+JVM_ENTRY(jobjectArray, jmm_GetInputArgumentArray(JNIEnv *env))
+  ResourceMark rm(THREAD);
+
+  if (Arguments::num_jvm_args() == 0 && Arguments::num_jvm_flags() == 0) {
+    return NULL;
+  }
+
+  char** vm_flags = Arguments::jvm_flags_array();
+  char** vm_args = Arguments::jvm_args_array();
+  int num_flags = Arguments::num_jvm_flags();
+  int num_args = Arguments::num_jvm_args();
+
+  InstanceKlass* ik = vmClasses::String_klass();
+  objArrayOop r = oopFactory::new_objArray(ik, num_args + num_flags, CHECK_NULL);
+  objArrayHandle result_h(THREAD, r);
+
+  int index = 0;
+  for (int j = 0; j < num_flags; j++, index++) {
+    Handle h = java_lang_String::create_from_platform_dependent_str(vm_flags[j], CHECK_NULL);
+    result_h->obj_at_put(index, h());
+  }
+  for (int i = 0; i < num_args; i++, index++) {
+    Handle h = java_lang_String::create_from_platform_dependent_str(vm_args[i], CHECK_NULL);
+    result_h->obj_at_put(index, h());
+  }
+  return (jobjectArray) JNIHandles::make_local(THREAD, result_h());
+JVM_END
+
+// Dump thread info for the specified threads.
+// It returns an array of ThreadInfo objects. Each element is the ThreadInfo
+// for the thread ID specified in the corresponding entry in
+// the given array of thread IDs; or NULL if the thread does not exist
+// or has terminated.
+//
+// Input parameter:
+//    ids - array of thread IDs; NULL indicates all live threads
+//    locked_monitors - if true, dump locked object monitors
+//    locked_synchronizers - if true, dump locked JSR-166 synchronizers
+//
+// This method exists only for compatbility with compiled binaries that call it.
+// The JDK library uses jmm_DumpThreadsMaxDepth.
+//
+JVM_ENTRY(jobjectArray, jmm_DumpThreads_JDK8(JNIEnv *env, jlongArray thread_ids, jboolean locked_monitors,
+                                        jboolean locked_synchronizers))
+  return dump_threads_common(env, thread_ids, locked_monitors, locked_synchronizers, INT_MAX, THREAD);
+JVM_END
+
+const struct jmmInterface_jdk8_ jmm_interface_jdk8 = {
+  jmm_GetTotalThreadAllocatedMemory,
+  jmm_GetOneThreadAllocatedMemory,
+  jmm_GetVersion,
+  jmm_GetOptionalSupport,
+  jmm_GetInputArguments,
+  jmm_GetThreadInfo,
+  jmm_GetInputArgumentArray,
+  jmm_GetMemoryPools,
+  jmm_GetMemoryManagers,
+  jmm_GetMemoryPoolUsage,
+  jmm_GetPeakMemoryPoolUsage,
+  jmm_GetThreadAllocatedMemory,
+  jmm_GetMemoryUsage,
+  jmm_GetLongAttribute,
+  jmm_GetBoolAttribute,
+  jmm_SetBoolAttribute,
+  jmm_GetLongAttributes,
+  jmm_FindMonitorDeadlockedThreads,
+  jmm_GetThreadCpuTime,
+  jmm_GetVMGlobalNames,
+  jmm_GetVMGlobals,
+  jmm_GetInternalThreadTimes,
+  jmm_ResetStatistic,
+  jmm_SetPoolSensor,
+  jmm_SetPoolThreshold,
+  jmm_GetPoolCollectionUsage,
+  jmm_GetGCExtAttributeInfo,
+  jmm_GetLastGCStat,
+  jmm_GetThreadCpuTimeWithKind,
+  jmm_GetThreadCpuTimesWithKind,
+  jmm_DumpHeap0,
+  jmm_FindDeadlockedThreads,
+  jmm_SetVMGlobal,
+  jmm_DumpThreads,
+  jmm_DumpThreads_JDK8,
+  jmm_SetGCNotificationEnabled,
+  jmm_GetDiagnosticCommands,
+  jmm_GetDiagnosticCommandInfo,
+  jmm_GetDiagnosticCommandArgumentsInfo_JDK8,
+  jmm_ExecuteDiagnosticCommand,
+  jmm_SetDiagnosticFrameworkNotificationEnabled
+};
+#endif
 #endif // INCLUDE_MANAGEMENT
 
 void* Management::get_jmm_interface(int version) {
 #if INCLUDE_MANAGEMENT
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  if (version == JMM_VERSION_1_0) {
+    return (void*) &jmm_interface_jdk8;
+  }
+#else
   if (version == JMM_VERSION) {
     return (void*) &jmm_interface;
   }
+#endif
 #endif // INCLUDE_MANAGEMENT
   return nullptr;
 }
