@@ -68,6 +68,10 @@ PerfVariable* ThreadService::_daemon_threads_count = NULL;
 volatile int ThreadService::_atomic_threads_count = 0;
 volatile int ThreadService::_atomic_daemon_threads_count = 0;
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+volatile jlong ThreadService::_exited_allocated_bytes = 0;
+#endif
+
 ThreadDumpResult* ThreadService::_threaddump_list = NULL;
 
 static const int INITIAL_ARRAY_SIZE = 10;
@@ -159,6 +163,11 @@ void ThreadService::remove_thread(JavaThread* thread, bool daemon) {
   if (is_hidden_thread(thread)) {
     return;
   }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // Include hidden thread allcations in exited_allocated_bytes
+  ThreadService::incr_exited_allocated_bytes(thread->cooked_allocated_bytes());
+#endif
 
   assert(!thread->is_terminated(), "must not be terminated");
   if (!thread->is_exiting()) {

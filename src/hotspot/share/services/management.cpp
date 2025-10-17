@@ -2288,6 +2288,44 @@ jlong Management::ticks_to_ms(jlong ticks) {
 }
 #endif // INCLUDE_MANAGEMENT
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+// Gets the amount of memory allocated on the Java heap since JVM launch.
+JVM_ENTRY(jlong, jmm_GetTotalThreadAllocatedMemory(JNIEnv *env))
+    // A thread increments exited_allocated_bytes in ThreadService::remove_thread
+    // only after it removes itself from the threads list, and once a TLH is
+    // created, no thread it references can remove itself from the threads
+    // list, so none can update exited_allocated_bytes. We therefore initialize
+    // result with exited_allocated_bytes after after we create the TLH so that
+    // the final result can only be short due to (1) threads that start after
+    // the TLH is created, or (2) terminating threads that escape TLH creation
+    // and don't update exited_allocated_bytes before we initialize result.
+
+    // We keep a high water mark to ensure monotonicity in case threads counted
+    // on a previous call end up in state (2).
+    static jlong high_water_result = 0;
+
+    JavaThreadIteratorWithHandle jtiwh;
+    jlong result = ThreadService::exited_allocated_bytes();
+    for (; JavaThread* thread = jtiwh.next();) {
+      jlong size = thread->cooked_allocated_bytes();
+      result += size;
+    }
+
+    {
+      assert(MonitoringSupport_lock != nullptr, "Must be");
+      MutexLocker ml(MonitoringSupport_lock, Mutex::_no_safepoint_check_flag);
+      if (result < high_water_result) {
+        // Encountered (2) above, or result wrapped to a negative value. In
+        // the latter case, it's pegged at the last positive value.
+        result = high_water_result;
+      } else {
+        high_water_result = result;
+      }
+    }
+    return result;
+JVM_END
+#endif
+
 // Gets the amount of memory allocated on the Java heap for a single thread.
 // Returns -1 if the thread does not exist or has terminated.
 JVM_ENTRY(jlong, jmm_GetOneThreadAllocatedMemory(JNIEnv *env, jlong thread_id))
@@ -2472,7 +2510,7 @@ const struct jmmInterface_1_ jmm_interface = {
 
 #if HOTSPOT_TARGET_CLASSLIB == 8
 const struct jmmInterface_jdk8_ jmm_interface_jdk8 = {
-  NULL,
+  jmm_GetTotalThreadAllocatedMemory,
   jmm_GetOneThreadAllocatedMemory,
   jmm_GetVersion_JDK8,
   jmm_GetOptionalSupport_JDK8,
