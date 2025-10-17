@@ -371,7 +371,8 @@ typedef struct jmmInterface_1_ {
 
 #if HOTSPOT_TARGET_CLASSLIB == 8
 typedef struct jmmInterface_jdk8_ {
-  void*        reserved1;
+  jlong        (JNICALL *GetTotalThreadAllocatedMemory)
+                                                 (JNIEnv *env);
   jlong        (JNICALL *GetOneThreadAllocatedMemory)
                                                  (JNIEnv *env,
                                                   jlong thread_id);
