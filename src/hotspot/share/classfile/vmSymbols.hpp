@@ -64,6 +64,7 @@ class SerializeClosure;
   template(reflect_MethodAccessorImpl,                "sun/reflect/MethodAccessorImpl")           \
   template(reflect_CallerSensitive,                   "sun/reflect/CallerSensitive")              \
   template(reflect_CallerSensitive_signature,         "Lsun/reflect/CallerSensitive;")            \
+  template(reflect_MagicAccessorImpl,                 "sun/reflect/MagicAccessorImpl")            \
   template(vmloader_name,                             "vmloader")                                 \
   template(java_security_PrivilegedActionException,   "java/security/PrivilegedActionException")  \
   template(exception_void_signature,                  "(Ljava/lang/Exception;)V")                 \

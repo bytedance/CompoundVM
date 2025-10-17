@@ -132,8 +132,15 @@ bool Verifier::relax_access_for(oop loader) {
 // or pass true for redefinition of any class.
 static bool is_eligible_for_verification(InstanceKlass* klass, bool should_verify_class) {
   Symbol* name = klass->name();
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  Klass* refl_magic_klass = vmClasses::reflect_MagicAccessorImpl_klass();
 
+  bool is_reflect = refl_magic_klass != nullptr && klass->is_subtype_of(refl_magic_klass);
+
+  return (should_verify_class && (!is_reflect) &&
+#else
   return (should_verify_class &&
+#endif
     // Can not verify the bytecodes for shared classes because they have
     // already been rewritten to contain constant pool cache indices,
     // which the verifier can't understand.
@@ -2911,8 +2918,20 @@ void ClassVerifier::verify_invoke_instructions(
                                // and we loaded the class. For any other "true" returns (e.g. same class
                                // or Object) we either can't get here (same class already excluded above)
                                // or we know it is not an interface (i.e. Object).
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    bool subtype = false;
+    if (!current_class()->is_hidden()) {
+      subtype = ref_class_type.is_reference_assignable_from(current_type(), this, false,
+                                                               &is_interface, CHECK_VERIFY(this));
+    } else {
+      VerificationType host_klass_type =
+                        VerificationType::reference_type(current_class()->nest_host(THREAD)->name());
+      subtype = ref_class_type.is_assignable_from(host_klass_type, this, false, CHECK_VERIFY(this));
+    }
+#else
     bool subtype = ref_class_type.is_reference_assignable_from(current_type(), this, false,
                                                                &is_interface, CHECK_VERIFY(this));
+#endif
     if (!subtype) {  // Totally unrelated class
       verify_error(ErrorContext::bad_code(bci),
                    "Bad invokespecial instruction: "
@@ -2950,7 +2969,28 @@ void ClassVerifier::verify_invoke_instructions(
     } else {   // other methods
       // Ensures that target class is assignable to method class.
       if (opcode == Bytecodes::_invokespecial) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+        if (!current_class()->is_hidden()) {
+          current_frame->pop_stack(current_type(), CHECK_VERIFY(this));
+        } else {
+          // anonymous class invokespecial calls: check if the
+          // objectref is a subtype of the host_klass of the current class
+          // to allow an anonymous class to reference methods in the host_klass
+          VerificationType top = current_frame->pop_stack(CHECK_VERIFY(this));
+          VerificationType hosttype =
+            VerificationType::reference_type(current_class()->nest_host(THREAD)->name());
+          bool subtype = hosttype.is_assignable_from(top, this, false, CHECK_VERIFY(this));
+          if (!subtype) {
+            verify_error( ErrorContext::bad_type(current_frame->offset(),
+              current_frame->stack_top_ctx(),
+              TypeOrigin::implicit(top)),
+              "Bad type on operand stack");
+            return;
+          }
+        }
+#else
         current_frame->pop_stack(current_type(), CHECK_VERIFY(this));
+#endif
       } else if (opcode == Bytecodes::_invokevirtual) {
         VerificationType stack_object_type =
           current_frame->pop_stack(ref_class_type, CHECK_VERIFY(this));

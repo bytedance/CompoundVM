@@ -82,7 +82,11 @@ bool VerificationType::resolve_and_check_assignability(InstanceKlass* current_kl
       target_klass == vmClasses::Serializable_klass();
   } else if (from_is_object) {
     Klass* from_klass;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    if (current_klass->name() == from_name) {
+#else
     if (current_klass->is_hidden() && current_klass->name() == from_name) {
+#endif
       from_klass = current_klass;
     } else {
       from_klass = SystemDictionary::resolve_or_fail(

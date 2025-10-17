@@ -1216,7 +1216,18 @@ Method* LinkResolver::linktime_resolve_special_method(const LinkInfo& link_info,
   Klass* current_klass = link_info.current_klass();
   if (current_klass != nullptr && resolved_klass->is_interface()) {
     InstanceKlass* klass_to_check = InstanceKlass::cast(current_klass);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    if (klass_to_check->is_hidden()) {
+      klass_to_check = klass_to_check->nest_host(THREAD);
+    }
+    // Disable verification for the dynamically-generated reflection bytecodes.
+    bool is_reflect = klass_to_check->is_subclass_of(
+                        vmClasses::reflect_MagicAccessorImpl_klass());
+    if (!is_reflect &&
+        !klass_to_check->is_same_or_direct_interface(resolved_klass)) {
+#else
     if (!klass_to_check->is_same_or_direct_interface(resolved_klass)) {
+#endif
       ResourceMark rm(THREAD);
       stringStream ss;
       ss.print("Interface method reference: '");
