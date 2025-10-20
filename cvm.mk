@@ -79,33 +79,63 @@ endef
 	[[ -d $(OUTPUTDIR)/$(DISTRO_NAME) ]] || mkdir -p $(OUTPUTDIR)/$(DISTRO_NAME)
 	[[ -d $(OUTPUTDIR)/$(DISTRO_JVM_PATCH_NAME) ]] || mkdir -p $(OUTPUTDIR)/$(DISTRO_JVM_PATCH_NAME)
 
-# Setup bootstrap JDK from a given URL
-# $1  URL of JDK in tar.gz format
-# $2  directory of JDK
-define setup_boot_jdk
-	$(eval DIR=$(shell dirname $(2)))
-	[[ -d $(DIR) ]] || mkdir -p $(DIR)
-	$(eval URL := $(1))
-	$(eval TAR_FILE := $(shell basename $(URL)))
-	rm -f $(TAR_FILE)
-	wget -q $(URL) -O $(TAR_FILE)
-	rm -fr $(2)
-	tar xf $(TAR_FILE) -C .bootjdks
-	rm -f $(TAR_FILE)
+# Download package from a given URL and extract to local directory
+# $1  URL of package in .tar.gz/.zip format
+# $2  local package file path to save
+# $3  expected MD5 checksum of the downloaded package
+# $4  directory to hold extracted content
+define setup_download_artifact
+	$(eval URL=$(1))
+	$(eval LPATH=$(2))
+	$(eval MD5_EXP=$(3))
+	$(eval DIR=$(4))
+	{ \
+		set -x; \
+		rm -rf $(DIR) && mkdir -p $(DIR); \
+		for i in `seq 4`; do \
+			[[ $$i -gt 1 ]] && echo "Retrying to download $(URL)"; \
+			[[ ! -f $(LPATH) ]] && wget -nc $(URL) -O $(LPATH); \
+			MD5SUM=`md5sum $(LPATH) | awk '{print $$1}'`; \
+			if [[ $$MD5SUM = $(MD5_EXP) ]]; then \
+				break; \
+			else \
+				echo "md5 checksum of downloaded $(LPATH) is wrong! expected=$(MD5_EXP), actual=$$MD5SUM"; \
+				rm -f $(LPATH); \
+				continue; \
+			fi; \
+		done; \
+		[[ -f $(LPATH) ]] || (echo "Failed to download $(URL)" && exit 127); \
+		if [[ $(LPATH) == *.tar.gz ]]; then tar -xzf $(LPATH) -C $(DIR) --strip-components=1; \
+		elif [[ $(LPATH) == *.zip ]]; then \
+			cd $(DIR) && unzip $(LPATH) && \
+			cd `zipinfo -1 $(LPATH) | grep '/$$' | sort | head -n 1` && mv * $(DIR)/; \
+		fi; \
+	}
 endef
 
 # '/' is indispensable otherwise target name will be treated as a file
 $(BOOTJDK25)/:
-	$(call setup_boot_jdk,https://download.java.net/java/GA/jdk24.0.1/24a58e0e276943138bf3e963e6291ac2/9/GPL/openjdk-24.0.1_linux-x64_bin.tar.gz,$@)
+	$(call setup_download_artifact, \
+		"https://download.java.net/java/GA/jdk24.0.1/24a58e0e276943138bf3e963e6291ac2/9/GPL/openjdk-24.0.1_linux-x64_bin.tar.gz", \
+		"$(WORKSPACE)/.bootjdks/bootjdk-24.0.1.tar.gz", \
+		"56319f30ef59f96ddd7c7c4df330f114", \
+		$@)
 	#cp -f $(WORKSPACE)/bin/linux-x86_64/hsdis-amd64.so $$(dirname $$(find $@ -name libjava.so))
 
 $(BOOTJDK8)/:
-	$(call setup_boot_jdk,https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u372-b07/OpenJDK8U-jdk_x64_linux_hotspot_8u372b07.tar.gz,$@)
+	$(call setup_download_artifact, \
+		"https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u372-b07/OpenJDK8U-jdk_x64_linux_hotspot_8u372b07.tar.gz", \
+		"$(WORKSPACE)/.bootjdks/bootjdk-8u372.tar.gz", \
+		"524d4fac3d2cc091265c35c829a36ea0", \
+		$@)
 	#cp -f $(WORKSPACE)/bin/linux-x86_64/hsdis-amd64.so $$(dirname $$(find $@ -name libjava.so))
 
-jdk8u/jdk/src:
-	wget -nc https://github.com/openjdk/jdk8u/archive/refs/tags/jdk8u452-ga.tar.gz
-	[[ -d $(JDK8_SRCROOT) ]] || (mkdir -p $(JDK8_SRCROOT) && tar -xzf jdk8u452-ga.tar.gz -C $(JDK8_SRCROOT) --strip-components=1)
+$(JDK8_SRCROOT)/jdk:
+	$(call setup_download_artifact, \
+		"https://github.com/openjdk/jdk8u/archive/refs/tags/jdk8u452-ga.tar.gz", \
+		"$(CVM8_SRCROOT)/jdk8u-src.tar.gz", \
+		"680255696b3a541effb8d8afd2e75e5b", \
+		$(JDK8_SRCROOT))
 
 cvm8: jdk8vm25
 
@@ -131,20 +161,21 @@ jvm-patch: cvm8default25
 	rm -fr $(BUILDDIR)/jdk8
 
 clean:
-	rm -fr $(BUILDDIR)
+	rm -fr $(BUILDDIR) $(OUTPUTDIR)
 	cd $(JDK8_SRCROOT) && make clean
 	cd $(JDK25_SRCROOT) && make clean
 
 full-clean:
-	rm -fr $(BUILDDIR) $(JDK25_SRCROOT)/build $(JDK8_SRCROOT)/build
+	rm -fr $(BUILDDIR) $(JDK25_SRCROOT)/build $(JDK8_SRCROOT)/build $(OUTPUTDIR)
 
-jdk8vm25: -clean-jdk8vm25 -bootstrap build_jdk8u build_jdk25u altkernel
+jdk8vm25: build_jdk8u build_jdk25u altkernel
 	@echo
 	@echo "###### Composing CVM8 ######"
 	$(eval SRC_BUILDDIR_25=$(shell find $(JDK25_SRCROOT)/build -type f -name build.log | grep $(MODE) | xargs dirname))
 	$(eval SRC_BUILDDIR_8=$(shell find $(JDK8_SRCROOT)/build -type f -name build.log | grep $(MODE) | xargs dirname))
 	$(eval JDK8_IMAGEDIR=$(shell find $(JDK8_SRCROOT)/build -type d -name j2sdk-image | grep $(MODE)))
 	{ \
+		set -x; \
 		cp -Lfr $(JDK8_IMAGEDIR) $(CVM8DIR) && \
 		mkdir -p $(CVM8_LIBDIR)/server25 && \
 		cp -f $(BUILDDIR)/rt8.jar $(CVM8_JARDIR)/ && \
@@ -157,8 +188,8 @@ jdk8vm25: -clean-jdk8vm25 -bootstrap build_jdk8u build_jdk25u altkernel
 		cp -f $(SRC_BUILDDIR_25)/jdk/lib/libjimage.debuginfo $(CVM8_LIBDIR)/libjimage25.debuginfo && \
 		cp -f $(SRC_BUILDDIR_25)/jdk/lib/libjava.debuginfo $(CVM8_LIBDIR)/libjava25.debuginfo && \
 		cp -f $(SRC_BUILDDIR_25)/jdk/lib/libjdwp.debuginfo $(CVM8_LIBDIR)/libjdwp25.debuginfo && \
-		cp -f $(SRC_BUILDDIR_25)/jdk/lib/server/libjvm.debuginfo $(CVM8_LIBDIR)/server25/libjvm.debuginfo && \
-		[[ "x$$(grep server25 $(CVM8_LIBDIR)/jvm.cfg)" = "x" ]] && echo "-server25 KNOWN" >> $(CVM8_LIBDIR)/jvm.cfg && \
+		cp -f $(SRC_BUILDDIR_25)/jdk/lib/server/libjvm.debuginfo $(CVM8_LIBDIR)/server25/libjvm.debuginfo; \
+		[[ "x$$(grep server25 $(CVM8_LIBDIR)/jvm.cfg)" = "x" ]] && echo "-server25 KNOWN" >> $(CVM8_LIBDIR)/jvm.cfg; \
 		cp -rf $(CVM8DIR)/* $(OUTPUTDIR)/$(DISTRO_NAME)/; \
 	}
 ifeq ($(MODE), release)
@@ -170,7 +201,7 @@ endif
 	@echo "###### Done ######"
 	@echo
 
-build_jdk8u: -bootstrap jdk8u/jdk/src
+build_jdk8u: -bootstrap $(JDK8_SRCROOT)/jdk
 	{ cd $(JDK8_SRCROOT); \
 		if [[ "x$$(find ./build -type f -name config.log | grep $(MODE))" = "x" ]]; then \
 			bash configure --with-debug-level=$(MODE) \
@@ -183,7 +214,7 @@ build_jdk8u: -bootstrap jdk8u/jdk/src
 											--with-vendor-vm-bug-url="https://github.com/bytedance/CompoundVM/issues" \
 										 ;\
 		fi; \
-		make $(JDK_MAKE_OPTS) CONF=linux-x86_64-normal-server-$(MODE) images; \
+		make $(JDK_MAKE_OPTS) CONF=$(MODE) images; \
 		[[ $$? -eq 0 ]] || exit 127; \
 	}
 
@@ -205,7 +236,7 @@ build_jdk25u: -bootstrap
 											; \
 		fi; \
 	}
-	make $(JDK_MAKE_OPTS) CONF=linux-x86_64-server-$(MODE) hotspot jdk.jdwp.agent
+	make $(JDK_MAKE_OPTS) CONF=$(MODE) hotspot jdk.jdwp.agent
 
 ################ alternative kernel classes ########
 # here we copy the JDK25 kernel classes to separate diretory,
@@ -232,18 +263,15 @@ MY_JT_HOME := $(WORKSPACE)/.jtreg
 JTREG := $(MY_JT_HOME)/bin/jtreg
 
 $(JTREG):
-	$(eval JTREG_URL := https://builds.shipilev.net/jtreg/jtreg5.1-b01.zip)
-	$(eval JTREG_ZIP := $(shell basename $(JTREG_URL)))
-	@echo "Installing jtreg5.1 to $(MY_JT_HOME)"
-	{ \
-		rm -f $(JTREG_ZIP);\
-		wget -q $(JTREG_URL); \
-		unzip -o -q $(JTREG_ZIP) && mv jtreg .jtreg && rm -fr $(JTREG_ZIP); \
-	}
+	$(call setup_download_artifact, \
+		"https://builds.shipilev.net/jtreg/jtreg5.1-b01.zip", \
+		"$(MY_JT_HOME)/jtreg.zip", \
+		"346baca6ca2d49aa5225d5a8c0594ddc", \
+		"$(MY_JT_HOME)")
 
 # minimize the effort to download source code
 ifeq ($(SKIP_BUILD), true)
--setup_jtreg8: -init-dirs $(JTREG) jdk8u/jdk/src
+-setup_jtreg8: -init-dirs $(JTREG) $(JDK8_SRCROOT)/jdk
 else
 -setup_jtreg8: $(JTREG) jdk8vm25
 endif
@@ -275,7 +303,7 @@ define overlay_single
 	$(eval FILEPATH=$(2))
 	$(eval DESTDIR=$(3))
 	@{ test -e $(DESTDIR)/$(FILEPATH)_origin || cp -f $(DESTDIR)/$(FILEPATH) $(DESTDIR)/$(FILEPATH)_origin; }
-	@{ cd cvm/overlay/$(REPO) && cp -f --parents $(FILEPATH) $(DESTDIR)/; }
+	@{ cd $(CVM8_SRCROOT)/overlay/$(REPO) && cp -f --parents $(FILEPATH) $(DESTDIR)/; }
 endef
 
 JT_OPTS_EXCLUDE=-exclude:$(JDK8_SRCROOT)/jdk/test/ProblemList.txt -exclude:$(CVM8_SRCROOT)/conf/jtreg_jdk8_excludes.list
