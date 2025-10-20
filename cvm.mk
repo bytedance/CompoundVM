@@ -36,7 +36,7 @@ CVM8_SRCROOT := $(WORKSPACE)/cvm
 JDK8_SRCROOT := $(CVM8_SRCROOT)/jdk8u
 SRC_BUILDDIR_8 :=
 SRC_BUILDDIR_25 :=
-SCRIPTS_DIR ?= $(WORKSPACE)/scripts
+SCRIPTS_DIR ?= $(CVM8_SRCROOT)/scripts
 SKIP_BUILD ?= false
 
 # compile set of alternative kernel/application classes
@@ -315,6 +315,21 @@ test_jtreg8_langtools: -setup_jtreg8 -overlay-langtools8
 	$(eval JT_REPO = langtools)
 	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
 
+jtreg8_gen_rerun:
+	@echo "Generating re-run scripts for ${JT_TEST}"
+	$(eval JTR_PATH=${JT8_WORKDIR}/$(subst .java,.jtr,${JT_TEST}))
+	@{ \
+    [[ "x${JT_TEST}" = "x" ]] && { echo "Please specify JT_TEST=<tests selection>"; exit 128; }; \
+		[[ -f "${JTR_PATH}" ]] || { echo "${JTR_PATH} file not found, please try to reproduce first: make test_jtreg JT_TEST=<tests selection>"; exit 128; }; \
+		bash ${SCRIPTS_DIR}/gen_rerun.sh ${JTR_PATH}; \
+	}
+
+gdb_jtreg8: jtreg8_gen_rerun
+	bash ${JTR_PATH}.gdb.sh
+
+jdwp_jtreg8: jtreg8_gen_rerun
+	bash ${JTR_PATH}.jdwp.sh
+
 ################# Help ########################
 help:
 	@echo "Makefile for CVM project"
@@ -337,3 +352,10 @@ help:
 	@echo "                     Run CVM8 jtreg8 tests in directory jdk8u/hotspot/test"
 	@echo "  make test_cvm8 JT_TEST=<test selection>"
 	@echo "                     Run additional jtreg8 tests for CVM8 in directory test"
+	@echo "Debug:"
+	@echo "  make gdb_jtreg8 JT_TEST=<test result jtr>"
+	@echo "                     Start GDB session to debug given CVM8 jtreg8 testcase"
+	@echo "  make jdwp_jtreg8 JT_TEST=<test result jtr>"
+	@echo "                     Start JDWP server to debug given CVM8 jtreg8 testcase"
+	@echo "  make jtreg8_gen_rerun JT_TEST=<test selection>"
+	@echo "                     Generate re-run, jdwp, and gdb scripts for the given testcase"
