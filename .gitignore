@@ -25,3 +25,8 @@ NashornProfile.txt
 **/core.[0-9]*
 *.rej
 *.orig
+/.bootjdks/
+/.jtreg/
+/cvm/build/
+/cvm/jdk8u/
+/output/
