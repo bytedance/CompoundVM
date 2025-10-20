@@ -134,13 +134,6 @@ JVM_ENTRY(jint, JVM_GetStackTraceDepth(JNIEnv *env, jobject throwable))
   return java_lang_Throwable::depth(exception);
 JVM_END
 
-JVM_ENTRY(jobject, JVM_GetStackTraceElement(JNIEnv *env, jobject throwable, jint index))
-  JvmtiVMObjectAllocEventCollector oam; // This ctor (throughout this module) may trigger a safepoint/GC
-  Handle exception(THREAD, JNIHandles::resolve(throwable));
-  oop element = java_lang_Throwable::get_stack_trace_element(exception, index, CHECK_NULL);
-  return JNIHandles::make_local(THREAD, element);
-JVM_END
-
 // java.lang.Compiler ////////////////////////////////////////////////////
 
 // The initial cuts of the HotSpot VM will not support JITs, and all existing

@@ -889,17 +889,6 @@ public class Throwable implements Serializable {
     native int getStackTraceDepth();
 
     /**
-     * Returns the specified element of the stack trace.
-     *
-     * package-protection for use by SharedSecrets.
-     *
-     * @param index index of the element to return.
-     * @throws IndexOutOfBoundsException if {@code index < 0 ||
-     *         index >= getStackTraceDepth() }
-     */
-    native StackTraceElement getStackTraceElement(int index);
-
-    /**
      * Reads a {@code Throwable} from a stream, enforcing
      * well-formedness constraints on fields.  Null entries and
      * self-pointers are not allowed in the list of {@code

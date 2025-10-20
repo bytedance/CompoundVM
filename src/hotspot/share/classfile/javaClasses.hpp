@@ -689,9 +689,6 @@ class java_lang_Throwable: AllStatic {
 
   // Programmatic access to stack trace
   static void get_stack_trace_elements(int depth, Handle backtrace, objArrayHandle stack_trace, TRAPS);
-#if HOTSPOT_TARGET_CLASSLIB == 8
-  static oop  get_stack_trace_element(Handle throwable, int index, TRAPS);
-#endif
 
   // For recreating class initialization error exceptions.
   static Handle create_initialization_error(JavaThread* current, Handle throwable);
