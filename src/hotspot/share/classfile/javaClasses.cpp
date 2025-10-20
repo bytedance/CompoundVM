@@ -3173,28 +3173,6 @@ void java_lang_Throwable::fill_in_stack_trace_of_preallocated_backtrace(Handle t
   assert(java_lang_Throwable::unassigned_stacktrace() != nullptr, "not initialized");
 }
 
-#if HOTSPOT_TARGET_CLASSLIB == 8
-oop java_lang_Throwable::get_stack_trace_element(Handle throwable, int index, TRAPS) {
-  if (throwable.is_null()) {
-    THROW_0(vmSymbols::java_lang_NullPointerException());
-  }
-  if (index < 0) {
-    THROW_(vmSymbols::java_lang_IndexOutOfBoundsException(), NULL);
-  }
-  int n = depth(throwable());
-  if (n <= 0 || n <= index) {
-    THROW_(vmSymbols::java_lang_IndexOutOfBoundsException(), NULL);
-  }
-  // just to avoid introducing j.l.StackFrameInfo to kernel class set.
-  // this should work as long as JVM does not embed an object into another.
-  ObjArrayKlass* arrayKlass = ObjArrayKlass::cast(vmClasses::Object_klass()->array_klass(n, THREAD));
-  objArrayHandle arrh(THREAD, arrayKlass->allocate(n, THREAD));
-  objArrayHandle backtraceh(THREAD, (objArrayOop)java_lang_Throwable::backtrace(throwable()));
-  get_stack_trace_elements(arrh->length(), backtraceh, arrh, THREAD);
-  return arrh->obj_at(index);
-}
-#endif
-
 void java_lang_Throwable::get_stack_trace_elements(int depth, Handle backtrace,
                                                    objArrayHandle stack_trace_array_h, TRAPS) {
 

@@ -121,9 +121,6 @@ JVM_IsNaN(jdouble d);
 JNIEXPORT jint JNICALL
 JVM_GetStackTraceDepth(JNIEnv *env, jobject throwable);
 
-JNIEXPORT jobject JNICALL
-JVM_GetStackTraceElement(JNIEnv *env, jobject throwable, jint index);
-
 JNIEXPORT void JNICALL
 JVM_InitializeCompiler (JNIEnv *env, jclass compCls);
 
