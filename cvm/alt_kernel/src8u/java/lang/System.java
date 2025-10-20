@@ -1273,7 +1273,10 @@ public final class System {
                 return t.getStackTraceDepth();
             }
             public StackTraceElement getStackTraceElement(Throwable t, int i) {
-                return t.getStackTraceElement(i);
+                if (t.getStackTrace().length == 0) {
+                  t.fillInStackTrace();
+                }
+                return t.getStackTrace()[i];
             }
             public String newStringUnsafe(char[] chars) {
                 return new String(chars, true);
