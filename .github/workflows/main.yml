@@ -30,6 +30,9 @@ permissions:
   pull-requests: write
 
 on:  
+  push:
+    branches:
+      - cvm8+25/trying_disable_c2
   pull_request:
     branches:
       - jdk17u-target8
