@@ -448,6 +448,15 @@ Reflection::VerifyClassAccessResults Reflection::verify_class_access(
     return ACCESS_OK;
   }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // Allow all accesses from jdk/internal/reflect/MagicAccessorImpl subclasses to
+  // succeed trivially.
+  if (vmClasses::reflect_MagicAccessorImpl_klass_is_loaded() &&
+      current_class->is_subclass_of(vmClasses::reflect_MagicAccessorImpl_klass())) {
+    return ACCESS_OK;
+  }
+#endif
+
   // module boundaries
   if (new_class->is_public()) {
   #if HOTSPOT_TARGET_CLASSLIB == 8
@@ -653,6 +662,14 @@ bool Reflection::verify_member_access(const Klass* current_class,
       }
     }
   }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // Allow all accesses from jdk/internal/reflect/MagicAccessorImpl subclasses to
+  // succeed trivially.
+  if (current_class->is_subclass_of(vmClasses::reflect_MagicAccessorImpl_klass())) {
+    return true;
+  }
+#endif
 
   // Check for special relaxations
   return can_relax_access_check_for(current_class, member_class, classloader_only);

@@ -325,6 +325,15 @@ void LinkResolver::check_klass_accessibility(Klass* ref_klass, Klass* sel_klass,
 
     // Names are all known to be < 64k so we know this formatted message is not excessively large.
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    if (msg == NULL) {
+      Exceptions::fthrow(
+        THREAD_AND_LOCATION,
+        vmSymbols::java_lang_IllegalAccessError(),
+        "failed to access class %s from class %s",
+        base_klass->external_name(),
+        ref_klass->external_name());
+#else
     bool same_module = (base_klass->module() == ref_klass->module());
     if (msg == nullptr) {
       Exceptions::fthrow(
@@ -336,6 +345,7 @@ void LinkResolver::check_klass_accessibility(Klass* ref_klass, Klass* sel_klass,
         (same_module) ? base_klass->joint_in_module_of_loader(ref_klass) : base_klass->class_in_module_of_loader(),
         (same_module) ? "" : "; ",
         (same_module) ? "" : ref_klass->class_in_module_of_loader());
+#endif // HOTSPOT_TARGET_CLASSLIB
     } else {
       // Use module specific message returned by verify_class_access_msg().
       Exceptions::fthrow(
@@ -599,6 +609,15 @@ void LinkResolver::check_method_accessability(Klass* ref_klass,
   if (!can_access) {
     ResourceMark rm(THREAD);
     stringStream ss;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    ss.print("class %s tried to access %s%s%smethod '%s'",
+             ref_klass->external_name(),
+             sel_method->is_abstract()  ? "abstract "  : "",
+             sel_method->is_protected() ? "protected " : "",
+             sel_method->is_private()   ? "private "   : "",
+             sel_method->external_name()
+             );
+#else
     bool same_module = (sel_klass->module() == ref_klass->module());
     ss.print("class %s tried to access %s%s%smethod '%s' (%s%s%s)",
              ref_klass->external_name(),
@@ -610,6 +629,7 @@ void LinkResolver::check_method_accessability(Klass* ref_klass,
              (same_module) ? "" : "; ",
              (same_module) ? "" : sel_klass->class_in_module_of_loader()
              );
+#endif // HOTSPOT_TARGET_CLASSLIB
 
     // For private access see if there was a problem with nest host
     // resolution, and if so report that as part of the message.
