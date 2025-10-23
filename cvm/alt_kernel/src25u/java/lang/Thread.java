@@ -237,7 +237,7 @@ public class Thread implements Runnable {
     // Additional fields for platform threads.
     // All fields, except task and terminatingThreadLocals, are accessed directly by the VM.
     private static class FieldHolder {
-        final ThreadGroup group;
+        ThreadGroup group;
         final Runnable task;
         final long stackSize;
         volatile int priority;
@@ -665,6 +665,8 @@ public class Thread implements Runnable {
             this.tid = ThreadIdentifiers.next();
         }
 
+        if (name != null)
+            g.addUnstarted();
         this.name = (name != null) ? name : genThreadName();
 
         // thread locals
@@ -1367,6 +1369,7 @@ public class Thread implements Runnable {
      * @throws IllegalThreadStateException if the thread was already started
      */
     public void start() {
+        holder.group.add(this);
         synchronized (this) {
             // zero status corresponds to state "NEW".
             if (holder.threadStatus != 0)
@@ -1477,7 +1480,10 @@ public class Thread implements Runnable {
                 container.remove(this);
             }  */
         }
-
+        if (holder.group != null) {
+            holder.group.threadTerminated(this);
+            holder.group = null;
+        }
         try {
             if (terminatingThreadLocals() != null) {
                 TerminatingThreadLocal.threadTerminated();
