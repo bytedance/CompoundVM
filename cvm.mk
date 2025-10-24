@@ -168,6 +168,16 @@ clean:
 full-clean:
 	rm -fr $(BUILDDIR) $(JDK25_SRCROOT)/build $(JDK8_SRCROOT)/build $(OUTPUTDIR)
 
+define update_debug_src
+	$(eval SRCZIP=$(1))
+	$(eval TEMPD=$(shell mktemp -d))
+	mkdir $(TEMPD)/src && unzip -q $(SRCZIP) -d $(TEMPD)/src
+	cd $(CVM8_SRCROOT)/alt_kernel/src25u && find . -type f -name "*.java" -exec cp --parents {} "${TEMPD}/src" \;
+	cd $(CVM8_SRCROOT)/alt_kernel/src8u && find . -type f -name "*.java" -exec cp --parents {} "${TEMPD}/src" \;
+	cd $(TEMPD)/src && zip -q -r $(SRCZIP) .
+	rm -rf $(TEMPD)
+endef
+
 jdk8vm25: build_jdk8u build_jdk25u altkernel
 	@echo
 	@echo "###### Composing CVM8 ######"
@@ -198,6 +208,7 @@ ifeq ($(MODE), release)
 	find $(OUTPUTDIR)/$(DISTRO_NAME) -name '*.diz' -execdir rm -f {} +
 	rm -fr $(OUTPUTDIR)/$(DISTRO_NAME)/demo
 endif
+	$(call update_debug_src,$(OUTPUTDIR)/$(DISTRO_NAME)/src.zip)
 	@echo "###### Done ######"
 	@echo
 
