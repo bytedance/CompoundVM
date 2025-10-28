@@ -1070,7 +1070,7 @@ public class Thread implements Runnable {
      * This is not a public constructor.
      */
     Thread(Runnable target, AccessControlContext acc) {
-        this(null, null, 0, target, 0);
+        this(null, target, genThreadName(), 0, false);
     }
 
     /**
