@@ -2625,4 +2625,7 @@ public class Thread implements Runnable {
 
     // The address of the next thread identifier, see ThreadIdentifiers.
     private static native long getNextThreadIdOffset();
+
+    /* The inherited AccessControlContext of this thread */
+    private AccessControlContext inheritedAccessControlContext;
 }
