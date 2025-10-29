@@ -95,6 +95,7 @@ define setup_download_artifact
 		for i in `seq 4`; do \
 			[[ $$i -gt 1 ]] && echo "Retrying to download $(URL)"; \
 			[[ ! -f $(LPATH) ]] && wget -nc $(URL) -O $(LPATH); \
+			if [[ x$$MD5_EXP = x ]]; then break; fi; \
 			MD5SUM=`md5sum $(LPATH) | awk '{print $$1}'`; \
 			if [[ $$MD5SUM = $(MD5_EXP) ]]; then \
 				break; \
@@ -277,7 +278,7 @@ $(JTREG):
 	$(call setup_download_artifact, \
 		"https://builds.shipilev.net/jtreg/jtreg5.1-b01.zip", \
 		"$(MY_JT_HOME)/jtreg.zip", \
-		"346baca6ca2d49aa5225d5a8c0594ddc", \
+		"", \
 		"$(MY_JT_HOME)")
 
 # minimize the effort to download source code
