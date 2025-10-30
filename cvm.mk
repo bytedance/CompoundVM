@@ -285,7 +285,7 @@ $(JTREG):
 ifeq ($(SKIP_BUILD), true)
 -setup_jtreg8: -init-dirs $(JTREG) $(JDK8_SRCROOT)/jdk
 else
--setup_jtreg8: $(JTREG) jdk8vm25
+-setup_jtreg8: $(JTREG) cvm8default25
 endif
 	$(eval JT8_OPTS=-jdk:${CVM8DIR} -w:${JT8_WORKDIR} -r:${JT8_REPORTDIR} -a -ea -esa -ignore:quiet -ovm -v:fail,error,time -javaoption:-server25 ${JT8_OPTS})
 
@@ -330,7 +330,7 @@ JT_OPTS_EXCLUDE=-exclude:$(JDK8_SRCROOT)/jdk/test/ProblemList.txt -exclude:$(CVM
 	$(call overlay_single,jdk8u,langtools/test/tools/javac/annotations/8218152/MalformedAnnotationProcessorTests.java, $(JDK8_SRCROOT))
 	$(call overlay_single,jdk8u,langtools/test/tools/javac/6508981/TestInferBinaryName.java, $(JDK8_SRCROOT))
 
-test_jtreg8: -setup_jtreg8 -overlay-jdk8  -overlay-langtools8
+test_jtreg8: -setup_jtreg8 -overlay-jdk8 -overlay-langtools8
 	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST))
 
 test_cvm8: -setup_jtreg8
