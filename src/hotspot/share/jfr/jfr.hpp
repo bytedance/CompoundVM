@@ -60,7 +60,11 @@ class Jfr : AllStatic {
   static bool is_excluded(Thread* thread);
   static void include_thread(Thread* thread);
   static void exclude_thread(Thread* thread);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static void on_klass_creation(InstanceKlass*& ik, ClassFileParser& parser, TRAPS) { }
+#else
   static void on_klass_creation(InstanceKlass*& ik, ClassFileParser& parser, TRAPS);
+#endif
   static void on_klass_redefinition(const InstanceKlass* ik, Thread* thread);
   static void on_thread_start(Thread* thread);
   static void on_thread_exit(Thread* thread);
