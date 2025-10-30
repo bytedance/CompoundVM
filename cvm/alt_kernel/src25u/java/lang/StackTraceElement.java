@@ -40,6 +40,21 @@ import java.util.Objects;
  * @author Josh Bloch
  */
 public final class StackTraceElement implements java.io.Serializable {
+    private transient Class<?> declaringClassObject;
+
+    // Normally initialized by VM
+    /**
+     * @serial The name of the class loader.
+     */
+    private String classLoaderName;
+    /**
+     * @serial The module name.
+     */
+    private String moduleName;
+    /**
+     * @serial The module version.
+     */
+    private String moduleVersion;
     // Normally initialized by VM (public constructor added in 1.5)
     private String declaringClass;
     private String methodName;
