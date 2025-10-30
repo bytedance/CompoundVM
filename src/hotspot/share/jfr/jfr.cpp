@@ -79,6 +79,7 @@ void Jfr::on_unloading_classes() {
   }
 }
 
+#if HOTSPOT_TARGET_CLASSLIB != 8
 void Jfr::on_klass_creation(InstanceKlass*& ik, ClassFileParser& parser, TRAPS) {
   if (IS_EVENT_OR_HOST_KLASS(ik)) {
     JfrEventClassTransformer::on_klass_creation(ik, parser, THREAD);
@@ -88,6 +89,7 @@ void Jfr::on_klass_creation(InstanceKlass*& ik, ClassFileParser& parser, TRAPS) 
     JfrMethodTracer::on_klass_creation(ik, parser, THREAD);
   }
 }
+#endif
 
 void Jfr::on_klass_redefinition(const InstanceKlass* ik, const InstanceKlass* scratch_klass) {
   JfrTraceTagging::on_klass_redefinition(ik, scratch_klass);
