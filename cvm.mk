@@ -242,9 +242,11 @@ build_jdk25u: -bootstrap
 											--with-vendor-url="https://github.com/bytedance/CompoundVM" \
 											--with-vendor-bug-url="https://github.com/bytedance/CompoundVM/issues" \
 											--with-vendor-vm-bug-url="https://github.com/bytedance/CompoundVM/issues" \
+											--with-version-build=8 \
 											--without-version-pre \
 											--without-version-opt \
 											--with-vendor-name="CompoundVM" \
+											--with-cvm-version-string=$(VERSION) \
 											; \
 		fi; \
 	}

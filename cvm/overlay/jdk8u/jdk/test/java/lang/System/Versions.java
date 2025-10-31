@@ -76,7 +76,7 @@ public class Versions {
         String runtimeVersion = getProperty("java.runtime.version");
         String specVersion    = getProperty("java.specification.version");
 
-        boolean isCVM = VMSpecVersion.equals("17");
+        boolean isCVM = VMSpecVersion.equals("25");
 
         if (! (javaVersion.startsWith(specVersion) &&
                runtimeVersion.startsWith(specVersion)))
