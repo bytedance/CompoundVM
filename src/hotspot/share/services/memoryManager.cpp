@@ -82,7 +82,11 @@ instanceOop MemoryManager::get_memory_manager_instance(TRAPS) {
   if (!Atomic::load_acquire(&_memory_mgr_obj_initialized)) {
     // It's ok for more than one thread to execute the code up to the locked region.
     // Extra manager instances will just be gc'ed.
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    Klass* k = Management::sun_management_ManagementFactory_klass(CHECK_NULL);
+#else
     Klass* k = Management::sun_management_ManagementFactoryHelper_klass(CHECK_NULL);
+#endif
 
     Handle mgr_name = java_lang_String::create_from_str(name(), CHECK_NULL);
 

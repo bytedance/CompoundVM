@@ -48,6 +48,9 @@ private:
   static InstanceKlass*     _garbageCollectorExtImpl_klass;
   static InstanceKlass*     _garbageCollectorMXBean_klass;
   static InstanceKlass*     _gcInfo_klass;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static InstanceKlass*     _managementFactory_klass;
+#endif
   static InstanceKlass*     _managementFactoryHelper_klass;
   static InstanceKlass*     _memoryManagerMXBean_klass;
   static InstanceKlass*     _memoryPoolMXBean_klass;
@@ -82,6 +85,10 @@ public:
   static InstanceKlass* java_lang_management_MemoryPoolMXBean_klass(TRAPS);
   static InstanceKlass* java_lang_management_MemoryManagerMXBean_klass(TRAPS);
   static InstanceKlass* java_lang_management_GarbageCollectorMXBean_klass(TRAPS);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  static InstanceKlass* sun_management_ManagementFactory_klass(TRAPS)
+      NOT_MANAGEMENT_RETURN_(nullptr);
+#endif
   static InstanceKlass* sun_management_ManagementFactoryHelper_klass(TRAPS)
       NOT_MANAGEMENT_RETURN_(nullptr);
   static InstanceKlass* sun_management_Sensor_klass(TRAPS)

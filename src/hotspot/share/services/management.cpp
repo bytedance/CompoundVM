@@ -79,6 +79,9 @@ InstanceKlass* Management::_diagnosticCommandImpl_klass = nullptr;
 InstanceKlass* Management::_garbageCollectorExtImpl_klass = nullptr;
 InstanceKlass* Management::_garbageCollectorMXBean_klass = nullptr;
 InstanceKlass* Management::_gcInfo_klass = nullptr;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+InstanceKlass* Management::_managementFactory_klass = nullptr;
+#endif
 InstanceKlass* Management::_managementFactoryHelper_klass = nullptr;
 InstanceKlass* Management::_memoryManagerMXBean_klass = nullptr;
 InstanceKlass* Management::_memoryPoolMXBean_klass = nullptr;
@@ -279,6 +282,15 @@ InstanceKlass* Management::sun_management_Sensor_klass(TRAPS) {
   }
   return _sensor_klass;
 }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+InstanceKlass* Management::sun_management_ManagementFactory_klass(TRAPS) {
+  if (_managementFactory_klass == NULL) {
+    _managementFactory_klass = load_and_initialize_klass(vmSymbols::sun_management_ManagementFactory(), CHECK_NULL);
+  }
+  return _managementFactory_klass;
+}
+#endif
 
 InstanceKlass* Management::sun_management_ManagementFactoryHelper_klass(TRAPS) {
   if (_managementFactoryHelper_klass == nullptr) {
