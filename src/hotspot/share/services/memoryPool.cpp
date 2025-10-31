@@ -93,8 +93,11 @@ instanceOop MemoryPool::get_memory_pool_instance(TRAPS) {
   if (!Atomic::load_acquire(&_memory_pool_obj_initialized)) {
     // It's ok for more than one thread to execute the code up to the locked region.
     // Extra pool instances will just be gc'ed.
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    InstanceKlass* ik = Management::sun_management_ManagementFactory_klass(CHECK_NULL);
+#else
     InstanceKlass* ik = Management::sun_management_ManagementFactoryHelper_klass(CHECK_NULL);
-
+#endif
     Handle pool_name = java_lang_String::create_from_str(_name, CHECK_NULL);
     jlong usage_threshold_value = (_usage_threshold->is_high_threshold_supported() ? 0 : -1L);
     jlong gc_usage_threshold_value = (_gc_usage_threshold->is_high_threshold_supported() ? 0 : -1L);
