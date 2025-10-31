@@ -46,8 +46,8 @@ public class Version {
         if (!jdk.equals(v1)) {
             throw new RuntimeException("Unmatched version: " + jdk + " vs " + v1);
         }
-        VersionInfo jvm = System.getProperty("java.vm.specification.version").equals("17") ?
-                jvm17VersionInfo(System.getProperty("java.vm.version"))
+        VersionInfo jvm = System.getProperty("java.vm.specification.version").equals("25") ?
+                jvm25VersionInfo(System.getProperty("java.vm.version"))
                 : jvmVersionInfo(System.getProperty("java.vm.version"));
         VersionInfo v2 = new VersionInfo(jvmMajorVersion(),
                                          jvmMinorVersion(),
@@ -138,8 +138,8 @@ public class Version {
         return vi;
     }
 
-    private static VersionInfo jvm17VersionInfo(String version) throws Exception {
-        // According to jdk-version.m4 in jdk17u
+    private static VersionInfo jvm25VersionInfo(String version) throws Exception {
+        // According to jdk-version.m4 in jdk25u
         // valid format of the version string is:
         // <major>[.<minor>][.<update>][.<patch>[-<version_pre>]+<build>[-<version_opt>]
         int major = 0;
