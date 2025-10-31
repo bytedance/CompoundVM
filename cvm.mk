@@ -325,6 +325,7 @@ JT_OPTS_EXCLUDE=-exclude:$(JDK8_SRCROOT)/jdk/test/ProblemList.txt -exclude:$(CVM
 	$(call overlay_single,jdk8u,jdk/test/com/sun/jdi/RedefineCrossEvent.java,$(JDK8_SRCROOT))
 	$(call overlay_single,jdk8u,jdk/test/java/lang/System/Versions.java,$(JDK8_SRCROOT))
 	$(call overlay_single,jdk8u,jdk/test/sun/misc/Version/Version.java,$(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,jdk/test/java/lang/ref/OOMEInReferenceHandler.java,$(JDK8_SRCROOT))
 
 -overlay-langtools8:
 	$(call overlay_single,jdk8u,langtools/test/tools/javac/annotations/8218152/MalformedAnnotationProcessorTests.java, $(JDK8_SRCROOT))
