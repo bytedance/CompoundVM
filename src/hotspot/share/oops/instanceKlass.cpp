@@ -746,9 +746,13 @@ void InstanceKlass::deallocate_contents(ClassLoaderData* loader_data) {
 }
 
 bool InstanceKlass::is_record() const {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  return false;
+#else
   return _record_components != nullptr &&
          is_final() &&
          java_super() == vmClasses::Record_klass();
+#endif
 }
 
 bool InstanceKlass::is_sealed() const {
@@ -3067,11 +3071,13 @@ bool InstanceKlass::in_javabase_module() const {
 
 void InstanceKlass::set_package(ClassLoaderData* loader_data, PackageEntry* pkg_entry, TRAPS) {
 
+#if HOTSPOT_TARGET_CLASSLIB != 8
   // ensure java/ packages only loaded by boot or platform builtin loaders
   // not needed for shared class since CDS does not archive prohibited classes.
   if (!is_shared()) {
     check_prohibited_package(name(), loader_data, CHECK);
   }
+#endif
 
   if (is_shared() && _package_entry != nullptr) {
     if (CDSConfig::is_using_full_module_graph() && _package_entry == pkg_entry) {
@@ -3151,6 +3157,9 @@ void InstanceKlass::set_package(ClassLoaderData* loader_data, PackageEntry* pkg_
 // classes are loaded by the boot loader) that at least one of the package's
 // classes has been loaded.
 void InstanceKlass::set_classpath_index(s2 path_index) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  _classpath_index = path_index;
+#endif
   if (_package_entry != nullptr) {
     DEBUG_ONLY(PackageEntryTable* pkg_entry_tbl = ClassLoaderData::the_null_class_loader_data()->packages();)
     assert(pkg_entry_tbl->lookup_only(_package_entry->name()) == _package_entry, "Should be same");

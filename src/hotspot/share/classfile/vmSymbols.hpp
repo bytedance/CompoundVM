@@ -50,9 +50,48 @@ class SerializeClosure;
 #define VM_SYMBOL_IGNORE(id, name)                       /*ignored*/
 #define VM_ALIAS_IGNORE(id, id2)                         /*ignored*/
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define WAIT_NAME "wait"
+#else
+#define WAIT_NAME "wait0"
+#endif
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define VM_SYMBOLS_DO_BY_CLASSLIB(template, do_alias)                                             \
+  template(jdk_internal_reflect,                      "sun/reflect")                              \
+  template(reflect_Reflection,                        "sun/reflect/Reflection")                   \
+  template(reflect_ConstantPool,                      "sun/reflect/ConstantPool")                 \
+  template(reflect_MethodAccessorImpl,                "sun/reflect/MethodAccessorImpl")           \
+  template(reflect_CallerSensitive,                   "sun/reflect/CallerSensitive")              \
+  template(reflect_CallerSensitive_signature,         "Lsun/reflect/CallerSensitive;")            \
+  template(reflect_MagicAccessorImpl,                 "sun/reflect/MagicAccessorImpl")            \
+  template(vmloader_name,                             "vmloader")                                 \
+  template(java_security_PrivilegedActionException,   "java/security/PrivilegedActionException")  \
+  template(exception_void_signature,                  "(Ljava/lang/Exception;)V")                 \
+  template(classloader_string_long_signature,         "(Ljava/lang/ClassLoader;Ljava/lang/String;)J")             \
+  template(sun_management_ManagementFactory,          "sun/management/ManagementFactory")         \
+  template(sun_misc_PostVMInitHook,                   "sun/misc/PostVMInitHook")                  \
+  template(sun_misc_Launcher_AppClassLoader,          "sun/misc/Launcher$AppClassLoader")         \
+  template(sun_misc_Launcher_ExtClassLoader,          "sun/misc/Launcher$ExtClassLoader")         \
+  template(java_lang_ClassLoader_NativeLibrary,       "java/lang/ClassLoader\x024NativeLibrary")  \
+
+
+#else
+#define VM_SYMBOLS_DO_BY_CLASSLIB(template, do_alias)                                             \
+  template(jdk_internal_reflect,                      "jdk/internal/reflect")                     \
+  template(reflect_Reflection,                        "jdk/internal/reflect/Reflection")          \
+  template(reflect_ConstantPool,                      "jdk/internal/reflect/ConstantPool")        \
+  template(reflect_MethodAccessorImpl,                "jdk/internal/reflect/MethodAccessorImpl")  \
+  template(reflect_CallerSensitive,                   "jdk/internal/reflect/CallerSensitive")     \
+  template(reflect_CallerSensitive_signature,         "Ljdk/internal/reflect/CallerSensitive;")   \
+
+
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
+
 // Mapping function names to values. New entries should be added below.
 
 #define VM_SYMBOLS_DO(template, do_alias)                                                         \
+  VM_SYMBOLS_DO_BY_CLASSLIB(template, do_alias)                                                   \
   /* commonly used class, package, module names */                                                \
   template(java_base,                                 "java.base")                                \
   template(java_lang_System,                          "java/lang/System")                         \
@@ -257,11 +296,6 @@ class SerializeClosure;
                                                                                                   \
   /* Support for reflection based on dynamic bytecode generation (JDK 1.4 and above) */           \
                                                                                                   \
-  template(jdk_internal_reflect,                      "jdk/internal/reflect")                     \
-  template(reflect_MethodAccessorImpl,                "jdk/internal/reflect/MethodAccessorImpl")      \
-  template(reflect_Reflection,                        "jdk/internal/reflect/Reflection")              \
-  template(reflect_CallerSensitive,                   "jdk/internal/reflect/CallerSensitive")         \
-  template(reflect_CallerSensitive_signature,         "Ljdk/internal/reflect/CallerSensitive;")       \
   template(reflect_DirectConstructorHandleAccessor_NativeAccessor,   "jdk/internal/reflect/DirectConstructorHandleAccessor$NativeAccessor") \
   template(clazz_name,                                "clazz")                                    \
   template(exceptionTypes_name,                       "exceptionTypes")                           \
@@ -289,7 +323,6 @@ class SerializeClosure;
   template(executable_name,                           "executable")                               \
   template(parameter_annotations_name,                "parameterAnnotations")                     \
   template(annotation_default_name,                   "annotationDefault")                        \
-  template(reflect_ConstantPool,                      "jdk/internal/reflect/ConstantPool")        \
   template(base_name,                                 "base")                                     \
   /* Type Annotations (JDK 8 and above) */                                                        \
   template(type_annotations_name,                     "typeAnnotations")                          \
@@ -437,7 +470,7 @@ class SerializeClosure;
   template(getCause_name,                             "getCause")                                 \
   template(initCause_name,                            "initCause")                                \
   template(getProperty_name,                          "getProperty")                              \
-  template(wait_name,                                 "wait0")                                    \
+  template(wait_name,                                 WAIT_NAME)                                  \
   template(forName_name,                              "forName")                                  \
   template(forName0_name,                             "forName0")                                 \
   template(isJavaIdentifierStart_name,                "isJavaIdentifierStart")                    \

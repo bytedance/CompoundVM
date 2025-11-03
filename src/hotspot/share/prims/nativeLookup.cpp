@@ -212,6 +212,9 @@ extern "C" {
   jlong    JNICALL JVM_ReadSystemPropertiesInfo(JNIEnv *env, jclass c, jintArray offsets);
   void     JNICALL JVM_RegisterJVMCINatives(JNIEnv *env, jclass compilerToVMClass);
 #endif
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  void     JNICALL JVM_RegisterSunMiscUnsafeMethods(JNIEnv *env, jclass unsafeclass);
+#endif
 }
 
 #define CC (char*)  /* cast a literal from (const char*) */
@@ -236,6 +239,10 @@ static JNINativeMethod lookup_special_native_methods[] = {
   { CC"Java_jdk_jfr_internal_JVM_registerNatives",                 nullptr, FN_PTR(jfr_register_natives)            },
 #endif
   { CC"Java_jdk_internal_misc_ScopedMemoryAccess_registerNatives", nullptr, FN_PTR(JVM_RegisterJDKInternalMiscScopedMemoryAccessMethods) },
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  { CC"Java_sun_misc_Perf_registerNatives",                        nullptr, FN_PTR(JVM_RegisterPerfMethods)         },
+  { CC"Java_sun_misc_Unsafe_registerNatives",                      nullptr, FN_PTR(JVM_RegisterSunMiscUnsafeMethods)       },
+#endif
 };
 
 static address lookup_special_native(const char* jni_name) {
@@ -248,6 +255,22 @@ static address lookup_special_native(const char* jni_name) {
   }
   return nullptr;
 }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#include "classfile/classLoader.inline.hpp"
+static void* bootclass_lookup_lib(const methodHandle& method) {
+   {
+     ResourceMark rm;
+     const char* cp = ClassLoader::classpath_entry(method->method_holder()->classpath_index())->name();
+     if ((strstr(cp, "/rt25.jar") != NULL) || (strstr(cp, "/rt8.jar") != NULL)) {
+       log_debug(library)("library25 %s for %s", cp, method->external_name());
+       return os::native_java_library25();
+     }
+     log_debug(library)("library8 %s for %s", cp, method->external_name());
+   }
+  return os::native_java_library();
+}
+#endif
 
 address NativeLookup::lookup_style(const methodHandle& method, char* pure_name, const char* long_name, int args_size, TRAPS) {
   address entry;
@@ -263,7 +286,15 @@ address NativeLookup::lookup_style(const methodHandle& method, char* pure_name, 
   if (loader.is_null()) {
     entry = lookup_special_native(jni_name);
     if (entry == nullptr) {
-       entry = (address) os::dll_lookup(os::native_java_library(), jni_name);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+      entry = (address) os::dll_lookup(bootclass_lookup_lib(method), jni_name);
+      // Find symbols in libjava.so if doesn't exist in libjava25.so
+      if (entry == nullptr) {
+        entry = (address) os::dll_lookup(os::native_java_library(), jni_name);
+      }
+#else
+      entry = (address) os::dll_lookup(os::native_java_library(), jni_name);
+#endif
     }
     if (entry != nullptr) {
       return entry;
@@ -277,6 +308,18 @@ address NativeLookup::lookup_style(const methodHandle& method, char* pure_name, 
   Handle java_name_arg = java_lang_String::create_from_str(method->name()->as_C_string(), CHECK_NULL);
 
   JavaCallArguments args;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  args.push_oop(loader);
+  args.push_oop(jni_name_arg);
+
+  JavaValue result(T_LONG);
+  JavaCalls::call_static(&result,
+                         klass,
+                         vmSymbols::findNative_name(),
+                         vmSymbols::classloader_string_long_signature(),
+                         &args,
+                         CHECK_NULL);
+#else
   args.push_oop(loader);
   args.push_oop(jni_class);
   args.push_oop(jni_name_arg);
@@ -289,6 +332,7 @@ address NativeLookup::lookup_style(const methodHandle& method, char* pure_name, 
                          vmSymbols::classloader_class_string_string_long_signature(),
                          &args,
                          CHECK_NULL);
+#endif
   entry = (address) (intptr_t) result.get_jlong();
 
   if (entry == nullptr) {
@@ -399,6 +443,7 @@ address NativeLookup::lookup_base(const methodHandle& method, TRAPS) {
   entry = lookup_entry_prefixed(method, CHECK_NULL);
   if (entry != nullptr) return entry;
 
+#if HOTSPOT_TARGET_CLASSLIB != 8
   if (THREAD->has_pending_exception()) {
     oop exception = THREAD->pending_exception();
     if (exception->is_a(vmClasses::IllegalCallerException_klass())) {
@@ -406,6 +451,7 @@ address NativeLookup::lookup_base(const methodHandle& method, TRAPS) {
       return nullptr;
     }
   }
+#endif
 
   // Native function not found, throw UnsatisfiedLinkError
   stringStream ss;

@@ -44,7 +44,11 @@ extern jboolean VerifyFixClassname(char *utf_name);
 
 #define OBJ "Ljava/lang/Object;"
 #define CLS "Ljava/lang/Class;"
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define CPL "Lsun/reflect/ConstantPool;"
+#else
 #define CPL "Ljdk/internal/reflect/ConstantPool;"
+#endif
 #define STR "Ljava/lang/String;"
 #define FLD "Ljava/lang/reflect/Field;"
 #define MHD "Ljava/lang/reflect/Method;"
@@ -52,6 +56,31 @@ extern jboolean VerifyFixClassname(char *utf_name);
 #define BA  "[B"
 #define RC  "Ljava/lang/reflect/RecordComponent;"
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define PD  "Ljava/security/ProtectionDomain;"
+static JNINativeMethod methods[] = {
+    {"getName0",         "()" STR,          (void *)&JVM_GetClassName},
+    {"getSuperclass",    "()" CLS,          NULL},
+    {"getInterfaces0",   "()[" CLS,         (void *)&JVM_GetClassInterfaces},
+    {"isInterface",      "()Z",             (void *)&JVM_IsInterface},
+    {"getSigners",       "()[" OBJ,         (void *)&JVM_GetClassSigners},
+    {"setSigners",       "([" OBJ ")V",     (void *)&JVM_SetClassSigners},
+    {"isArray",          "()Z",             (void *)&JVM_IsArrayClass},
+    {"isPrimitive",      "()Z",             (void *)&JVM_IsPrimitiveClass},
+    {"getDeclaredFields0","(Z)[" FLD,       (void *)&JVM_GetClassDeclaredFields},
+    {"getDeclaredMethods0","(Z)[" MHD,      (void *)&JVM_GetClassDeclaredMethods},
+    {"getDeclaredConstructors0","(Z)[" CTR, (void *)&JVM_GetClassDeclaredConstructors},
+    {"getProtectionDomain0", "()" PD,       (void *)&JVM_GetProtectionDomain},
+    {"getDeclaredClasses0",  "()[" CLS,      (void *)&JVM_GetDeclaredClasses},
+    {"getDeclaringClass0",   "()" CLS,      (void *)&JVM_GetDeclaringClass},
+    {"getGenericSignature0", "()" STR,      (void *)&JVM_GetClassSignature},
+    {"getRawAnnotations",      "()" BA,        (void *)&JVM_GetClassAnnotations},
+    {"getConstantPool",     "()" CPL,       (void *)&JVM_GetClassConstantPool},
+    {"desiredAssertionStatus0","("CLS")Z",(void *)&JVM_DesiredAssertionStatus},
+    {"getEnclosingMethod0", "()[" OBJ,      (void *)&JVM_GetEnclosingMethodInfo},
+    {"getRawTypeAnnotations", "()" BA,      (void *)&JVM_GetClassTypeAnnotations},
+};
+#else
 static JNINativeMethod methods[] = {
     {"initClassName",    "()" STR,          (void *)&JVM_InitClassName},
     {"getSuperclass",    "()" CLS,          NULL},
@@ -77,6 +106,7 @@ static JNINativeMethod methods[] = {
     {"getClassFileVersion0", "()I",         (void *)&JVM_GetClassFileVersion},
     {"getClassAccessFlagsRaw0", "()I",      (void *)&JVM_GetClassAccessFlags},
 };
+#endif
 
 #undef OBJ
 #undef CLS

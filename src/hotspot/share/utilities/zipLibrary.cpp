@@ -81,7 +81,10 @@ static void store_function_pointers(const char* path, bool vm_exit_on_failure) {
   ZIP_Close = CAST_TO_FN_PTR(ZIP_Close_t, dll_lookup("ZIP_Close", path, vm_exit_on_failure));
   ZIP_FindEntry = CAST_TO_FN_PTR(ZIP_FindEntry_t, dll_lookup("ZIP_FindEntry", path, vm_exit_on_failure));
   ZIP_ReadEntry = CAST_TO_FN_PTR(ZIP_ReadEntry_t, dll_lookup("ZIP_ReadEntry", path, vm_exit_on_failure));
+// Seems only used in AOT, not needed in jdk8
+#if HOTSPOT_TARGET_CLASSLIB != 8
   ZIP_FreeEntry = CAST_TO_FN_PTR(ZIP_FreeEntry_t, dll_lookup("ZIP_FreeEntry", path, vm_exit_on_failure));
+#endif
   ZIP_CRC32 = CAST_TO_FN_PTR(ZIP_CRC32_t, dll_lookup("ZIP_CRC32", path, vm_exit_on_failure));
   // The following entry points are most likely optional from a zip library implementation perspective.
   // Hence no vm_exit on a resolution failure. Further refactorings should investigate this,

@@ -133,6 +133,23 @@ oop SystemDictionary::java_platform_loader() {
   return _java_platform_loader.resolve();
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+void SystemDictionary::compute_java_loaders(TRAPS) {
+  if (_java_system_loader.is_empty()) {
+    oop system_loader = get_system_class_loader_impl(CHECK);
+    _java_system_loader = OopHandle(Universe::vm_global(), system_loader);
+  } else {
+    // It must have been restored from the archived module graph
+    assert(CDSConfig::is_using_archive(), "must be");
+    assert(CDSConfig::is_using_full_module_graph(), "must be");
+    DEBUG_ONLY(
+      oop system_loader = get_system_class_loader_impl(CHECK);
+      assert(_java_system_loader.resolve() == system_loader, "must be");
+    )
+  }
+  _java_platform_loader = _java_system_loader;
+}
+#else
 void SystemDictionary::compute_java_loaders(TRAPS) {
   if (_java_platform_loader.is_empty()) {
     oop platform_loader = get_platform_class_loader_impl(CHECK);
@@ -160,6 +177,7 @@ void SystemDictionary::compute_java_loaders(TRAPS) {
     )
   }
 }
+#endif
 
 oop SystemDictionary::get_system_class_loader_impl(TRAPS) {
   JavaValue result(T_OBJECT);
@@ -233,8 +251,12 @@ bool SystemDictionary::is_system_class_loader(oop class_loader) {
   if (class_loader == nullptr) {
     return false;
   }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  return class_loader == _java_system_loader.peek();
+#else
   return (class_loader->klass() == vmClasses::jdk_internal_loader_ClassLoaders_AppClassLoader_klass() ||
          class_loader == _java_system_loader.peek());
+#endif
 }
 
 // Returns true if the passed class loader is the platform class loader.
@@ -242,8 +264,25 @@ bool SystemDictionary::is_platform_class_loader(oop class_loader) {
   if (class_loader == nullptr) {
     return false;
   }
+#if HOTSPOT_TARGET_CLASSLIB == 8
+   Handle class_loader_handle(Thread::current(), class_loader);
+  return SystemDictionary::is_ext_class_loader(class_loader_handle);
+#else
   return (class_loader->klass() == vmClasses::jdk_internal_loader_ClassLoaders_PlatformClassLoader_klass());
+#endif
 }
+
+/**
+ * Returns true if the passed class loader is the extension class loader.
+ */
+#if HOTSPOT_TARGET_CLASSLIB == 8
+bool SystemDictionary::is_ext_class_loader(Handle class_loader) {
+  if (class_loader.is_null()) {
+    return false;
+  }
+  return (class_loader->klass()->name() == vmSymbols::sun_misc_Launcher_ExtClassLoader());
+}
+#endif
 
 Handle SystemDictionary::get_loader_lock_or_null(Handle class_loader) {
   // If class_loader is null or parallelCapable, the JVM doesn't acquire a lock while loading.
@@ -894,10 +933,48 @@ InstanceKlass* SystemDictionary::resolve_class_from_stream(
   }
 
   // Make sure we have an entry in the SystemDictionary on success
+#if HOTSPOT_TARGET_CLASSLIB != 8
   DEBUG_ONLY(verify_dictionary_entry(h_name, k));
+#endif
 
   return k;
 }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+
+// Note: this method is much like resolve_from_stream, but
+// updates no supplemental data structures.
+Klass* SystemDictionary::parse_stream(Symbol* class_name,
+                                      Handle class_loader,
+                                      Handle protection_domain,
+                                      ClassFileStream* st,
+                                      Klass* host_klass,
+                                      GrowableArray<Handle>* cp_patches,
+                                      TRAPS) {
+  InstanceKlass* k;
+  {
+    // Callers are expected to declare a ResourceMark to determine
+    // the lifetime of any updated (resource) allocated under
+    // this call to parseClassFile
+    ResourceMark rm(THREAD);
+
+    // Critical part of making java/lang/invoke to work
+    ClassLoadInfo cli(protection_domain, (InstanceKlass*)(host_klass), Handle(), true, true, true);
+    k = resolve_from_stream(st, class_name, class_loader, cli, THREAD);
+  }
+
+  if (k != NULL) {
+    // Rewrite and patch constant pool here.
+    k->link_class(CHECK_NULL);
+    if (cp_patches != NULL) {
+      k->constants()->patch_resolved_references(cp_patches);
+    }
+  }
+
+  return k;
+}
+
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
 
 InstanceKlass* SystemDictionary::resolve_from_stream(ClassFileStream* st,
                                                      Symbol* class_name,
@@ -1360,7 +1437,9 @@ void SystemDictionary::define_instance_class(InstanceKlass* k, Handle class_load
   // classloader lock held
   // Parallel classloaders will call find_or_define_instance_class
   // which will require a token to perform the define class
+#if HOTSPOT_TARGET_CLASSLIB != 8
   check_constraints(k, loader_data, true, CHECK);
+#endif
 
   // Register class just loaded with class loader (placed in ArrayList)
   // Note we do this before updating the dictionary, as this can

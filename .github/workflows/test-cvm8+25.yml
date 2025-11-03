@@ -1,0 +1,108 @@
+# This project is a modified version of OpenJDK, licensed under GPL v2.
+# Modifications Copyright (C) 2025 ByteDance Inc.
+#
+# This code is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License version 2 only, as
+# published by the Free Software Foundation.  Oracle designates this
+# particular file as subject to the "Classpath" exception as provided
+# by Oracle in the LICENSE file that accompanied this code.
+#
+# This code is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+# version 2 for more details (a copy is included in the LICENSE file that
+# accompanied this code).
+#
+# You should have received a copy of the GNU General Public License version
+# 2 along with this work; if not, write to the Free Software Foundation,
+# Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+
+name: 'Run tests'
+
+on:
+  workflow_call:
+    inputs:
+      platform:
+        required: true
+        type: string
+      arch:
+        required: true
+        type: string
+      runs-on:
+        required: true
+        type: string
+      debug-level:
+        required: true
+        type: string
+
+env:
+  # These are needed to make the MSYS2 bash work properly
+  MSYS2_PATH_TYPE: minimal
+  CHERE_INVOKING: 1
+
+jobs:
+  test:
+    name: test
+    runs-on: ${{ inputs.runs-on }}
+    defaults:
+      run:
+        shell: bash
+
+    strategy:
+      fail-fast: false
+      matrix:
+        test-name:
+          - 'jdk/tier1'
+          #- 'langtools'
+          #- 'cvm8'
+
+        include:
+          - test-name: 'jdk/tier1'
+            test-suite: 'jdk_tier1'
+
+          #- test-name: 'langtools'
+          # test-suite: 'langtools'
+
+          #- test-name: 'cvm8'
+          #test-suite: 'cvm8'
+
+    steps:
+      - name: 'Checkout the JDK source'
+        uses: actions/checkout@v3
+
+      - name: 'Determine version'
+        id: version
+        run: echo "::set-output name=version::$(cat ./cvm/conf/version)"
+
+      - name: 'Get bundles'
+        uses: actions/download-artifact@v4
+        with:
+          name: CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}.tar.gz
+          path: .
+
+      - name: 'Unpack bundles'
+        run: |
+          rm -rf cvm/build/jdk8
+          mkdir -p cvm/build/jdk8
+          tar xzvf CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}.tar.gz -C cvm/build/jdk8 --strip-components=1
+        shell: bash
+
+      - name: 'Run tests'
+        id: run-tests
+        run: |
+          make -f cvm.mk test_jtreg8_${{ matrix.test-suite }} SKIP_BUILD=true MODE=${{ inputs.debug-level }}
+        shell: bash
+
+      - name: 'Get bundles jvm patch'
+        uses: actions/download-artifact@v4
+        with:
+          name: CompoundVM_${{ steps.version.outputs.version }}_jvm_patch_${{ inputs.platform }}.tar.gz
+          path: .
+
+      - name: 'Run sanity test jvm patch'
+        run: |
+          wget -nc https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u372-b07/OpenJDK8U-jdk_${{ inputs.arch }}_linux_hotspot_8u372b07.tar.gz
+          tar xzf OpenJDK8U-jdk_${{ inputs.arch }}_linux_hotspot_8u372b07.tar.gz
+          tar xzf CompoundVM_${{ steps.version.outputs.version }}_jvm_patch_${{ inputs.platform }}.tar.gz -C jdk8u372-b07/
+          jdk8u372-b07/bin/java -version 2>&1 | grep "CompoundVM"
+        shell: bash

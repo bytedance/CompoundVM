@@ -720,8 +720,59 @@ JVM_END
 
 // Misc. class handling ///////////////////////////////////////////////////////////
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(jclass, JVM_GetCallerClass(JNIEnv* env, int depth))
+  // Pre-JDK 8 and early builds of JDK 8 don't have a CallerSensitive annotation; or
+  // sun.reflect.Reflection.getCallerClass with a depth parameter is provided
+  // temporarily for existing code to use until a replacement API is defined.
+  if (vmClasses::reflect_CallerSensitive_klass() == NULL || depth != JVM_CALLER_DEPTH) {
+    Klass* k = thread->security_get_caller_class(depth);
+    return (k == NULL) ? NULL : (jclass) JNIHandles::make_local(THREAD, k->java_mirror());
+  }
 
+  // Getting the class of the caller frame.
+  //
+  // The call stack at this point looks something like this:
+  //
+  // [0] [ @CallerSensitive public sun.reflect.Reflection.getCallerClass ]
+  // [1] [ @CallerSensitive API.method                                   ]
+  // [.] [ (skipped intermediate frames)                                 ]
+  // [n] [ caller                                                        ]
+  vframeStream vfst(thread);
+  // Cf. LibraryCallKit::inline_native_Reflection_getCallerClass
+  for (int n = 0; !vfst.at_end(); vfst.security_next(), n++) {
+    Method* m = vfst.method();
+    assert(m != NULL, "sanity");
+    switch (n) {
+    case 0:
+      // This must only be called from Reflection.getCallerClass
+      // TODO: this check is for jdk/internal/reflect/Reflection; but may also be sun/reflect/Reflection
+      if (m->intrinsic_id() != vmIntrinsics::_getCallerClass) {
+        THROW_MSG_NULL(vmSymbols::java_lang_InternalError(), "JVM_GetCallerClass must only be called from Reflection.getCallerClass");
+      }
+      // fall-through
+    case 1:
+      // Frame 0 and 1 must be caller sensitive.
+      // TODO: this check is for jdk/internal/reflect/Reflection; but may also be sun/reflect/Reflection
+      if (!m->caller_sensitive()) {
+        THROW_MSG_NULL(vmSymbols::java_lang_InternalError(), err_msg("CallerSensitive annotation expected at frame %d", n));
+      }
+      break;
+    default:
+      if (!m->is_ignored_by_security_stack_walk()) {
+        // We have reached the desired frame; return the holder class.
+        return (jclass) JNIHandles::make_local(THREAD, m->method_holder()->java_mirror());
+      }
+      break;
+    }
+  }
+  return NULL;
+JVM_END
+
+JVM_ENTRY(jclass, JVM_GetCallerClass17(JNIEnv* env))
+#else
 JVM_ENTRY(jclass, JVM_GetCallerClass(JNIEnv* env))
+#endif // HOTSPOT_TARGET_CLASSLIB
   // Getting the class of the caller frame.
   //
   // The call stack at this point looks something like this:
@@ -1620,6 +1671,7 @@ JVM_END
 // even if the class is not a record.
 JVM_ENTRY(jobjectArray, JVM_GetRecordComponents(JNIEnv* env, jclass ofClass))
 {
+#if HOTSPOT_TARGET_CLASSLIB != 8
   Klass* c = java_lang_Class::as_Klass(JNIHandles::resolve_non_null(ofClass));
   assert(c->is_instance_klass(), "must be");
   InstanceKlass* ik = InstanceKlass::cast(c);
@@ -1642,6 +1694,7 @@ JVM_ENTRY(jobjectArray, JVM_GetRecordComponents(JNIEnv* env, jclass ofClass))
     }
     return (jobjectArray)JNIHandles::make_local(THREAD, components_h());
   }
+#endif
 
   return nullptr;
 }
@@ -2916,7 +2969,11 @@ JVM_ENTRY(jobject, JVM_CurrentCarrierThread(JNIEnv* env, jclass threadClass))
 JVM_END
 
 JVM_ENTRY(jobject, JVM_CurrentThread(JNIEnv* env, jclass threadClass))
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  oop theThread = thread->threadObj();
+#else
   oop theThread = thread->vthread();
+#endif
   assert(theThread != (oop)nullptr, "no current thread!");
   return JNIHandles::make_local(THREAD, theThread);
 JVM_END
@@ -3845,3 +3902,96 @@ JVM_END
 JVM_LEAF(jboolean, JVM_PrintWarningAtDynamicAgentLoad(void))
   return (EnableDynamicAgentLoading && !FLAG_IS_CMDLINE(EnableDynamicAgentLoading)) ? JNI_TRUE : JNI_FALSE;
 JVM_END
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+// This must match that definition in JDK8u
+#define JVM_O_DELETE 0x10000
+
+JVM_LEAF(jint, JVM_Open(const char *fname, jint flags, jint mode))
+  //%note jvm_r6
+  int o_delete = (flags & JVM_O_DELETE);
+  flags = flags & ~JVM_O_DELETE;
+
+  int result = os::open(fname, flags, mode);
+
+  if (result >= 0) {
+    if (o_delete != 0) {
+      os::unlink(fname);
+    }
+    return result;
+  } else {
+    switch(errno) {
+      case EEXIST:
+        return JVM_EEXIST;
+      default:
+        return -1;
+    }
+  }
+JVM_END
+#endif // HOTSPOT_TARGET_CLASSLIB
+/*
+JVM_ENTRY(jstring, JVM_GetClassName(JNIEnv *env, jclass cls))
+  assert (cls != NULL, "illegal class");
+  JvmtiVMObjectAllocEventCollector oam;
+  ResourceMark rm(THREAD);
+  const char* name;
+  if (java_lang_Class::is_primitive(JNIHandles::resolve(cls))) {
+    name = type2name(java_lang_Class::primitive_type(JNIHandles::resolve(cls)));
+  } else {
+    // Consider caching interned string in Klass
+    Klass* k = java_lang_Class::as_Klass(JNIHandles::resolve(cls));
+    assert(k->is_klass(), "just checking");
+    name = k->external_name();
+  }
+  oop result = StringTable::intern((char*) name, CHECK_NULL);
+  return (jstring) JNIHandles::make_local(THREAD, result);
+JVM_END
+
+JVM_ENTRY(jobjectArray, JVM_GetClassSigners(JNIEnv *env, jclass cls))
+  JvmtiVMObjectAllocEventCollector oam;
+  ResourceMark rm(THREAD);
+  if (java_lang_Class::is_primitive(JNIHandles::resolve_non_null(cls))) {
+    // There are no signers for primitive types
+    return NULL;
+  }
+
+  objArrayOop signers = java_lang_Class::signers(JNIHandles::resolve_non_null(cls));
+
+  // If there are no signers set in the class, or if the class
+  // is an array, return NULL.
+  if (signers == NULL) return NULL;
+
+  // copy of the signers array
+  Klass* element = ObjArrayKlass::cast(signers->klass())->element_klass();
+  objArrayOop signers_copy = oopFactory::new_objArray(element, signers->length(), CHECK_NULL);
+  for (int index = 0; index < signers->length(); index++) {
+    signers_copy->obj_at_put(index, signers->obj_at(index));
+  }
+
+  // return the copy
+  return (jobjectArray) JNIHandles::make_local(THREAD, signers_copy);
+JVM_END
+
+JVM_ENTRY(void, JVM_SetClassSigners(JNIEnv *env, jclass cls, jobjectArray signers))
+  oop mirror = JNIHandles::resolve_non_null(cls);
+  if (!java_lang_Class::is_primitive(mirror)) {
+    // This call is ignored for primitive types and arrays.
+    // Signers are only set once, ClassLoader.java, and thus shouldn't
+    // be called with an array.  Only the bootstrap loader creates arrays.
+    Klass* k = java_lang_Class::as_Klass(mirror);
+    if (k->is_instance_klass()) {
+      java_lang_Class::set_signers(k->java_mirror(), objArrayOop(JNIHandles::resolve(signers)));
+    }
+  }
+JVM_END
+
+JVM_ENTRY(jboolean, JVM_IsArrayClass(JNIEnv *env, jclass cls))
+  Klass* k = java_lang_Class::as_Klass(JNIHandles::resolve_non_null(cls));
+  return (k != NULL) && k->is_array_klass() ? true : false;
+JVM_END
+
+JVM_ENTRY(jboolean, JVM_IsPrimitiveClass(JNIEnv *env, jclass cls))
+  oop mirror = JNIHandles::resolve_non_null(cls);
+  return (jboolean) java_lang_Class::is_primitive(mirror);
+JVM_END
+#endif */

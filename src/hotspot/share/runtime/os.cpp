@@ -544,6 +544,44 @@ void* os::native_java_library() {
   return _native_java_library;
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+static void* _native_java_library25 = nullptr;
+
+void* os::native_java_library25() {
+  if (_native_java_library25 == nullptr) {
+    if (is_vm_statically_linked()) {
+      _native_java_library25 = get_default_process_handle();
+      return _native_java_library25;
+    }
+
+    //TODO: need to open libjava.so before libjava25.so
+    // native_java_library(); // load java.so first
+
+    char buffer[JVM_MAXPATHLEN];
+    char ebuf[1024];
+
+    // Load java dll
+    if (dll_locate_lib(buffer, sizeof(buffer), Arguments::get_dll_dir(),
+                       "java25")) {
+      _native_java_library25 = dll_load(buffer, ebuf, sizeof(ebuf));
+    }
+    if (_native_java_library25 == nullptr) {
+      vm_exit_during_initialization("Unable to load native library", ebuf);
+    }
+
+#if defined(__OpenBSD__)
+    // Work-around OpenBSD's lack of $ORIGIN support by pre-loading libnet.so
+    // ignore errors
+    if (dll_locate_lib(buffer, sizeof(buffer), Arguments::get_dll_dir(),
+                       "net")) {
+      dll_load(buffer, ebuf, sizeof(ebuf));
+    }
+#endif
+  }
+  return _native_java_library25;
+}
+#endif
+
 /*
  * Support for finding Agent_On(Un)Load/Attach<_lib_name> if it exists.
  * If check_lib == true then we are looking for an
@@ -1506,7 +1544,37 @@ FILE* os::fopen(const char* path, const char* mode) {
   return file;
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+bool os::set_boot_path8(char fileSep, char pathSep) {
+     const char* home = Arguments::get_java_home();
+     int home_len = (int)strlen(home);
+
+     // Any modification to the JAR-file list, for the boot classpath must be
+     // aligned with install/install/make/common/Pack.gmk. Note: boot class
+     // path class JARs, are stripped for StackMapTable to reduce download size.
+     static const char classpath_format[] =
+         "%/lib/rt25.jar:"
+         "%/lib/rt8.jar:"
+         "%/lib/resources.jar:"
+         "%/lib/rt.jar:"
+         //"%/lib/sunrsasign.jar:"
+         "%/lib/jsse.jar:"
+         "%/lib/jce.jar:"
+         "%/lib/charsets.jar:"
+         "%/lib/jfr.jar:"
+         "%/classes";
+     char* sysclasspath = format_boot_path(classpath_format, home, home_len, fileSep, pathSep);
+     if (sysclasspath == NULL) return false;
+     Arguments::set_boot_class_path(sysclasspath, false);
+
+     return true;
+}
+#endif
+
 bool os::set_boot_path(char fileSep, char pathSep) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    return set_boot_path8(fileSep, pathSep);
+#endif
   const char* home = Arguments::get_java_home();
   int home_len = (int)strlen(home);
 

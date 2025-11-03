@@ -325,6 +325,15 @@ void LinkResolver::check_klass_accessibility(Klass* ref_klass, Klass* sel_klass,
 
     // Names are all known to be < 64k so we know this formatted message is not excessively large.
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    if (msg == NULL) {
+      Exceptions::fthrow(
+        THREAD_AND_LOCATION,
+        vmSymbols::java_lang_IllegalAccessError(),
+        "failed to access class %s from class %s",
+        base_klass->external_name(),
+        ref_klass->external_name());
+#else
     bool same_module = (base_klass->module() == ref_klass->module());
     if (msg == nullptr) {
       Exceptions::fthrow(
@@ -336,6 +345,7 @@ void LinkResolver::check_klass_accessibility(Klass* ref_klass, Klass* sel_klass,
         (same_module) ? base_klass->joint_in_module_of_loader(ref_klass) : base_klass->class_in_module_of_loader(),
         (same_module) ? "" : "; ",
         (same_module) ? "" : ref_klass->class_in_module_of_loader());
+#endif // HOTSPOT_TARGET_CLASSLIB
     } else {
       // Use module specific message returned by verify_class_access_msg().
       Exceptions::fthrow(
@@ -599,6 +609,15 @@ void LinkResolver::check_method_accessability(Klass* ref_klass,
   if (!can_access) {
     ResourceMark rm(THREAD);
     stringStream ss;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    ss.print("class %s tried to access %s%s%smethod '%s'",
+             ref_klass->external_name(),
+             sel_method->is_abstract()  ? "abstract "  : "",
+             sel_method->is_protected() ? "protected " : "",
+             sel_method->is_private()   ? "private "   : "",
+             sel_method->external_name()
+             );
+#else
     bool same_module = (sel_klass->module() == ref_klass->module());
     ss.print("class %s tried to access %s%s%smethod '%s' (%s%s%s)",
              ref_klass->external_name(),
@@ -610,6 +629,7 @@ void LinkResolver::check_method_accessability(Klass* ref_klass,
              (same_module) ? "" : "; ",
              (same_module) ? "" : sel_klass->class_in_module_of_loader()
              );
+#endif // HOTSPOT_TARGET_CLASSLIB
 
     // For private access see if there was a problem with nest host
     // resolution, and if so report that as part of the message.
@@ -953,6 +973,17 @@ void LinkResolver::check_field_accessability(Klass* ref_klass,
   // Any existing exceptions that may have been thrown, for example LinkageErrors
   // from nest-host resolution, have been allowed to propagate.
   if (!can_access) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    ResourceMark rm(THREAD);
+    stringStream ss;
+    ss.print("class %s tried to access %s%sfield %s.%s",
+             ref_klass->external_name(),
+             fd.is_protected() ? "protected " : "",
+             fd.is_private()   ? "private "   : "",
+             sel_klass->external_name(),
+             fd.name()->as_C_string()
+             );
+#else
     bool same_module = (sel_klass->module() == ref_klass->module());
     ResourceMark rm(THREAD);
     stringStream ss;
@@ -966,6 +997,7 @@ void LinkResolver::check_field_accessability(Klass* ref_klass,
              (same_module) ? "" : "; ",
              (same_module) ? "" : sel_klass->class_in_module_of_loader()
              );
+#endif
     // For private access see if there was a problem with nest host
     // resolution, and if so report that as part of the message.
     if (fd.is_private()) {
@@ -1204,7 +1236,18 @@ Method* LinkResolver::linktime_resolve_special_method(const LinkInfo& link_info,
   Klass* current_klass = link_info.current_klass();
   if (current_klass != nullptr && resolved_klass->is_interface()) {
     InstanceKlass* klass_to_check = InstanceKlass::cast(current_klass);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    if (klass_to_check->is_hidden()) {
+      klass_to_check = klass_to_check->nest_host(THREAD);
+    }
+    // Disable verification for the dynamically-generated reflection bytecodes.
+    bool is_reflect = klass_to_check->is_subclass_of(
+                        vmClasses::reflect_MagicAccessorImpl_klass());
+    if (!is_reflect &&
+        !klass_to_check->is_same_or_direct_interface(resolved_klass)) {
+#else
     if (!klass_to_check->is_same_or_direct_interface(resolved_klass)) {
+#endif
       ResourceMark rm(THREAD);
       stringStream ss;
       ss.print("Interface method reference: '");

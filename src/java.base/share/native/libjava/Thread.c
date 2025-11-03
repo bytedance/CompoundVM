@@ -35,6 +35,32 @@
 
 #define ARRAY_LENGTH(a) (sizeof(a)/sizeof(a[0]))
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+static JNINativeMethod methods[] = {
+    {"start0",           "()V",        (void *)&JVM_StartThread},
+    {"setPriority0",     "(I)V",       (void *)&JVM_SetThreadPriority},
+    {"stop0",            "(" OBJ ")V", (void *)&JVM_StopThread},
+    {"suspend0",         "()V",        (void *)&JVM_SuspendThread},
+    {"resume0",          "()V",        (void *)&JVM_ResumeThread},
+    {"yield0",           "()V",        (void *)&JVM_Yield},
+    {"sleepNanos0",      "(J)V",       (void *)&JVM_SleepNanos},
+    {"currentCarrierThread", "()" THD, (void *)&JVM_CurrentCarrierThread},
+    {"currentThread",    "()" THD,     (void *)&JVM_CurrentThread},
+    {"setCurrentThread", "(" THD ")V", (void *)&JVM_SetCurrentThread},
+    {"interrupt0",       "()V",        (void *)&JVM_Interrupt},
+    {"holdsLock",        "(" OBJ ")Z", (void *)&JVM_HoldsLock},
+    {"getThreads",       "()[" THD,    (void *)&JVM_GetAllThreads},
+    {"dumpThreads",      "([" THD ")[[" STE, (void *)&JVM_DumpThreads},
+    {"getStackTrace0",   "()" OBJ,     (void *)&JVM_GetStackTrace},
+    {"setNativeName",    "(" STR ")V", (void *)&JVM_SetNativeThreadName},
+    {"scopedValueCache", "()[" OBJ,    (void *)&JVM_ScopedValueCache},
+    {"setScopedValueCache", "([" OBJ ")V",(void *)&JVM_SetScopedValueCache},
+    {"getNextThreadIdOffset", "()J",   (void *)&JVM_GetNextThreadIdOffset},
+    {"findScopedValueBindings", "()" OBJ, (void *)&JVM_FindScopedValueBindings},
+    {"ensureMaterializedForStackWalk",
+                         "(" OBJ ")V", (void*)&JVM_EnsureMaterializedForStackWalk_func},
+};
+#else
 static JNINativeMethod methods[] = {
     {"start0",           "()V",        (void *)&JVM_StartThread},
     {"setPriority0",     "(I)V",       (void *)&JVM_SetThreadPriority},
@@ -56,6 +82,7 @@ static JNINativeMethod methods[] = {
     {"ensureMaterializedForStackWalk",
                          "(" OBJ ")V", (void*)&JVM_EnsureMaterializedForStackWalk_func},
 };
+#endif
 
 #undef THD
 #undef OBJ

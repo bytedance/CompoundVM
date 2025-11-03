@@ -49,3 +49,11 @@ Java_java_lang_Throwable_fillInStackTrace(JNIEnv *env, jobject throwable, jint d
     JVM_FillInStackTrace(env, throwable);
     return throwable;
 }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JNIEXPORT jint JNICALL
+Java_java_lang_Throwable_getStackTraceDepth(JNIEnv *env, jobject throwable)
+{
+    return JVM_GetStackTraceDepth(env, throwable);
+}
+#endif

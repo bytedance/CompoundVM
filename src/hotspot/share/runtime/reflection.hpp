@@ -126,7 +126,10 @@ class Reflection: public AllStatic {
                                TRAPS);
   // Method invocation through java.lang.reflect.Constructor
   static oop      invoke_constructor(oop method_mirror, objArrayHandle args, TRAPS);
-
+#if HOTSPOT_TARGET_CLASSLIB == 8  
+  // Returns mirror on array element type (NULL for basic type arrays and non-arrays).
+  static oop       array_component_type(oop mirror, TRAPS);
+#endif
 };
 
 #endif // SHARE_RUNTIME_REFLECTION_HPP

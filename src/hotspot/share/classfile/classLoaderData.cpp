@@ -106,6 +106,9 @@ void ClassLoaderData::init_null_class_loader_data() {
 void ClassLoaderData::initialize_name(Handle class_loader) {
   ResourceMark rm;
 
+  // skip for classlib8
+  CLASSLIB8_EARLY_RETURN_();
+
   // Obtain the class loader's name.  If the class loader's name was not
   // explicitly set during construction, the CLD's _name field will be null.
   oop cl_name = java_lang_ClassLoader::name(class_loader());

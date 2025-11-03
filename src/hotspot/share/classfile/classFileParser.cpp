@@ -4076,6 +4076,7 @@ void ClassFileParser::check_super_class_access(const InstanceKlass* this_klass, 
       }
     }
 
+#if HOTSPOT_TARGET_CLASSLIB != 8
     Reflection::VerifyClassAccessResults vca_result =
       Reflection::verify_class_access(this_klass, InstanceKlass::cast(super), false);
     if (vca_result != Reflection::ACCESS_OK) {
@@ -4106,6 +4107,7 @@ void ClassFileParser::check_super_class_access(const InstanceKlass* this_klass, 
           msg);
       }
     }
+#endif
   }
 }
 
@@ -5535,6 +5537,14 @@ void ClassFileParser::parse_stream(const ClassFileStream* const stream,
                        "Bad class name in class file %s",
                        CHECK);
   }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  if (_is_hidden) {
+    if (_class_name == vmSymbols::unknown_class_name()) {
+      update_class_name(class_name_in_cp);
+    }
+  }
+#endif
 
 #ifdef ASSERT
   // Basic sanity checks

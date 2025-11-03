@@ -59,6 +59,9 @@
 #include "runtime/stubRoutines.hpp"
 #include "sanitizers/leak.hpp"
 #include "utilities/exceptions.hpp"
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#include "runtime/reflectionUtils.hpp"
+#endif
 
 
 /*
@@ -138,6 +141,10 @@ enum {
   HIDDEN_MEMBER        = java_lang_invoke_MemberName::MN_HIDDEN_MEMBER,
   REFERENCE_KIND_SHIFT = java_lang_invoke_MemberName::MN_REFERENCE_KIND_SHIFT,
   REFERENCE_KIND_MASK  = java_lang_invoke_MemberName::MN_REFERENCE_KIND_MASK,
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  SEARCH_SUPERCLASSES  = java_lang_invoke_MemberName::MN_SEARCH_SUPERCLASSES,
+  SEARCH_INTERFACES    = java_lang_invoke_MemberName::MN_SEARCH_INTERFACES,
+#endif
   LM_UNCONDITIONAL     = java_lang_invoke_MemberName::MN_UNCONDITIONAL_MODE,
   LM_MODULE            = java_lang_invoke_MemberName::MN_MODULE_MODE,
   LM_TRUSTED           = java_lang_invoke_MemberName::MN_TRUSTED_MODE,
@@ -338,7 +345,11 @@ oop MethodHandles::init_method_MemberName(Handle mname, CallInfo& info) {
 
   oop mname_oop = mname();
   java_lang_invoke_MemberName::set_flags  (mname_oop, flags);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  java_lang_invoke_MemberName::set_vmtarget(mname_oop, m());
+#else
   java_lang_invoke_MemberName::set_method (mname_oop, resolved_method());
+#endif
   java_lang_invoke_MemberName::set_vmindex(mname_oop, vmindex);   // vtable/itable index
   java_lang_invoke_MemberName::set_clazz  (mname_oop, m_klass->java_mirror());
   // Note:  name and type can be lazily computed by resolve_MemberName,
@@ -359,7 +370,11 @@ oop MethodHandles::init_field_MemberName(Handle mname, fieldDescriptor& fd, bool
 
   oop mname_oop = mname();
   java_lang_invoke_MemberName::set_flags  (mname_oop, flags);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  java_lang_invoke_MemberName::set_vmtarget(mname_oop, nullptr);
+#else
   java_lang_invoke_MemberName::set_method (mname_oop, nullptr);
+#endif
   java_lang_invoke_MemberName::set_vmindex(mname_oop, vmindex);
   java_lang_invoke_MemberName::set_clazz  (mname_oop, ik->java_mirror());
 
@@ -392,8 +407,12 @@ bool MethodHandles::is_method_handle_invoke_name(Klass* klass, Symbol* name) {
   // The following test will fail spuriously during bootstrap of MethodHandle itself:
   //    if (klass != vmClasses::MethodHandle_klass())
   // Test the name instead:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  if (klass->name() != vmSymbols::java_lang_invoke_MethodHandle()) {
+#else
   if (klass->name() != vmSymbols::java_lang_invoke_MethodHandle() &&
       klass->name() != vmSymbols::java_lang_invoke_VarHandle()) {
+#endif
     return false;
   }
 
@@ -487,11 +506,13 @@ vmIntrinsics::ID MethodHandles::signature_polymorphic_name_id(Symbol* name) {
     return vmIntrinsics::_invokeGeneric;
   }
 
+#if HOTSPOT_TARGET_CLASSLIB != 8
   // Cover the case of methods on VarHandle.
   Klass* vh_klass = vmClasses::klass_at(VM_CLASS_ID(VarHandle_klass));
   if (vh_klass != nullptr && is_method_handle_invoke_name(vh_klass, name)) {
     return vmIntrinsics::_invokeGeneric;
   }
+#endif
 
   // Note: The pseudo-intrinsic _compiledLambdaForm is never linked against.
   // Instead it is used to mark lambda forms bound to invokehandle or invokedynamic.
@@ -500,8 +521,12 @@ vmIntrinsics::ID MethodHandles::signature_polymorphic_name_id(Symbol* name) {
 
 vmIntrinsics::ID MethodHandles::signature_polymorphic_name_id(Klass* klass, Symbol* name) {
   if (klass != nullptr &&
+#if HOTSPOT_TARGET_CLASSLIB == 8
+      (klass->name() == vmSymbols::java_lang_invoke_MethodHandle())) {
+#else
       (klass->name() == vmSymbols::java_lang_invoke_MethodHandle() ||
        klass->name() == vmSymbols::java_lang_invoke_VarHandle())) {
+#endif
     vmIntrinsics::ID iid = signature_polymorphic_name_id(name);
     if (iid != vmIntrinsics::_none)
       return iid;
@@ -680,6 +705,159 @@ oop MethodHandles::field_signature_type_or_null(Symbol* s) {
   return nullptr;
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+//  static native int getMembers(Class<?> defc, String matchName, String matchSig,
+//          int matchFlags, Class<?> caller, int skip, MemberName[] results);
+JVM_ENTRY(jint, MHN_getMembers(JNIEnv *env, jobject igcls,
+                               jclass clazz_jh, jstring name_jh, jstring sig_jh,
+                               int mflags, jclass caller_jh, jint skip, jobjectArray results_jh)) {
+  if (clazz_jh == NULL || results_jh == NULL)  return -1;
+  Klass* k = java_lang_Class::as_Klass(JNIHandles::resolve_non_null(clazz_jh));
+
+  objArrayHandle results(THREAD, (objArrayOop) JNIHandles::resolve(results_jh));
+  if (results.is_null() || !results->is_objArray())  return -1;
+
+  TempNewSymbol name = NULL;
+  TempNewSymbol sig = NULL;
+  if (name_jh != NULL) {
+    name = java_lang_String::as_symbol_or_null(JNIHandles::resolve_non_null(name_jh));
+    if (name == NULL)  return 0; // a match is not possible
+  }
+  if (sig_jh != NULL) {
+    sig = java_lang_String::as_symbol_or_null(JNIHandles::resolve_non_null(sig_jh));
+    if (sig == NULL)  return 0; // a match is not possible
+  }
+
+  Klass* caller = NULL;
+  if (caller_jh != NULL) {
+    oop caller_oop = JNIHandles::resolve_non_null(caller_jh);
+    if (!java_lang_Class::is_instance(caller_oop))  return -1;
+    caller = java_lang_Class::as_Klass(caller_oop);
+  }
+
+  if (name != NULL && sig != NULL && results.not_null()) {
+    // try a direct resolve
+    // %%% TO DO
+  }
+
+  int res = MethodHandles::find_MemberNames(k, name, sig, mflags,
+                                            caller, skip, results, CHECK_0);
+  // TO DO: expand at least some of the MemberNames, to avoid massive callbacks
+  return res;
+}
+JVM_END
+
+int MethodHandles::find_MemberNames(Klass* k,
+                                    Symbol* name, Symbol* sig,
+                                    int mflags, Klass* caller,
+                                    int skip, objArrayHandle results, TRAPS) {
+  // %%% take caller into account!
+
+  if (k == NULL || !k->is_instance_klass())  return -1;
+
+  int rfill = 0, rlimit = results->length(), rskip = skip;
+  // overflow measurement:
+  int overflow = 0, overflow_limit = MAX2(1000, rlimit);
+
+  int match_flags = mflags;
+  bool search_superc = ((match_flags & SEARCH_SUPERCLASSES) != 0);
+  bool search_intfc  = ((match_flags & SEARCH_INTERFACES)   != 0);
+  bool local_only = !(search_superc | search_intfc);
+
+  if (name != NULL) {
+    if (name->utf8_length() == 0)  return 0; // a match is not possible
+  }
+  if (sig != NULL) {
+    if (sig->starts_with(JVM_SIGNATURE_FUNC))
+      match_flags &= ~(IS_FIELD | IS_TYPE);
+    else
+      match_flags &= ~(IS_CONSTRUCTOR | IS_METHOD);
+  }
+
+  if ((match_flags & IS_TYPE) != 0) {
+    // NYI, and Core Reflection works quite well for this query
+  }
+
+  if ((match_flags & IS_FIELD) != 0) {
+    InstanceKlass* ik = InstanceKlass::cast(k);
+    for (FieldStream st(ik, local_only, !search_intfc); !st.eos(); st.next()) {
+      if (name != NULL && st.name() != name)
+          continue;
+      if (sig != NULL && st.signature() != sig)
+        continue;
+      // passed the filters
+      if (rskip > 0) {
+        --rskip;
+      } else if (rfill < rlimit) {
+        Handle result(THREAD, results->obj_at(rfill++));
+        if (!java_lang_invoke_MemberName::is_instance(result()))
+          return -99;  // caller bug!
+        oop saved = MethodHandles::init_field_MemberName(result, st.field_descriptor());
+        if (saved != result())
+          results->obj_at_put(rfill-1, saved);  // show saved instance to user
+      } else if (++overflow >= overflow_limit) {
+        match_flags = 0; break; // got tired of looking at overflow
+      }
+    }
+  }
+
+  if ((match_flags & (IS_METHOD | IS_CONSTRUCTOR)) != 0) {
+    // watch out for these guys:
+    Symbol* init_name   = vmSymbols::object_initializer_name();
+    Symbol* clinit_name = vmSymbols::class_initializer_name();
+    if (name == clinit_name)  clinit_name = NULL; // hack for exposing <clinit>
+    bool negate_name_test = false;
+    // fix name so that it captures the intention of IS_CONSTRUCTOR
+    if (!(match_flags & IS_METHOD)) {
+      // constructors only
+      if (name == NULL) {
+        name = init_name;
+      } else if (name != init_name) {
+        return 0;               // no constructors of this method name
+      }
+    } else if (!(match_flags & IS_CONSTRUCTOR)) {
+      // methods only
+      if (name == NULL) {
+        name = init_name;
+        negate_name_test = true; // if we see the name, we *omit* the entry
+      } else if (name == init_name) {
+        return 0;               // no methods of this constructor name
+      }
+    } else {
+      // caller will accept either sort; no need to adjust name
+    }
+    InstanceKlass* ik = InstanceKlass::cast(k);
+    for (MethodStream st(ik, local_only, !search_intfc); !st.eos(); st.next()) {
+      Method* m = st.method();
+      Symbol* m_name = m->name();
+      if (m_name == clinit_name)
+        continue;
+      if (name != NULL && ((m_name != name) ^ negate_name_test))
+          continue;
+      if (sig != NULL && m->signature() != sig)
+        continue;
+      // passed the filters
+      if (rskip > 0) {
+        --rskip;
+      } else if (rfill < rlimit) {
+        Handle result(THREAD, results->obj_at(rfill++));
+        if (!java_lang_invoke_MemberName::is_instance(result()))
+          return -99;  // caller bug!
+        CallInfo info(m, NULL, CHECK_0);
+        oop saved = MethodHandles::init_method_MemberName(result, info);
+        if (saved != result())
+          results->obj_at_put(rfill-1, saved);  // show saved instance to user
+      } else if (++overflow >= overflow_limit) {
+        match_flags = 0; break; // got tired of looking at overflow
+      }
+    }
+  }
+
+  // return number of elements we at leasted wanted to initialize
+  return rfill + overflow;
+}
+#endif
+
 // An unresolved member name is a mere symbolic reference.
 // Resolving it plants a vmtarget/vmindex in it,
 // which refers directly to JVM internals.
@@ -734,7 +912,11 @@ Handle MethodHandles::resolve_MemberName(Handle mname, Klass* caller, int lookup
 
   vmIntrinsics::ID mh_invoke_id = vmIntrinsics::_none;
   if ((flags & ALL_KINDS) == IS_METHOD &&
+#if HOTSPOT_TARGET_CLASSLIB == 8
+      (defc == vmClasses::MethodHandle_klass()) &&
+#else
       (defc == vmClasses::MethodHandle_klass() || defc == vmClasses::VarHandle_klass()) &&
+#endif
       (ref_kind == JVM_REF_invokeVirtual ||
        ref_kind == JVM_REF_invokeSpecial ||
        // static invocation mode is required for _linkToVirtual, etc.:
@@ -984,6 +1166,28 @@ void MethodHandles::trace_method_handle_interpreter_entry(MacroAssembler* _masm,
 //
 
 #ifndef PRODUCT
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#define EACH_NAMED_CON(template, requirement) \
+    template(java_lang_invoke_MemberName,MN_IS_METHOD) \
+    template(java_lang_invoke_MemberName,MN_IS_CONSTRUCTOR) \
+    template(java_lang_invoke_MemberName,MN_IS_FIELD) \
+    template(java_lang_invoke_MemberName,MN_IS_TYPE) \
+    template(java_lang_invoke_MemberName,MN_CALLER_SENSITIVE) \
+    template(java_lang_invoke_MemberName,MN_TRUSTED_FINAL) \
+    template(java_lang_invoke_MemberName,MN_SEARCH_SUPERCLASSES) \
+    template(java_lang_invoke_MemberName,MN_SEARCH_INTERFACES) \
+    template(java_lang_invoke_MemberName,MN_HIDDEN_MEMBER) \
+    template(java_lang_invoke_MemberName,MN_REFERENCE_KIND_SHIFT) \
+    template(java_lang_invoke_MemberName,MN_REFERENCE_KIND_MASK) \
+    template(java_lang_invoke_MemberName,MN_NESTMATE_CLASS) \
+    template(java_lang_invoke_MemberName,MN_HIDDEN_CLASS) \
+    template(java_lang_invoke_MemberName,MN_STRONG_LOADER_LINK) \
+    template(java_lang_invoke_MemberName,MN_ACCESS_VM_ANNOTATIONS) \
+    template(java_lang_invoke_MemberName,MN_MODULE_MODE) \
+    template(java_lang_invoke_MemberName,MN_UNCONDITIONAL_MODE) \
+    template(java_lang_invoke_MemberName,MN_TRUSTED_MODE) \
+    /*end*/
+#else
 #define EACH_NAMED_CON(template, requirement) \
     template(java_lang_invoke_MemberName,MN_IS_METHOD) \
     template(java_lang_invoke_MemberName,MN_IS_CONSTRUCTOR) \
@@ -1002,6 +1206,7 @@ void MethodHandles::trace_method_handle_interpreter_entry(MacroAssembler* _masm,
     template(java_lang_invoke_MemberName,MN_UNCONDITIONAL_MODE) \
     template(java_lang_invoke_MemberName,MN_TRUSTED_MODE) \
     /*end*/
+#endif
 
 #define IGNORE_REQ(req_expr) /* req_expr */
 #define ONE_PLUS(scope,value) 1+
@@ -1073,8 +1278,14 @@ JVM_ENTRY(void, MHN_expand_Mem(JNIEnv *env, jobject igcls, jobject mname_jh)) {
 JVM_END
 
 // void resolve(MemberName self, Class<?> caller)
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JVM_ENTRY(jobject, MHN_resolve_Mem(JNIEnv *env, jobject igcls, jobject mname_jh, jclass caller_jh)) {
+  jint lookup_mode = LM_TRUSTED;
+  jboolean speculative_resolve = JNI_FALSE;
+#else
 JVM_ENTRY(jobject, MHN_resolve_Mem(JNIEnv *env, jobject igcls, jobject mname_jh, jclass caller_jh,
     jint lookup_mode, jboolean speculative_resolve)) {
+#endif
   if (mname_jh == nullptr) { THROW_MSG_NULL(vmSymbols::java_lang_InternalError(), "mname is null"); }
   Handle mname(THREAD, JNIHandles::resolve_non_null(mname_jh));
 
@@ -1305,7 +1516,68 @@ JVM_END
 
 
 /// JVM_RegisterMethodHandleMethods
+#if HOTSPOT_TARGET_CLASSLIB == 8
+//
+// Here are the native methods in java.lang.invoke.MethodHandleNatives
+// They are the private interface between this JVM and the HotSpot-specific
+// Java code that implements JSR 292 method handles.
+//
+// Note:  We use a JVM_ENTRY macro to define each of these, for this is the way
+// that intrinsic (non-JNI) native methods are defined in HotSpot.
+//
 
+JVM_ENTRY(jint, MHN_getConstant(JNIEnv *env, jobject igcls, jint which)) {
+//  switch (which) {
+//  case MethodHandles::GC_COUNT_GWT:
+//#ifdef COMPILER2
+//    return true;
+//#else
+//    return false;
+//#endif
+//  }
+  return 0;
+}
+JVM_END
+
+#define LANG "Ljava/lang/"
+#define JLINV "Ljava/lang/invoke/"
+
+#define OBJ   LANG "Object;"
+#define CLS   LANG "Class;"
+#define STRG  LANG "String;"
+#define CS    JLINV "CallSite;"
+#define MT    JLINV "MethodType;"
+#define MH    JLINV "MethodHandle;"
+#define MEM   JLINV "MemberName;"
+
+#define CC (char*)  /*cast a literal from (const char*)*/
+#define FN_PTR(f) CAST_FROM_FN_PTR(void*, &f)
+
+// These are the native methods on java.lang.invoke.MethodHandleNatives.
+static JNINativeMethod MHN_methods[] = {
+  {CC "init",                      CC "(" MEM "" OBJ ")V",                     FN_PTR(MHN_init_Mem)},
+  {CC"expand",                     CC "(" MEM ")V",                          FN_PTR(MHN_expand_Mem)},
+  {CC "resolve",                   CC "(" MEM "" CLS ")" MEM,                   FN_PTR(MHN_resolve_Mem)},
+  {CC "getConstant",               CC "(I)I",                              FN_PTR(MHN_getConstant)},
+  //  static native int getNamedCon(int which, Object[] name)
+  {CC "getNamedCon",               CC "(I[" OBJ ")I",                        FN_PTR(MHN_getNamedCon)},
+  //  static native int getMembers(Class<?> defc, String matchName, String matchSig,
+  //          int matchFlags, Class<?> caller, int skip, MemberName[] results);
+  {CC "getMembers",                CC "(" CLS "" STRG "" STRG "I" CLS "I[" MEM ")I", FN_PTR(MHN_getMembers)},
+  {CC "objectFieldOffset",         CC "(" MEM ")J",                          FN_PTR(MHN_objectFieldOffset)},
+  {CC "setCallSiteTargetNormal",   CC "(" CS "" MH ")V",                       FN_PTR(MHN_setCallSiteTargetNormal)},
+  {CC "setCallSiteTargetVolatile", CC "(" CS "" MH ")V",                       FN_PTR(MHN_setCallSiteTargetVolatile)},
+  {CC "staticFieldOffset",         CC "(" MEM ")J",                          FN_PTR(MHN_staticFieldOffset)},
+  {CC "staticFieldBase",           CC "(" MEM ")" OBJ,                        FN_PTR(MHN_staticFieldBase)},
+  {CC "getMemberVMInfo",           CC "(" MEM ")" OBJ,                        FN_PTR(MHN_getMemberVMInfo)}
+};
+
+static JNINativeMethod MH_methods[] = {
+  // UnsupportedOperationException throwers
+  {CC "invoke",                    CC "([" OBJ ")" OBJ,                       FN_PTR(MH_invoke_UOE)},
+  {CC "invokeExact",               CC "([" OBJ ")" OBJ,                       FN_PTR(MH_invokeExact_UOE)}
+};
+#else // HOTSPOT_TARGET_CLASSLIB
 #define LANG "Ljava/lang/"
 #define JLINV "Ljava/lang/invoke/"
 
@@ -1341,6 +1613,7 @@ static JNINativeMethod MH_methods[] = {
   {CC "invoke",                    CC "([" OBJ ")" OBJ,                       FN_PTR(MH_invoke_UOE)},
   {CC "invokeExact",               CC "([" OBJ ")" OBJ,                       FN_PTR(MH_invokeExact_UOE)}
 };
+#endif // HOTSPOT_TARGET_CLASSLIB
 static JNINativeMethod VH_methods[] = {
   // UnsupportedOperationException throwers
   {CC "get",                        CC "([" OBJ ")" OBJ,    FN_PTR(VH_UOE)},
@@ -1400,9 +1673,11 @@ JVM_ENTRY(void, JVM_RegisterMethodHandleMethods(JNIEnv *env, jclass MHN_class)) 
     guarantee(status == JNI_OK && !env->ExceptionCheck(),
               "register java.lang.invoke.MethodHandle natives");
 
+#if HOTSPOT_TARGET_CLASSLIB != 8
     status = env->RegisterNatives(VH_class, VH_methods, sizeof(VH_methods)/sizeof(JNINativeMethod));
     guarantee(status == JNI_OK && !env->ExceptionCheck(),
               "register java.lang.invoke.VarHandle natives");
+#endif
   }
 
   log_debug(methodhandles, indy)("MethodHandle support loaded (using LambdaForms)");

@@ -42,6 +42,7 @@
 #include "runtime/orderAccess.hpp"
 #include "runtime/safepoint.hpp"
 
+
 inline void JavaThread::set_suspend_flag(SuspendFlags f) {
   uint32_t flags;
   do {

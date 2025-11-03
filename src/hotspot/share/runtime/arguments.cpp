@@ -124,6 +124,12 @@ SystemProperty *Arguments::_java_class_path = nullptr;
 SystemProperty *Arguments::_jdk_boot_class_path_append = nullptr;
 SystemProperty *Arguments::_vm_info = nullptr;
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+SystemProperty *Arguments::_sun_boot_class_path = NULL;
+SystemProperty *Arguments::_java_ext_dirs = NULL;
+SystemProperty *Arguments::_java_endorsed_dirs = NULL;
+#endif
+
 GrowableArray<ModulePatchPath*> *Arguments::_patch_mod_prefix = nullptr;
 PathString *Arguments::_boot_class_path = nullptr;
 bool Arguments::_has_jimage = false;
@@ -403,6 +409,14 @@ void Arguments::init_system_properties() {
   // Properties values are set to nullptr and they are
   // os specific they are initialized in os::init_system_properties_values().
   _sun_boot_library_path = new SystemProperty("sun.boot.library.path", nullptr,  true);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  _sun_boot_class_path = new SystemProperty("sun.boot.class.path", NULL,  true);
+  _java_ext_dirs = new SystemProperty("java.ext.dirs", NULL,  true);
+  _java_endorsed_dirs = new SystemProperty("java.endorsed.dirs", NULL,  true);
+
+  PropertyList_add(&_system_properties, _java_ext_dirs);
+  PropertyList_add(&_system_properties, _java_endorsed_dirs);
+#endif
   _java_library_path = new SystemProperty("java.library.path", nullptr,  true);
   _java_home =  new SystemProperty("java.home", nullptr,  true);
   _java_class_path = new SystemProperty("java.class.path", "",  true);
@@ -419,6 +433,9 @@ void Arguments::init_system_properties() {
   PropertyList_add(&_system_properties, _java_class_path);
   PropertyList_add(&_system_properties, _jdk_boot_class_path_append);
   PropertyList_add(&_system_properties, _vm_info);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  PropertyList_add(&_system_properties, _sun_boot_class_path);
+#endif
 
   // Set OS specific system properties values
   os::init_system_properties_values();
@@ -2132,6 +2149,21 @@ jint Arguments::parse_xss(const JavaVMOption* option, const char* tail, intx* ou
   return JNI_OK;
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+// append to c-heap string
+// will overwrite the old buffer variable
+static void sappend(char*& buf, const char* s) {
+  if (buf == NULL || s == NULL) {
+    return;
+  }
+  size_t cap = strlen(buf) + strlen(s) + 1;
+  char* nbuf = NEW_C_HEAP_ARRAY(char, cap, mtArguments);
+  jio_snprintf(nbuf, cap, "%s%s", buf, s);
+  FREE_C_HEAP_ARRAY(char, buf);
+  buf = nbuf;
+}
+#endif
+
 jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, JVMFlagOrigin origin) {
   // For match_option to return remaining or value part of option string
   const char* tail;
@@ -2217,6 +2249,12 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, JVMFlagOrigin
           return JNI_ERR;
         }
 #endif // !INCLUDE_JVMTI
+#if HOTSPOT_TARGET_CLASSLIB == 8
+        // convert jdwp arguments to jdwp25 agent
+        if (strcmp(name, "jdwp") == 0) {
+          sappend(name, "25");
+        }
+#endif
         JvmtiAgentList::add_xrun(name, options, false);
         FREE_C_HEAP_ARRAY(char, name);
         FREE_C_HEAP_ARRAY(char, options);
@@ -2302,6 +2340,11 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, JVMFlagOrigin
           name = NEW_C_HEAP_ARRAY(char, len + 1, mtArguments);
           memcpy(name, tail, len);
           name[len] = '\0';
+#if HOTSPOT_TARGET_CLASSLIB == 8
+          if (!is_absolute_path && strcmp(name, "jdwp") == 0) {
+            sappend(name, "25");
+          }
+#endif
         }
 
         char *options = nullptr;
@@ -2892,6 +2935,7 @@ jint Arguments::finalize_vm_init_args() {
   const char* fileSep = os::file_separator();
   jio_snprintf(path, JVM_MAXPATHLEN, "%s%slib%sendorsed", Arguments::get_java_home(), fileSep, fileSep);
 
+#if HOTSPOT_TARGET_CLASSLIB != 8
   DIR* dir = os::opendir(path);
   if (dir != nullptr) {
     jio_fprintf(defaultStream::output_stream(),
@@ -2910,6 +2954,7 @@ jint Arguments::finalize_vm_init_args() {
     os::closedir(dir);
     return JNI_ERR;
   }
+#endif
 
   // This must be done after all arguments have been processed
   // and the container support has been initialized since AggressiveHeap
@@ -3492,6 +3537,14 @@ static void apply_debugger_ergo() {
 jint Arguments::parse(const JavaVMInitArgs* initial_cmd_args) {
   assert(verify_special_jvm_flags(false), "deprecated and obsolete flag table inconsistent");
   JVMFlag::check_all_flag_declarations();
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  FLAG_SET_DEFAULT(IgnoreUnrecognizedVMOptions, true);
+  // forcefully disable vector support for JDK8
+  FLAG_SET_DEFAULT(EnableVectorSupport, false);
+  FLAG_SET_DEFAULT(CompactStrings, false);
+  FLAG_SET_DEFAULT(AllowRedefinitionToAddDeleteMethods, true);
+#endif
 
   // If flag "-XX:Flags=flags-file" is used it will be the first option to be processed.
   const char* hotspotrc = ".hotspotrc";

@@ -305,7 +305,9 @@ class ConstantPool : public Metadata {
   }
 
   void unresolved_string_at_put(int cp_index, Symbol* s) {
+#if HOTSPOT_TARGET_CLASSLIB != 8
     assert(s->refcount() != 0, "should have nonzero refcount");
+#endif
     // Note that release_tag_at_put is not needed here because this is called only
     // when constructing a ConstantPool in a single thread, with no possibility
     // of concurrent access.
@@ -354,6 +356,16 @@ class ConstantPool : public Metadata {
     tag_at_put(cp_index, JVM_CONSTANT_StringIndex);
     *int_at_addr(cp_index) = string_index;
   }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // patch JSR 292 resolved references after the class is linked.
+  void patch_resolved_references(GrowableArray<Handle>* cp_patches);
+  void pseudo_string_at_put(int which, int obj_index, oop x) {
+    assert(tag_at(which).is_string(), "Corrupted constant pool");
+    unresolved_string_at_put(which, NULL); // indicates patched string
+    string_at_put(obj_index, x);    // this works just fine
+  }
+#endif
 
   void field_at_put(int cp_index, int class_index, int name_and_type_index) {
     tag_at_put(cp_index, JVM_CONSTANT_Fieldref);

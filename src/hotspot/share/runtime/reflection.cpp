@@ -448,8 +448,20 @@ Reflection::VerifyClassAccessResults Reflection::verify_class_access(
     return ACCESS_OK;
   }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // Allow all accesses from jdk/internal/reflect/MagicAccessorImpl subclasses to
+  // succeed trivially.
+  if (vmClasses::reflect_MagicAccessorImpl_klass_is_loaded() &&
+      current_class->is_subclass_of(vmClasses::reflect_MagicAccessorImpl_klass())) {
+    return ACCESS_OK;
+  }
+#endif
+
   // module boundaries
   if (new_class->is_public()) {
+  #if HOTSPOT_TARGET_CLASSLIB == 8
+    return ACCESS_OK;
+  #endif
     // Find the module entry for current_class, the accessor
     ModuleEntry* module_from = current_class->module();
     // Find the module entry for new_class, the accessee
@@ -650,6 +662,14 @@ bool Reflection::verify_member_access(const Klass* current_class,
       }
     }
   }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // Allow all accesses from jdk/internal/reflect/MagicAccessorImpl subclasses to
+  // succeed trivially.
+  if (current_class->is_subclass_of(vmClasses::reflect_MagicAccessorImpl_klass())) {
+    return true;
+  }
+#endif
 
   // Check for special relaxations
   return can_relax_access_check_for(current_class, member_class, classloader_only);
@@ -1169,3 +1189,36 @@ oop Reflection::invoke_constructor(oop constructor_mirror, objArrayHandle args, 
   invoke(klass, method, receiver, override, ptypes, T_VOID, args, false, CHECK_NULL);
   return receiver();
 }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+oop Reflection::array_component_type(oop mirror, TRAPS) {
+  if (java_lang_Class::is_primitive(mirror)) {
+    return NULL;
+  }
+
+  Klass* klass = java_lang_Class::as_Klass(mirror);
+  if (!klass->is_array_klass()) {
+    return NULL;
+  }
+
+  oop result = java_lang_Class::component_mirror(klass->java_mirror());
+#ifdef ASSERT
+/*
+  oop result2 = NULL;
+  if (ArrayKlass::cast(klass)->dimension() == 1) {
+    if (klass->is_typeArray_klass()) {
+      result2 = basic_type_arrayklass_to_mirror(klass, CHECK_NULL);
+    } else {
+      result2 = ObjArrayKlass::cast(klass)->element_klass()->java_mirror();
+    }
+  } else {
+    Klass* lower_dim = ArrayKlass::cast(klass)->lower_dimension();
+    assert(lower_dim->oop_is_array(), "just checking");
+    result2 = lower_dim->java_mirror();
+  }
+  assert(result == result2, "results must be consistent");
+*/
+#endif //ASSERT
+  return result;
+}
+#endif

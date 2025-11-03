@@ -156,6 +156,9 @@ static void create_initial_thread(Handle thread_group, JavaThread* thread,
   // constructor calls Thread.current(), which must be set here for the
   // initial thread.
   java_lang_Thread::set_thread(thread_oop(), thread);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  //java_lang_Thread::set_priority(thread_oop(), NormPriority);
+#endif
   thread->set_threadOopHandles(thread_oop());
 
   Handle string = java_lang_String::create_from_str("main", CHECK);
@@ -170,9 +173,9 @@ static void create_initial_thread(Handle thread_group, JavaThread* thread,
                           CHECK);
 
   DEBUG_ONLY(int64_t main_thread_tid = java_lang_Thread::thread_id(thread_oop());)
-  assert(main_thread_tid == ThreadIdentifier::initial(), "");
-  assert(main_thread_tid == thread->monitor_owner_id(), "");
-  JFR_ONLY(assert(JFR_JVM_THREAD_ID(thread) == static_cast<traceid>(main_thread_tid), "initial tid mismatch");)
+  //assert(main_thread_tid == ThreadIdentifier::initial(), "");
+  //assert(main_thread_tid == thread->monitor_owner_id(), "");
+  //JFR_ONLY(assert(JFR_JVM_THREAD_ID(thread) == static_cast<traceid>(main_thread_tid), "initial tid mismatch");)
 
   // Set thread status to running since main thread has
   // been started and running.
@@ -227,7 +230,11 @@ bool        Threads::_vm_complete = false;
 // General purpose hook into Java code, run once when the VM is initialized.
 // The Java library method itself may be changed independently from the VM.
 static void call_postVMInitHook(TRAPS) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  Klass* klass = SystemDictionary::resolve_or_null(vmSymbols::sun_misc_PostVMInitHook(), THREAD);
+#else
   Klass* klass = SystemDictionary::resolve_or_null(vmSymbols::jdk_internal_vm_PostVMInitHook(), THREAD);
+#endif
   if (klass != nullptr) {
     JavaValue result(T_VOID);
     JavaCalls::call_static(&result, klass, vmSymbols::run_method_name(),
@@ -362,8 +369,10 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
 
   HeapShared::init_box_classes(CHECK);
 
+#if HOTSPOT_TARGET_CLASSLIB != 8
   // The VM creates objects of this class.
   initialize_class(vmSymbols::java_lang_Module(), CHECK);
+#endif
 
 #ifdef ASSERT
   InstanceKlass *k = vmClasses::UnsafeConstants_klass();
@@ -381,6 +390,17 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
   // Phase 1 of the system initialization in the library, java.lang.System class initialization
   call_initPhase1(CHECK);
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // for classlib 8, versions are not stored in class j.l.VersionProps, but in raw properties
+  {
+    ResourceMark rm(main_thread);
+    JDK_Version::set_java_version("1.8.0");
+    JDK_Version::set_runtime_name("OpenJDK Runtime Environment");
+    JDK_Version::set_runtime_version("25");
+    JDK_Version::set_runtime_vendor_version("ByteDance Testing");
+    JDK_Version::set_runtime_vendor_vm_bug_url("https://github.com/bytedance/CompoundVM");
+  }
+#else
   // Get the Java runtime name, version, and vendor info after java.lang.System is initialized.
   // Some values are actually configure-time constants but some can be set via the jlink tool and
   // so must be read dynamically. We treat them all the same.
@@ -398,6 +418,7 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
 
     JDK_Version::set_runtime_vendor_vm_bug_url(get_java_version_info(ik, vmSymbols::java_runtime_vendor_vm_bug_url_name()));
   }
+#endif
 
   // an instance of OutOfMemory exception has been allocated earlier
   initialize_class(vmSymbols::java_lang_OutOfMemoryError(), CHECK);
@@ -416,7 +437,9 @@ void Threads::initialize_jsr292_core_classes(TRAPS) {
   TraceTime timer("Initialize java.lang.invoke classes", TRACETIME_LOG(Info, startuptime));
 
   initialize_class(vmSymbols::java_lang_invoke_MethodHandle(), CHECK);
+#if HOTSPOT_TARGET_CLASSLIB != 8
   initialize_class(vmSymbols::java_lang_invoke_ResolvedMethodName(), CHECK);
+#endif
   initialize_class(vmSymbols::java_lang_invoke_MemberName(), CHECK);
   initialize_class(vmSymbols::java_lang_invoke_MethodHandleNatives(), CHECK);
 

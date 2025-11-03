@@ -33,6 +33,14 @@
 #include "jvm_io.h"
 #include "jvm_md.h"
 
+#ifndef HOTSPOT_TARGET_CLASSLIB
+#define HOTSPOT_TARGET_CLASSLIB 8
+#endif
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+#include "jvm8.h"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -406,8 +414,15 @@ JVM_NewMultiArray(JNIEnv *env, jclass eltClass, jintArray dim);
  * jdk.internal.reflect.CallerSensitive. The JVM will throw an
  * error if it is not marked properly.
  */
+#if HOTSPOT_TARGET_CLASSLIB == 8
+JNIEXPORT jclass JNICALL
+JVM_GetCallerClass(JNIEnv *env, int depth);
+JNIEXPORT jclass JNICALL
+JVM_GetCallerClass17(JNIEnv *env);
+#else
 JNIEXPORT jclass JNICALL
 JVM_GetCallerClass(JNIEnv *env);
+#endif
 
 
 /*
@@ -1171,6 +1186,32 @@ typedef struct JDK1_1InitArgs {
     jint debugPort;
 } JDK1_1InitArgs;
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+/*
+ * JVM I/O error codes
+ */
+#define JVM_EEXIST       -100
+
+/*
+ * Open a file descriptor. This function returns a negative error code
+ * on error, and a non-negative integer that is the file descriptor on
+ * success.
+ */
+JNIEXPORT jint JNICALL
+JVM_Open(const char *fname, jint flags, jint mode);
+/*
+JNIEXPORT jstring JNICALL
+JVM_GetClassName(JNIEnv *env, jclass cls);
+JNIEXPORT jobjectArray JNICALL
+JVM_GetClassSigners(JNIEnv *env, jclass cls);
+JNIEXPORT void JNICALL
+JVM_SetClassSigners(JNIEnv *env, jclass cls, jobjectArray signers);
+JNIEXPORT jboolean JNICALL
+JVM_IsArrayClass(JNIEnv *env, jclass cls);
+JNIEXPORT jboolean JNICALL
+JVM_IsPrimitiveClass(JNIEnv *env, jclass cls);
+*/
+#endif // HOTSPOT_TARGET_CLASSLIB
 
 #ifdef __cplusplus
 } /* extern "C" */

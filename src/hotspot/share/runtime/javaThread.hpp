@@ -216,6 +216,9 @@ class JavaThread: public Thread {
   enum SuspendFlags {
     // NOTE: avoid using the sign-bit as cc generates different test code
     //       when the sign-bit is used, and sometimes incorrectly - see CR 6398077
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    _external_suspend       = 0x20000000U, // thread is asked to self suspend
+#endif
     _obj_deopt              = 0x00000008U  // suspend for object reallocation and relocking for JVMTI agent
   };
 
@@ -743,6 +746,7 @@ private:
 #endif
 
   void set_contended_entered_monitor(ObjectMonitor* val) NOT_JVMTI_RETURN JVMTI_ONLY({ _contended_entered_monitor = val; })
+
 
   // Support for object deoptimization and JFR suspension
   void handle_special_runtime_exit_condition();
