@@ -265,7 +265,7 @@ bool SystemDictionary::is_platform_class_loader(oop class_loader) {
     return false;
   }
 #if HOTSPOT_TARGET_CLASSLIB == 8
-   Handle class_loader_handle(Thread::current(), class_loader);
+  Handle class_loader_handle(Thread::current(), class_loader);
   return SystemDictionary::is_ext_class_loader(class_loader_handle);
 #else
   return (class_loader->klass() == vmClasses::jdk_internal_loader_ClassLoaders_PlatformClassLoader_klass());

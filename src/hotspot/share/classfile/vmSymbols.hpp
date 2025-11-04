@@ -61,10 +61,11 @@ class SerializeClosure;
   template(jdk_internal_reflect,                      "sun/reflect")                              \
   template(reflect_Reflection,                        "sun/reflect/Reflection")                   \
   template(reflect_ConstantPool,                      "sun/reflect/ConstantPool")                 \
-  template(reflect_MethodAccessorImpl,                "sun/reflect/MethodAccessorImpl")           \
   template(reflect_CallerSensitive,                   "sun/reflect/CallerSensitive")              \
   template(reflect_CallerSensitive_signature,         "Lsun/reflect/CallerSensitive;")            \
+  template(reflect_MethodAccessorImpl,                "sun/reflect/MethodAccessorImpl")           \
   template(reflect_MagicAccessorImpl,                 "sun/reflect/MagicAccessorImpl")            \
+  template(reflect_ConstructorAccessorImpl,           "sun/reflect/ConstructorAccessorImpl")          \
   template(vmloader_name,                             "vmloader")                                 \
   template(java_security_PrivilegedActionException,   "java/security/PrivilegedActionException")  \
   template(exception_void_signature,                  "(Ljava/lang/Exception;)V")                 \
