@@ -562,6 +562,15 @@ void vframeStreamCommon::security_next() {
   }
 }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+void vframeStreamCommon::skip_reflection_related_frames() {
+  while (!at_end() &&
+          (method()->method_holder()->is_subclass_of(vmClasses::reflect_MethodAccessorImpl_klass()) ||
+           method()->method_holder()->is_subclass_of(vmClasses::reflect_ConstructorAccessorImpl_klass()))) {
+    next();
+  }
+}
+#endif
 
 void vframeStreamCommon::skip_prefixed_method_and_wrappers() {
   ResourceMark rm;
