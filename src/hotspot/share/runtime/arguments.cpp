@@ -2218,17 +2218,25 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, JVMFlagOrigin
       JavaAssertions::setSystemClassDefault(enable);
     // -bootclasspath:
     } else if (match_option(option, "-Xbootclasspath:", &tail)) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+        Arguments::reset_sysclasspath(tail);
+#else
         jio_fprintf(defaultStream::output_stream(),
           "-Xbootclasspath is no longer a supported option.\n");
         return JNI_EINVAL;
+#endif
     // -bootclasspath/a:
     } else if (match_option(option, "-Xbootclasspath/a:", &tail)) {
       Arguments::append_sysclasspath(tail);
     // -bootclasspath/p:
     } else if (match_option(option, "-Xbootclasspath/p:", &tail)) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+        Arguments::prepend_sysclasspath(tail);
+#else
         jio_fprintf(defaultStream::output_stream(),
           "-Xbootclasspath/p is no longer a supported option.\n");
         return JNI_EINVAL;
+#endif
     // -Xrun
     } else if (match_option(option, "-Xrun", &tail)) {
       if (tail != nullptr) {
@@ -4119,3 +4127,29 @@ bool Arguments::copy_expand_pid(const char* src, size_t srclen,
   *b = '\0';
   return (p == src_end); // return false if not all of the source was copied
 }
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+void PathString::prepend_value(const char *value) {
+  char *sp = NULL;
+  size_t len = 0;
+  if (value != NULL) {
+    len = strlen(value);
+    if (_value != NULL) {
+      len += strlen(_value);
+    }
+    sp = AllocateHeap(len+2, mtArguments);
+    assert(sp != NULL, "Unable to allocate space for new append path value");
+    if (sp != NULL) {
+      if (_value != NULL) {
+        strcpy(sp, value);
+        strcat(sp, os::path_separator());
+        strcat(sp, _value);
+        FreeHeap(_value);
+      } else {
+        strcpy(sp, value);
+      }
+      _value = sp;
+    }
+  }
+}
+#endif
