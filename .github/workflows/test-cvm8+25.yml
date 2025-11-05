@@ -53,15 +53,15 @@ jobs:
       matrix:
         test-name:
           - 'jdk/tier1'
-          #- 'langtools'
+          - 'langtools'
           #- 'cvm8'
 
         include:
           - test-name: 'jdk/tier1'
             test-suite: 'jdk_tier1'
 
-          #- test-name: 'langtools'
-          # test-suite: 'langtools'
+          - test-name: 'langtools'
+            test-suite: 'langtools'
 
           #- test-name: 'cvm8'
           #test-suite: 'cvm8'

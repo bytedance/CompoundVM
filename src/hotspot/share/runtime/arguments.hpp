@@ -72,6 +72,9 @@ class PathString : public CHeapObj<mtArguments> {
   // return false iff OOM && alloc_failmode == AllocFailStrategy::RETURN_NULL
   bool set_value(const char *value, AllocFailType alloc_failmode = AllocFailStrategy::EXIT_OOM);
   void append_value(const char *value);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  void prepend_value(const char *value);
+#endif
 
   PathString(const char* value);
   ~PathString();
@@ -512,6 +515,11 @@ class Arguments : AllStatic {
   }
 
 #if HOTSPOT_TARGET_CLASSLIB == 8
+  static void prepend_sysclasspath(const char *value) {
+    _boot_class_path->prepend_value(value);
+    _sun_boot_class_path->prepend_value(value);
+  }
+
   static void reset_sysclasspath(const char *value) {
     _boot_class_path->set_value(value);
     _sun_boot_class_path->set_value(value);
