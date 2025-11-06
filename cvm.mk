@@ -94,7 +94,7 @@ define setup_download_artifact
 		rm -rf $(DIR) && mkdir -p $(DIR); \
 		for i in `seq 4`; do \
 			[[ $$i -gt 1 ]] && echo "Retrying to download $(URL)"; \
-			[[ ! -f $(LPATH) ]] && wget -nc $(URL) -O $(LPATH); \
+			[[ ! -f $(LPATH) ]] && wget -nc -q $(URL) -O $(LPATH); \
 			if [[ x$$MD5_EXP = x ]]; then break; fi; \
 			MD5SUM=`md5sum $(LPATH) | awk '{print $$1}'`; \
 			if [[ $$MD5SUM = $(MD5_EXP) ]]; then \
@@ -142,13 +142,13 @@ cvm8: jdk8vm25
 
 cvm8default25: jdk8vm25
 	echo "-server25 KNOWN" > $(CVM8_LIBDIR)/jvm.cfg
+	echo "-cvm KNOWN" >> $(CVM8_LIBDIR)/jvm.cfg
 	echo "-server KNOWN" >> $(CVM8_LIBDIR)/jvm.cfg
 	echo "-client IGNORE" >> $(CVM8_LIBDIR)/jvm.cfg
-	echo "-server25 KNOWN" > $(OUTPUTDIR)/$(DISTRO_NAME)/jre/lib/amd64/jvm.cfg
-	echo "-server KNOWN" >> $(OUTPUTDIR)/$(DISTRO_NAME)/jre/lib/amd64/jvm.cfg
-	echo "-client IGNORE" >> $(OUTPUTDIR)/$(DISTRO_NAME)/jre/lib/amd64/jvm.cfg
+	cp -f $(CVM8_LIBDIR)/jvm.cfg $(OUTPUTDIR)/$(DISTRO_NAME)/jre/lib/amd64/jvm.cfg
 
 JVM_PATCH_ARTIFACTS := jre/lib/rt25.jar jre/lib/rt8.jar jre/lib/amd64/libjava25.so jre/lib/amd64/libjimage25.so jre/lib/amd64/libjdwp25.so jre/lib/amd64/server25 jre/lib/amd64/jvm.cfg
+JVM_PATCH_ARTIFACTS_SOFTLINK := jre/lib/amd64/cvm
 
 jvm-patch: cvm8default25
 	@echo "###### Composing CVM8 jvm patch ######"
@@ -156,6 +156,7 @@ jvm-patch: cvm8default25
 	for file in $(JVM_PATCH_ARTIFACTS); do \
 		cd $(OUTPUTDIR)/$(DISTRO_NAME) && cp -rf --parents $$file $(OUTPUTDIR)/$(DISTRO_JVM_PATCH_NAME)/; \
 	done
+	cd $(OUTPUTDIR)/$(DISTRO_NAME) && cp -a --parents $(JVM_PATCH_ARTIFACTS_SOFTLINK) $(OUTPUTDIR)/$(DISTRO_JVM_PATCH_NAME)/;
 
 -clean-jdk8vm25:
 	rm -fr $(BUILDDIR)/alt_kernel
@@ -201,6 +202,8 @@ jdk8vm25: build_jdk8u build_jdk25u altkernel
 		cp -f $(SRC_BUILDDIR_25)/jdk/lib/libjdwp.debuginfo $(CVM8_LIBDIR)/libjdwp25.debuginfo && \
 		cp -f $(SRC_BUILDDIR_25)/jdk/lib/server/libjvm.debuginfo $(CVM8_LIBDIR)/server25/libjvm.debuginfo; \
 		[[ "x$$(grep server25 $(CVM8_LIBDIR)/jvm.cfg)" = "x" ]] && echo "-server25 KNOWN" >> $(CVM8_LIBDIR)/jvm.cfg; \
+		[[ "x$$(grep cvm $(CVM8_LIBDIR)/jvm.cfg)" = "x" ]] && echo "-cvm KNOWN" >> $(CVM8_LIBDIR)/jvm.cfg; \
+		pushd $(CVM8_LIBDIR) && ln -sf server25 cvm && popd; \
 		cp -rf $(CVM8DIR)/* $(OUTPUTDIR)/$(DISTRO_NAME)/; \
 	}
 ifeq ($(MODE), release)
@@ -289,7 +292,7 @@ ifeq ($(SKIP_BUILD), true)
 else
 -setup_jtreg8: $(JTREG) jdk8vm25
 endif
-	$(eval JT8_OPTS=-jdk:${CVM8DIR} -w:${JT8_WORKDIR} -r:${JT8_REPORTDIR} -a -ea -esa -ignore:quiet -ovm -v:fail,error,time -javaoption:-server25 ${JT8_OPTS})
+	$(eval JT8_OPTS=-jdk:${CVM8DIR} -w:${JT8_WORKDIR} -r:${JT8_REPORTDIR} -a -ea -esa -ignore:quiet -ovm -v:fail,error,time -javaoption:-cvm ${JT8_OPTS})
 
 # Setup bootstrap JDK from a given URL
 # $1  root directory of jtreg

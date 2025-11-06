@@ -83,7 +83,7 @@ runs:
         # Download BootJDK and verify checksum
         mkdir -p bootjdk/jdk
         mkdir -p bootjdk/unpacked
-        wget --progress=dot:mega -O bootjdk/jdk.${{ steps.ext.outputs.value }} '${{ steps.url.outputs.value }}'
+        wget -q --progress=dot:mega -O bootjdk/jdk.${{ steps.ext.outputs.value }} '${{ steps.url.outputs.value }}'
         echo '${{ steps.sha256.outputs.value }} bootjdk/jdk.${{ steps.ext.outputs.value }}' | sha256sum -c >/dev/null -
       shell: bash
       if: steps.get-cached-bootjdk.outputs.cache-hit != 'true'
