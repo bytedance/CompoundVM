@@ -110,6 +110,11 @@ bool Compiler::is_intrinsic_supported(const methodHandle& method) {
 
 bool Compiler::is_intrinsic_supported(vmIntrinsics::ID id) {
   switch (id) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_putOrderedObject:
+  case vmIntrinsics::_putOrderedInt:
+  case vmIntrinsics::_putOrderedLong:
+#endif
   case vmIntrinsics::_compareAndSetLong:
     break;
   case vmIntrinsics::_getAndAddInt:

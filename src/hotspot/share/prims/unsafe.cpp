@@ -379,6 +379,13 @@ UNSAFE_ENTRY(jobject, Unsafe_AllocateInstance(JNIEnv *env, jobject unsafe, jclas
 UNSAFE_LEAF(jlong, Unsafe_AllocateMemory0(JNIEnv *env, jobject unsafe, jlong size)) {
   size_t sz = (size_t)size;
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // classlib8 needs alignment here
+  if (!is_aligned(sz, HeapWordSize)) {
+    sz = align_up(sz, HeapWordSize);
+  }
+#endif
+
   assert(is_aligned(sz, HeapWordSize), "sz not aligned");
 
   void* x = os::malloc(sz, mtOther);
@@ -389,6 +396,13 @@ UNSAFE_LEAF(jlong, Unsafe_AllocateMemory0(JNIEnv *env, jobject unsafe, jlong siz
 UNSAFE_LEAF(jlong, Unsafe_ReallocateMemory0(JNIEnv *env, jobject unsafe, jlong addr, jlong size)) {
   void* p = addr_from_java(addr);
   size_t sz = (size_t)size;
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // classlib8 needs alignment here
+  if (!is_aligned(sz, HeapWordSize)) {
+    sz = align_up(sz, HeapWordSize);
+  }
+#endif
 
   assert(is_aligned(sz, HeapWordSize), "sz not aligned");
 

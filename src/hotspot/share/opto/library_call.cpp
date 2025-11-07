@@ -355,6 +355,11 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_putLongVolatile:          return inline_unsafe_access( is_store, T_LONG,     Volatile, false);
   case vmIntrinsics::_putFloatVolatile:         return inline_unsafe_access( is_store, T_FLOAT,    Volatile, false);
   case vmIntrinsics::_putDoubleVolatile:        return inline_unsafe_access( is_store, T_DOUBLE,   Volatile, false);
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_putOrderedObject:         return inline_unsafe_access( is_store, T_OBJECT,   Release, false);
+  case vmIntrinsics::_putOrderedInt:            return inline_unsafe_access( is_store, T_INT,      Release, false);
+  case vmIntrinsics::_putOrderedLong:           return inline_unsafe_access( is_store, T_LONG,     Release, false);
+#endif
 
   case vmIntrinsics::_getShortUnaligned:        return inline_unsafe_access(!is_store, T_SHORT,    Relaxed, true);
   case vmIntrinsics::_getCharUnaligned:         return inline_unsafe_access(!is_store, T_CHAR,     Relaxed, true);

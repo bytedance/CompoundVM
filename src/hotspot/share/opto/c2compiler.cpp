@@ -687,6 +687,11 @@ bool C2Compiler::is_intrinsic_supported(vmIntrinsics::ID id) {
   case vmIntrinsics::_putLongVolatile:
   case vmIntrinsics::_putFloatVolatile:
   case vmIntrinsics::_putDoubleVolatile:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_putOrderedObject:
+  case vmIntrinsics::_putOrderedInt:
+  case vmIntrinsics::_putOrderedLong:
+#endif
   case vmIntrinsics::_getReferenceAcquire:
   case vmIntrinsics::_getBooleanAcquire:
   case vmIntrinsics::_getByteAcquire:

@@ -3613,6 +3613,11 @@ void GraphBuilder::build_graph_for_intrinsic(ciMethod* callee, bool ignore_retur
   case vmIntrinsics::_putLongVolatile        : append_unsafe_put(callee, T_LONG,    true); return;
   case vmIntrinsics::_putFloatVolatile       : append_unsafe_put(callee, T_FLOAT,   true); return;
   case vmIntrinsics::_putDoubleVolatile      : append_unsafe_put(callee, T_DOUBLE,  true); return;
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_putOrderedObject       : append_unsafe_put(callee, T_OBJECT,  true); return;
+  case vmIntrinsics::_putOrderedInt          : append_unsafe_put(callee, T_INT,     true); return;
+  case vmIntrinsics::_putOrderedLong         : append_unsafe_put(callee, T_LONG,    true); return;
+#endif
   case vmIntrinsics::_compareAndSetLong:
   case vmIntrinsics::_compareAndSetInt:
   case vmIntrinsics::_compareAndSetReference : append_unsafe_CAS(callee); return;
