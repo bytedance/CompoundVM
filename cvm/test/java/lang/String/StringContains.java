@@ -23,7 +23,7 @@
  * @bug 1234567
  * @summary check String.contains c2 bug is fixed
  * @compile StringContains.java
- * @run main/othervm -server17 StringContains
+ * @run main/othervm -cvm StringContains
  */
 
 public class StringContains {

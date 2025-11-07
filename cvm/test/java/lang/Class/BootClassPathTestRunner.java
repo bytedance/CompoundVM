@@ -23,7 +23,7 @@
  * @bug 1234567
  * @summary check -Xbootclasspath and -Xbootclasspath/p option works for java17
  * @compile BootClassPathTest.java BootClassPathTestRunner.java
- * @run main/othervm -server17 BootClassPathTestRunner
+ * @run main/othervm -cvm BootClassPathTestRunner
  */
 
 import java.io.BufferedReader;
@@ -53,7 +53,7 @@ public class BootClassPathTestRunner {
     static void test(String bootclasspath, String expect) throws Exception {
         List<String> cmd = new ArrayList<String>();
         cmd.add(new File(new File(JAVAHOME, "bin"), "java").getPath());
-        cmd.add("-server17");
+        cmd.add("-cvm");
         cmd.add(bootclasspath);
         cmd.add("BootClassPathTest");
         ProcessBuilder pb = new ProcessBuilder(cmd);

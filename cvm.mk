@@ -153,13 +153,13 @@ cvm8: jdk8vm17
 
 cvm8default17: jdk8vm17
 	echo "-server17 KNOWN" > $(CVM8_LIBDIR)/jvm.cfg
+	echo "-cvm KNOWN" >> $(CVM8_LIBDIR)/jvm.cfg
 	echo "-server KNOWN" >> $(CVM8_LIBDIR)/jvm.cfg
 	echo "-client IGNORE" >> $(CVM8_LIBDIR)/jvm.cfg
-	echo "-server17 KNOWN" > $(OUTPUTDIR)/$(DISTRO_NAME)/jre/lib/$(ARCH_DIR)/jvm.cfg
-	echo "-server KNOWN" >> $(OUTPUTDIR)/$(DISTRO_NAME)/jre/lib/$(ARCH_DIR)/jvm.cfg
-	echo "-client IGNORE" >> $(OUTPUTDIR)/$(DISTRO_NAME)/jre/lib/$(ARCH_DIR)/jvm.cfg
+	cp -f $(CVM8_LIBDIR)/jvm.cfg $(OUTPUTDIR)/$(DISTRO_NAME)/jre/lib/$(ARCH_DIR)/jvm.cfg
 
 JVM_PATCH_ARTIFACTS := jre/lib/rt17.jar jre/lib/rt8.jar jre/lib/$(ARCH_DIR)/libjava17.so jre/lib/$(ARCH_DIR)/libjimage17.so jre/lib/$(ARCH_DIR)/libjdwp17.so jre/lib/$(ARCH_DIR)/server17 jre/lib/$(ARCH_DIR)/jvm.cfg
+JVM_PATCH_ARTIFACTS_SOFTLINK := jre/lib/$(ARCH_DIR)/cvm
 
 jvm-patch: cvm8default17
 	@echo "###### Composing CVM8 jvm patch ######"
@@ -167,6 +167,7 @@ jvm-patch: cvm8default17
 	for file in $(JVM_PATCH_ARTIFACTS); do \
 		cd $(OUTPUTDIR)/$(DISTRO_NAME) && cp -rf --parents $$file $(OUTPUTDIR)/$(DISTRO_JVM_PATCH_NAME)/; \
 	done
+	cd $(OUTPUTDIR)/$(DISTRO_NAME) && cp -a --parents $(JVM_PATCH_ARTIFACTS_SOFTLINK) $(OUTPUTDIR)/$(DISTRO_JVM_PATCH_NAME)/;
 
 -clean-jdk8vm17:
 	rm -fr $(BUILDDIR)/alt_kernel
@@ -202,6 +203,8 @@ jdk8vm17: -clean-jdk8vm17 -bootstrap build_jdk8u build_jdk17u altkernel
 		cp -f $(SRC_BUILDDIR_17)/jdk/lib/libjdwp.debuginfo $(CVM8_LIBDIR)/libjdwp17.debuginfo && \
 		cp -f $(SRC_BUILDDIR_17)/jdk/lib/server/libjvm.debuginfo $(CVM8_LIBDIR)/server17/libjvm.debuginfo && \
 		[[ "x$$(grep server17 $(CVM8_LIBDIR)/jvm.cfg)" = "x" ]] && echo "-server17 KNOWN" >> $(CVM8_LIBDIR)/jvm.cfg && \
+		[[ "x$$(grep cvm $(CVM8_LIBDIR)/jvm.cfg)" = "x" ]] && echo "-cvm KNOWN" >> $(CVM8_LIBDIR)/jvm.cfg; \
+		pushd $(CVM8_LIBDIR) && ln -sf server17 cvm && popd; \
 		cp -rf $(CVM8DIR)/* $(OUTPUTDIR)/$(DISTRO_NAME)/; \
 	}
 ifeq ($(MODE), release)
@@ -299,7 +302,7 @@ ifeq ($(SKIP_BUILD), true)
 else
 -setup_jtreg8: $(JTREG) jdk8vm17
 endif
-	$(eval JT8_OPTS=-jdk:${CVM8DIR} -w:${JT8_WORKDIR} -r:${JT8_REPORTDIR} -a -ea -esa -ignore:quiet -ovm -v:fail,error,time -javaoption:-server17 ${JT8_OPTS})
+	$(eval JT8_OPTS=-jdk:${CVM8DIR} -w:${JT8_WORKDIR} -r:${JT8_REPORTDIR} -a -ea -esa -ignore:quiet -ovm -v:fail,error,time -javaoption:-cvm ${JT8_OPTS})
 
 # Setup bootstrap JDK from a given URL
 # $1  root directory of jtreg

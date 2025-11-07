@@ -45,7 +45,7 @@ if [ -z "${TESTCLASSES}" ]; then
   exit 1
 fi
 
-JAVA="${TESTJAVA}/bin/java -server17"
+JAVA="${TESTJAVA}/bin/java -cvm"
 
 # Support functions to start and stop a given application
 
