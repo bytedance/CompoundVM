@@ -22,7 +22,7 @@
  * @test
  * @bug 1234567
  * @summary use Class.forName to detect anonymous classes
- * @run main/othervm -server17 -Xlog:class+init=info,class+load=info ForNameHidden
+ * @run main/othervm -cvm -Xlog:class+init=info,class+load=info ForNameHidden
  * @run main/othervm -server -verbose:class ForNameHidden
  */
 
