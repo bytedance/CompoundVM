@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -33,8 +33,8 @@ package gc.arguments;
  * @library /
  * @modules java.base/jdk.internal.misc
  *          java.management
- * @build sun.hotspot.WhiteBox
- * @run driver jdk.test.lib.helpers.ClassFileInstaller sun.hotspot.WhiteBox
+ * @build jdk.test.whitebox.WhiteBox
+ * @run driver jdk.test.lib.helpers.ClassFileInstaller jdk.test.whitebox.WhiteBox
  * @run driver gc.arguments.TestTargetSurvivorRatioFlag
  */
 
@@ -48,7 +48,7 @@ import java.util.regex.Pattern;
 import jdk.internal.misc.Unsafe;
 import jdk.test.lib.process.OutputAnalyzer;
 import jdk.test.lib.Utils;
-import sun.hotspot.WhiteBox;
+import jdk.test.whitebox.WhiteBox;
 import static gc.testlibrary.Allocation.blackHole;
 
 /* In order to test that TargetSurvivorRatio affects survivor space occupancy
@@ -116,7 +116,7 @@ public class TestTargetSurvivorRatioFlag {
         vmOptions.add("-XX:TargetSurvivorRatio=" + ratio);
         vmOptions.add("-version");
 
-        ProcessBuilder procBuilder = GCArguments.createJavaProcessBuilder(vmOptions);
+        ProcessBuilder procBuilder = GCArguments.createLimitedTestJavaProcessBuilder(vmOptions);
         OutputAnalyzer analyzer = new OutputAnalyzer(procBuilder.start());
 
         analyzer.shouldHaveExitValue(1);
@@ -151,7 +151,7 @@ public class TestTargetSurvivorRatioFlag {
                 Integer.toString(ratio)
         );
 
-        ProcessBuilder procBuilder = GCArguments.createJavaProcessBuilder(vmOptions);
+        ProcessBuilder procBuilder = GCArguments.createLimitedTestJavaProcessBuilder(vmOptions);
         OutputAnalyzer analyzer = new OutputAnalyzer(procBuilder.start());
 
         analyzer.shouldHaveExitValue(0);

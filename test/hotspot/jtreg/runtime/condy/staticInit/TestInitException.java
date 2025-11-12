@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -37,7 +37,7 @@ import jdk.test.lib.process.OutputAnalyzer;
 
 public class TestInitException {
     public static void main(java.lang.String[] unused) throws Exception {
-        ProcessBuilder pb = ProcessTools.createJavaProcessBuilder("Example");
+        ProcessBuilder pb = ProcessTools.createTestJavaProcessBuilder("Example");
         OutputAnalyzer oa = new OutputAnalyzer(pb.start());
         // First call stack trace
         // shouldMatch is used to workaround CODETOOLS-7902686
@@ -51,4 +51,3 @@ public class TestInitException {
         oa.shouldHaveExitValue(1);
     }
 }
-

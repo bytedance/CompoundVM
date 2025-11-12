@@ -34,6 +34,7 @@
 #include "classfile/stackMapTableFormat.hpp"
 #include "classfile/symbolTable.hpp"
 #include "classfile/systemDictionary.hpp"
+#include "classfile/systemDictionaryShared.hpp"
 #include "classfile/verifier.hpp"
 #include "classfile/vmClasses.hpp"
 #include "classfile/vmSymbols.hpp"
@@ -213,6 +214,12 @@ bool Verifier::verify(InstanceKlass* klass, bool should_verify_class, TRAPS) {
          exception_name == vmSymbols::java_lang_ClassFormatError())) {
       log_info(verification)("Fail over class verification to old verifier for: %s", klass->external_name());
       log_info(class, init)("Fail over class verification to old verifier for: %s", klass->external_name());
+      // Exclude any classes that fail over during dynamic dumping
+      if (CDS_ONLY(DynamicDumpSharedSpaces) NOT_CDS(false)) {
+        ResourceMark rm;
+        log_warning(cds)("Skipping %s: Failed over class verification while dynamic dumping", klass->name()->as_C_string());
+        SystemDictionaryShared::set_excluded(klass);
+      }
       message_buffer = NEW_RESOURCE_ARRAY(char, message_buffer_len);
       exception_message = message_buffer;
       exception_name = inference_verify(
@@ -596,7 +603,7 @@ void ErrorContext::stackmap_details(outputStream* ss, const Method* method) cons
 
 ClassVerifier::ClassVerifier(JavaThread* current, InstanceKlass* klass)
     : _thread(current), _previous_symbol(NULL), _symbols(NULL), _exception_type(NULL),
-      _message(NULL), _method_signatures_table(NULL), _klass(klass) {
+      _message(NULL), _klass(klass) {
   _this_type = VerificationType::reference_type(klass->name());
 }
 
@@ -627,16 +634,12 @@ void ClassVerifier::verify_class(TRAPS) {
   // Either verifying both local and remote classes or just remote classes.
   assert(BytecodeVerificationRemote, "Should not be here");
 
-  // Create hash table containing method signatures.
-  method_signatures_table_type method_signatures_table;
-  set_method_signatures_table(&method_signatures_table);
-
   Array<Method*>* methods = _klass->methods();
   int num_methods = methods->length();
 
   for (int index = 0; index < num_methods; index++) {
     // Check for recursive re-verification before each method.
-    if (was_recursively_verified())  return;
+    if (was_recursively_verified()) return;
 
     Method* m = methods->at(index);
     if (m->is_native() || m->is_abstract() || m->is_overpass()) {
@@ -2256,11 +2259,12 @@ void ClassVerifier::verify_switch(
           "low must be less than or equal to high in tableswitch");
       return;
     }
-    keys = high - low + 1;
-    if (keys < 0) {
+    int64_t keys64 = ((int64_t)high - low) + 1;
+    if (keys64 > 65535) {  // Max code length
       verify_error(ErrorContext::bad_code(bci), "too many keys in tableswitch");
       return;
     }
+    keys = (int)keys64;
     delta = 1;
   } else {
     keys = (int)Bytes::get_Java_u4(aligned_bcp + jintSize);

@@ -25,7 +25,6 @@
 
 package sun.security.pkcs;
 
-import java.io.OutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.CertPathValidatorException;
@@ -236,7 +235,7 @@ public class SignerInfo implements DerEncoder {
      *
      * @exception IOException on encoding error.
      */
-    public void derEncode(OutputStream out) throws IOException {
+    public void derEncode(DerOutputStream out) throws IOException {
         DerOutputStream seq = new DerOutputStream();
         seq.putInteger(version);
         DerOutputStream issuerAndSerialNumber = new DerOutputStream();
@@ -258,10 +257,7 @@ public class SignerInfo implements DerEncoder {
         if (unauthenticatedAttributes != null)
             unauthenticatedAttributes.encode((byte)0xA1, seq);
 
-        DerOutputStream tmp = new DerOutputStream();
-        tmp.write(DerValue.tag_Sequence, seq);
-
-        out.write(tmp.toByteArray());
+        out.write(DerValue.tag_Sequence, seq);
     }
 
     /*
@@ -698,14 +694,15 @@ public class SignerInfo implements DerEncoder {
             md.digest(encryptedDigest))) {
 
             throw new SignatureException("Signature timestamp (#" +
-                token.getSerialNumber() + ") generated on " + token.getDate() +
-                " is inapplicable");
+                Debug.toString(token.getSerialNumber()) +
+                ") generated on " + token.getDate() + " is inapplicable");
         }
 
         if (debug != null) {
             debug.println();
             debug.println("Detected signature timestamp (#" +
-                token.getSerialNumber() + ") generated on " + token.getDate());
+                Debug.toString(token.getSerialNumber()) +
+                ") generated on " + token.getDate());
             debug.println();
         }
     }

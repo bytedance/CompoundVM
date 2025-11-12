@@ -371,7 +371,6 @@ static bool matches_property_suffix(const char* option, const char* property, si
 // any of the reserved module properties.
 // property should be passed without the leading "-D".
 bool Arguments::is_internal_module_property(const char* property) {
-  assert((strncmp(property, "-D", 2) != 0), "Unexpected leading -D");
   if  (strncmp(property, MODULE_PROPERTY_PREFIX, MODULE_PROPERTY_PREFIX_LEN) == 0) {
     const char* property_suffix = property + MODULE_PROPERTY_PREFIX_LEN;
     if (matches_property_suffix(property_suffix, ADDEXPORTS, ADDEXPORTS_LEN) ||
@@ -2034,6 +2033,14 @@ bool Arguments::check_vm_args_consistency() {
     PropertyList_unique_add(&_system_properties, "jdk.internal.vm.ci.enabled", "true",
         AddProperty, UnwriteableProperty, InternalProperty);
     if (!create_numbered_module_property("jdk.module.addmods", "jdk.internal.vm.ci", addmods_count++)) {
+      return false;
+    }
+  }
+#endif
+
+#if INCLUDE_JFR
+  if (status && (FlightRecorderOptions || StartFlightRecording)) {
+    if (!create_numbered_module_property("jdk.module.addmods", "jdk.jfr", addmods_count++)) {
       return false;
     }
   }

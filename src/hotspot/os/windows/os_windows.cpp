@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -55,11 +55,12 @@
 #include "runtime/orderAccess.hpp"
 #include "runtime/osThread.hpp"
 #include "runtime/perfMemory.hpp"
-#include "runtime/safefetch.inline.hpp"
+#include "runtime/safefetch.hpp"
 #include "runtime/safepointMechanism.hpp"
 #include "runtime/semaphore.inline.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/statSampler.hpp"
+#include "runtime/stubRoutines.hpp"
 #include "runtime/thread.inline.hpp"
 #include "runtime/threadCritical.hpp"
 #include "runtime/timer.hpp"
@@ -88,6 +89,7 @@
 #include <shlobj.h>
 
 #include <malloc.h>
+#include <powerbase.h>
 #include <signal.h>
 #include <direct.h>
 #include <errno.h>
@@ -383,8 +385,9 @@ void os::init_system_properties_values() {
     char path[MAX_PATH];
     char buf[2 * MAX_PATH + 2 * sizeof(EXT_DIR) + sizeof(PACKAGE_DIR) + 1];
     GetWindowsDirectory(path, MAX_PATH);
-    sprintf(buf, "%s%s;%s%s%s", Arguments::get_java_home(), EXT_DIR,
-            path, PACKAGE_DIR, EXT_DIR);
+    os::snprintf_checked(buf, sizeof(buf), "%s%s;%s%s%s",
+                         Arguments::get_java_home(), EXT_DIR,
+                         path, PACKAGE_DIR, EXT_DIR);
     Arguments::set_ext_dirs(buf);
   }
   #undef EXT_DIR
@@ -1894,7 +1897,10 @@ void os::win32::print_windows_version(outputStream* st) {
       // - 2016 GA 10/2016 build: 14393
       // - 2019 GA 11/2018 build: 17763
       // - 2022 GA 08/2021 build: 20348
-      if (build_number > 20347) {
+      // - 2025 Preview build   : 26040
+      if (build_number > 26039) {
+        st->print("Server 2025");
+      } else if (build_number > 20347) {
         st->print("Server 2022");
       } else if (build_number > 17762) {
         st->print("Server 2019");
@@ -1925,8 +1931,65 @@ void os::win32::print_windows_version(outputStream* st) {
   st->cr();
 }
 
+// Processor Power Information; missing from Windows headers
+typedef struct _PROCESSOR_POWER_INFORMATION {
+    ULONG Number;
+    ULONG MaxMhz;     // max specified clock frequency of the system processor
+    ULONG CurrentMhz; // max specified processor clock frequency mult. by current processor throttle
+    ULONG MhzLimit;   // max specified processor clock frequency mult. by current processor thermal throttle limit
+    ULONG MaxIdleState;
+    ULONG CurrentIdleState;
+} PROCESSOR_POWER_INFORMATION;
+
 void os::pd_print_cpu_info(outputStream* st, char* buf, size_t buflen) {
-  // Nothing to do for now.
+  int proc_count = os::processor_count();
+  // handle potential early cases where processor count is not yet set
+  if (proc_count < 1) {
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    proc_count = si.dwNumberOfProcessors;
+  }
+
+  size_t sz_check = sizeof(PROCESSOR_POWER_INFORMATION) * (size_t)proc_count;
+  NTSTATUS status = ::CallNtPowerInformation(ProcessorInformation, nullptr, 0, buf, (ULONG) buflen);
+  int max_mhz = -1, current_mhz = -1, mhz_limit = -1;
+  bool same_vals_for_all_cpus = true;
+
+  if (status == ERROR_SUCCESS) {
+    PROCESSOR_POWER_INFORMATION* pppi = (PROCESSOR_POWER_INFORMATION*) buf;
+    for (int i = 0; i < proc_count; i++) {
+      if (i == 0) {
+        max_mhz = (int) pppi->MaxMhz;
+        current_mhz = (int) pppi->CurrentMhz;
+        mhz_limit = (int) pppi->MhzLimit;
+      } else {
+        if (max_mhz != (int) pppi->MaxMhz ||
+            current_mhz != (int) pppi->CurrentMhz ||
+            mhz_limit != (int) pppi->MhzLimit) {
+          same_vals_for_all_cpus = false;
+          break;
+        }
+      }
+      // avoid iteration in case buf is too small to hold all proc infos
+      if (sz_check > buflen) break;
+      pppi++;
+    }
+
+    if (same_vals_for_all_cpus && max_mhz != -1) {
+      st->print_cr("Processor Information for all %d processors :", proc_count);
+      st->print_cr("  Max Mhz: %d, Current Mhz: %d, Mhz Limit: %d", max_mhz, current_mhz, mhz_limit);
+      return;
+    }
+    // differing values, iterate again
+    pppi = (PROCESSOR_POWER_INFORMATION*) buf;
+    for (int i = 0; i < proc_count; i++) {
+      st->print_cr("Processor Information for processor %d", (int) pppi->Number);
+      st->print_cr("  Max Mhz: %d, Current Mhz: %d, Mhz Limit: %d",
+                     (int) pppi->MaxMhz, (int) pppi->CurrentMhz, (int) pppi->MhzLimit);
+      if (sz_check > buflen) break;
+      pppi++;
+    }
+  }
 }
 
 void os::get_summary_cpu_info(char* buf, size_t buflen) {
@@ -2525,11 +2588,6 @@ LONG WINAPI topLevelExceptionFilter(struct _EXCEPTION_POINTERS* exceptionInfo) {
   address pc = (address) exceptionInfo->ContextRecord->Eip;
 #endif
   Thread* t = Thread::current_or_null_safe();
-
-  // Handle SafeFetch32 and SafeFetchN exceptions.
-  if (StubRoutines::is_safefetch_fault(pc)) {
-    return Handle_Exception(exceptionInfo, StubRoutines::continuation_for_safefetch_fault(pc));
-  }
 
 #ifndef _WIN64
   // Execution protection violation - win32 running on AMD64 only
@@ -3297,7 +3355,8 @@ static char* map_or_reserve_memory_aligned(size_t size, size_t alignment, int fi
                                      os::attempt_reserve_memory_at(aligned_base, size);
   }
 
-  assert(aligned_base != NULL, "Did not manage to re-map after %d attempts?", max_attempts);
+  assert(aligned_base != nullptr,
+      "Did not manage to re-map after %d attempts (size %zu, alignment %zu, file descriptor %d)", max_attempts, size, alignment, file_desc);
 
   return aligned_base;
 }
@@ -4788,8 +4847,19 @@ FILE* os::open(int fd, const char* mode) {
   return ::_fdopen(fd, mode);
 }
 
-size_t os::write(int fd, const void *buf, unsigned int nBytes) {
-  return ::write(fd, buf, nBytes);
+ssize_t os::pd_write(int fd, const void *buf, size_t nBytes) {
+  ssize_t original_len = (ssize_t)nBytes;
+  while (nBytes > 0) {
+    unsigned int len = nBytes > INT_MAX ? INT_MAX : (unsigned int)nBytes;
+    // On Windows, ::write takes 'unsigned int' no of bytes, so nBytes should be split if larger.
+    ssize_t written_bytes = ::write(fd, buf, len);
+    if (written_bytes < 0) {
+      return OS_ERR;
+    }
+    nBytes -= written_bytes;
+    buf = (char *)buf + written_bytes;
+  }
+  return original_len;
 }
 
 int os::close(int fd) {
@@ -5741,10 +5811,6 @@ static jint initSock() {
     return JNI_ERR;
   }
   return JNI_OK;
-}
-
-struct hostent* os::get_host_by_name(char* name) {
-  return (struct hostent*)gethostbyname(name);
 }
 
 int os::socket_close(int fd) {

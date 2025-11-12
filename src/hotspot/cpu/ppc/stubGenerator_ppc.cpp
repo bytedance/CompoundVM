@@ -2133,7 +2133,7 @@ class StubGenerator: public StubCodeGenerator {
 
     __ check_klass_subtype_fast_path(sub_klass, super_klass, temp, R0, &L_success, &L_miss, NULL,
                                      super_check_offset);
-    __ check_klass_subtype_slow_path(sub_klass, super_klass, temp, R0, &L_success, NULL);
+    __ check_klass_subtype_slow_path(sub_klass, super_klass, temp, R0, &L_success);
 
     // Fall through on failure!
     __ bind(L_miss);
@@ -3159,45 +3159,6 @@ class StubGenerator: public StubCodeGenerator {
 #endif
   }
 
-  // Safefetch stubs.
-  void generate_safefetch(const char* name, int size, address* entry, address* fault_pc, address* continuation_pc) {
-    // safefetch signatures:
-    //   int      SafeFetch32(int*      adr, int      errValue);
-    //   intptr_t SafeFetchN (intptr_t* adr, intptr_t errValue);
-    //
-    // arguments:
-    //   R3_ARG1 = adr
-    //   R4_ARG2 = errValue
-    //
-    // result:
-    //   R3_RET  = *adr or errValue
-
-    StubCodeMark mark(this, "StubRoutines", name);
-
-    // Entry point, pc or function descriptor.
-    *entry = __ function_entry();
-
-    // Load *adr into R4_ARG2, may fault.
-    *fault_pc = __ pc();
-    switch (size) {
-      case 4:
-        // int32_t, signed extended
-        __ lwa(R4_ARG2, 0, R3_ARG1);
-        break;
-      case 8:
-        // int64_t
-        __ ld(R4_ARG2, 0, R3_ARG1);
-        break;
-      default:
-        ShouldNotReachHere();
-    }
-
-    // return errValue or *adr
-    *continuation_pc = __ pc();
-    __ mr(R3_RET, R4_ARG2);
-    __ blr();
-  }
-
   // Stub for BigInteger::multiplyToLen()
   //
   //  Arguments:
@@ -3576,7 +3537,7 @@ class StubGenerator: public StubCodeGenerator {
     // passing the link register's value directly doesn't work.
     // Since we have to save the link register on the stack anyway, we calculate the corresponding stack address
     // and pass that one instead.
-    __ add(R3_ARG1, _abi0(lr), R1_SP);
+    __ addi(R3_ARG1, R1_SP, _abi0(lr));
 
     __ save_LR_CR(R0);
     __ push_frame_reg_args(nbytes_save, R0);
@@ -4534,14 +4495,6 @@ class StubGenerator: public StubCodeGenerator {
       StubRoutines::_crc32c_table_addr = StubRoutines::ppc::generate_crc_constants(REVERSE_CRC32C_POLY);
       StubRoutines::_updateBytesCRC32C = generate_CRC32_updateBytes(true);
     }
-
-    // Safefetch stubs.
-    generate_safefetch("SafeFetch32", sizeof(int),     &StubRoutines::_safefetch32_entry,
-                                                       &StubRoutines::_safefetch32_fault_pc,
-                                                       &StubRoutines::_safefetch32_continuation_pc);
-    generate_safefetch("SafeFetchN", sizeof(intptr_t), &StubRoutines::_safefetchN_entry,
-                                                       &StubRoutines::_safefetchN_fault_pc,
-                                                       &StubRoutines::_safefetchN_continuation_pc);
   }
 
   void generate_all() {

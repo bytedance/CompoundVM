@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2025, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -142,7 +142,7 @@ Node *AddNode::Ideal(PhaseGVN *phase, bool can_reshape) {
   // Check for commutative operation desired
   if (commute(phase, this)) return this;
 
-  AddNode *progress = NULL;             // Progress flag
+  AddNode *progress = nullptr;             // Progress flag
 
   // Convert "(x+1)+2" into "x+(1+2)".  If the right input is a
   // constant, and the left input is an add of a constant, flatten the
@@ -246,7 +246,7 @@ const Type *AddNode::add_of_identity( const Type *t1, const Type *t2 ) const {
   if( t1->higher_equal( zero ) ) return t2;
   if( t2->higher_equal( zero ) ) return t1;
 
-  return NULL;
+  return nullptr;
 }
 
 AddNode* AddNode::make(Node* in1, Node* in2, BasicType bt) {
@@ -258,7 +258,7 @@ AddNode* AddNode::make(Node* in1, Node* in2, BasicType bt) {
     default:
       fatal("Not implemented for %s", type2name(bt));
   }
-  return NULL;
+  return nullptr;
 }
 
 //=============================================================================
@@ -286,7 +286,7 @@ Node *AddINode::Ideal(PhaseGVN *phase, bool can_reshape) {
       // Check for dead cycle: d = (a-b)+(c-d)
       assert( in1->in(2) != this && in2->in(2) != this,
               "dead loop in AddINode::Ideal" );
-      Node *sub  = new SubINode(NULL, NULL);
+      Node *sub  = new SubINode(nullptr, nullptr);
       sub->init_req(1, phase->transform(new AddINode(in1->in(1), in2->in(1) ) ));
       sub->init_req(2, phase->transform(new AddINode(in1->in(2), in2->in(2) ) ));
       return sub;
@@ -349,14 +349,14 @@ Node *AddINode::Ideal(PhaseGVN *phase, bool can_reshape) {
   // Convert (x >>> rshift) + (x << lshift) into RotateRight(x, rshift)
   if (Matcher::match_rule_supported(Op_RotateRight) &&
       ((op1 == Op_URShiftI && op2 == Op_LShiftI) || (op1 == Op_LShiftI && op2 == Op_URShiftI)) &&
-      in1->in(1) != NULL && in1->in(1) == in2->in(1)) {
+      in1->in(1) != nullptr && in1->in(1) == in2->in(1)) {
     Node* rshift = op1 == Op_URShiftI ? in1->in(2) : in2->in(2);
     Node* lshift = op1 == Op_URShiftI ? in2->in(2) : in1->in(2);
-    if (rshift != NULL && lshift != NULL) {
+    if (rshift != nullptr && lshift != nullptr) {
       const TypeInt* rshift_t = phase->type(rshift)->isa_int();
       const TypeInt* lshift_t = phase->type(lshift)->isa_int();
-      if (lshift_t != NULL && lshift_t->is_con() &&
-          rshift_t != NULL && rshift_t->is_con() &&
+      if (lshift_t != nullptr && lshift_t->is_con() &&
+          rshift_t != nullptr && rshift_t->is_con() &&
           ((lshift_t->get_con() & 0x1F) == (32 - (rshift_t->get_con() & 0x1F)))) {
         return new RotateRightNode(in1->in(1), phase->intcon(rshift_t->get_con() & 0x1F), TypeInt::INT);
       }
@@ -441,7 +441,7 @@ Node *AddLNode::Ideal(PhaseGVN *phase, bool can_reshape) {
       // Check for dead cycle: d = (a-b)+(c-d)
       assert( in1->in(2) != this && in2->in(2) != this,
               "dead loop in AddLNode::Ideal" );
-      Node *sub  = new SubLNode(NULL, NULL);
+      Node *sub  = new SubLNode(nullptr, nullptr);
       sub->init_req(1, phase->transform(new AddLNode(in1->in(1), in2->in(1) ) ));
       sub->init_req(2, phase->transform(new AddLNode(in1->in(2), in2->in(2) ) ));
       return sub;
@@ -479,14 +479,14 @@ Node *AddLNode::Ideal(PhaseGVN *phase, bool can_reshape) {
   // Convert (x >>> rshift) + (x << lshift) into RotateRight(x, rshift)
   if (Matcher::match_rule_supported(Op_RotateRight) &&
       ((op1 == Op_URShiftL && op2 == Op_LShiftL) || (op1 == Op_LShiftL && op2 == Op_URShiftL)) &&
-      in1->in(1) != NULL && in1->in(1) == in2->in(1)) {
+      in1->in(1) != nullptr && in1->in(1) == in2->in(1)) {
     Node* rshift = op1 == Op_URShiftL ? in1->in(2) : in2->in(2);
     Node* lshift = op1 == Op_URShiftL ? in2->in(2) : in1->in(2);
-    if (rshift != NULL && lshift != NULL) {
+    if (rshift != nullptr && lshift != nullptr) {
       const TypeInt* rshift_t = phase->type(rshift)->isa_int();
       const TypeInt* lshift_t = phase->type(lshift)->isa_int();
-      if (lshift_t != NULL && lshift_t->is_con() &&
-          rshift_t != NULL && rshift_t->is_con() &&
+      if (lshift_t != nullptr && lshift_t->is_con() &&
+          rshift_t != nullptr && rshift_t->is_con() &&
           ((lshift_t->get_con() & 0x3F) == (64 - (rshift_t->get_con() & 0x3F)))) {
         return new RotateRightNode(in1->in(1), phase->intcon(rshift_t->get_con() & 0x3F), TypeLong::LONG);
       }
@@ -558,7 +558,7 @@ const Type *AddFNode::add_of_identity( const Type *t1, const Type *t2 ) const {
   // if( t1->higher_equal( zero ) ) return t2;
   // if( t2->higher_equal( zero ) ) return t1;
 
-  return NULL;
+  return nullptr;
 }
 
 //------------------------------add_ring---------------------------------------
@@ -573,7 +573,7 @@ const Type *AddFNode::add_ring( const Type *t0, const Type *t1 ) const {
 //------------------------------Ideal------------------------------------------
 Node *AddFNode::Ideal(PhaseGVN *phase, bool can_reshape) {
   // Floating point additions are not associative because of boundary conditions (infinity)
-  return commute(phase, this) ? this : NULL;
+  return commute(phase, this) ? this : nullptr;
 }
 
 
@@ -590,7 +590,7 @@ const Type *AddDNode::add_of_identity( const Type *t1, const Type *t2 ) const {
   // if( t1->higher_equal( zero ) ) return t2;
   // if( t2->higher_equal( zero ) ) return t1;
 
-  return NULL;
+  return nullptr;
 }
 //------------------------------add_ring---------------------------------------
 // Supplied function returns the sum of the inputs.
@@ -604,7 +604,7 @@ const Type *AddDNode::add_ring( const Type *t0, const Type *t1 ) const {
 //------------------------------Ideal------------------------------------------
 Node *AddDNode::Ideal(PhaseGVN *phase, bool can_reshape) {
   // Floating point additions are not associative because of boundary conditions (infinity)
-  return commute(phase, this) ? this : NULL;
+  return commute(phase, this) ? this : nullptr;
 }
 
 
@@ -618,7 +618,7 @@ Node* AddPNode::Identity(PhaseGVN* phase) {
 //------------------------------Idealize---------------------------------------
 Node *AddPNode::Ideal(PhaseGVN *phase, bool can_reshape) {
   // Bail out if dead inputs
-  if( phase->type( in(Address) ) == Type::TOP ) return NULL;
+  if( phase->type( in(Address) ) == Type::TOP ) return nullptr;
 
   // If the left input is an add of a constant, flatten the expression tree.
   const Node *n = in(Address);
@@ -629,12 +629,12 @@ Node *AddPNode::Ideal(PhaseGVN *phase, bool can_reshape) {
             "dead loop in AddPNode::Ideal" );
     // Type of left input's right input
     const Type *t = phase->type( addp->in(Offset) );
-    if( t == Type::TOP ) return NULL;
+    if( t == Type::TOP ) return nullptr;
     const TypeX *t12 = t->is_intptr_t();
     if( t12->is_con() ) {       // Left input is an add of a constant?
       // If the right input is a constant, combine constants
       const Type *temp_t2 = phase->type( in(Offset) );
-      if( temp_t2 == Type::TOP ) return NULL;
+      if( temp_t2 == Type::TOP ) return nullptr;
       const TypeX *t2 = temp_t2->is_intptr_t();
       Node* address;
       Node* offset;
@@ -655,7 +655,7 @@ Node *AddPNode::Ideal(PhaseGVN *phase, bool can_reshape) {
 
   // Raw pointers?
   if( in(Base)->bottom_type() == Type::TOP ) {
-    // If this is a NULL+long form (from unsafe accesses), switch to a rawptr.
+    // If this is a null+long form (from unsafe accesses), switch to a rawptr.
     if (phase->type(in(Address)) == TypePtr::NULL_PTR) {
       Node* offset = in(Offset);
       return new CastX2PNode(offset);
@@ -681,13 +681,13 @@ Node *AddPNode::Ideal(PhaseGVN *phase, bool can_reshape) {
     }
   }
 
-  return NULL;                  // No progress
+  return nullptr;                  // No progress
 }
 
 //------------------------------bottom_type------------------------------------
 // Bottom-type is the pointer-type with unknown offset.
 const Type *AddPNode::bottom_type() const {
-  if (in(Address) == NULL)  return TypePtr::BOTTOM;
+  if (in(Address) == nullptr)  return TypePtr::BOTTOM;
   const TypePtr *tp = in(Address)->bottom_type()->isa_ptr();
   if( !tp ) return Type::TOP;   // TOP input means TOP output
   assert( in(Offset)->Opcode() != Op_ConP, "" );
@@ -725,7 +725,7 @@ const Type* AddPNode::Value(PhaseGVN* phase) const {
 //------------------------Ideal_base_and_offset--------------------------------
 // Split an oop pointer into a base and offset.
 // (The offset might be Type::OffsetBot in the case of an array.)
-// Return the base, or NULL if failure.
+// Return the base, or null if failure.
 Node* AddPNode::Ideal_base_and_offset(Node* ptr, PhaseTransform* phase,
                                       // second return value:
                                       intptr_t& offset) {
@@ -741,7 +741,7 @@ Node* AddPNode::Ideal_base_and_offset(Node* ptr, PhaseTransform* phase,
     }
   }
   offset = Type::OffsetBot;
-  return NULL;
+  return nullptr;
 }
 
 //------------------------------unpack_offsets----------------------------------
@@ -791,20 +791,20 @@ Node* rotate_shift(PhaseGVN* phase, Node* lshift, Node* rshift, int mask) {
   // val << norm_con_shift | val >> ({32|64} - norm_con_shift) => rotate_left val, norm_con_shift
   const TypeInt* lshift_t = phase->type(lshift)->isa_int();
   const TypeInt* rshift_t = phase->type(rshift)->isa_int();
-  if (lshift_t != NULL && lshift_t->is_con() &&
-      rshift_t != NULL && rshift_t->is_con() &&
+  if (lshift_t != nullptr && lshift_t->is_con() &&
+      rshift_t != nullptr && rshift_t->is_con() &&
       ((lshift_t->get_con() & mask) == ((mask + 1) - (rshift_t->get_con() & mask)))) {
     return phase->intcon(lshift_t->get_con() & mask);
   }
   // val << var_shift | val >> ({0|32|64} - var_shift) => rotate_left val, var_shift
   if (rshift->Opcode() == Op_SubI && rshift->in(2) == lshift && rshift->in(1)->is_Con()){
     const TypeInt* shift_t = phase->type(rshift->in(1))->isa_int();
-    if (shift_t != NULL && shift_t->is_con() &&
+    if (shift_t != nullptr && shift_t->is_con() &&
         (shift_t->get_con() == 0 || shift_t->get_con() == (mask + 1))) {
       return lshift;
     }
   }
-  return NULL;
+  return nullptr;
 }
 
 Node* OrINode::Ideal(PhaseGVN* phase, bool can_reshape) {
@@ -815,21 +815,21 @@ Node* OrINode::Ideal(PhaseGVN* phase, bool can_reshape) {
     Node* lshift = in(1)->in(2);
     Node* rshift = in(2)->in(2);
     Node* shift = rotate_shift(phase, lshift, rshift, 0x1F);
-    if (shift != NULL) {
+    if (shift != nullptr) {
       return new RotateLeftNode(in(1)->in(1), shift, TypeInt::INT);
     }
-    return NULL;
+    return nullptr;
   }
   if (Matcher::match_rule_supported(Op_RotateRight) &&
       lopcode == Op_URShiftI && ropcode == Op_LShiftI && in(1)->in(1) == in(2)->in(1)) {
     Node* rshift = in(1)->in(2);
     Node* lshift = in(2)->in(2);
     Node* shift = rotate_shift(phase, rshift, lshift, 0x1F);
-    if (shift != NULL) {
+    if (shift != nullptr) {
       return new RotateRightNode(in(1)->in(1), shift, TypeInt::INT);
     }
   }
-  return NULL;
+  return nullptr;
 }
 
 //------------------------------add_ring---------------------------------------
@@ -881,21 +881,21 @@ Node* OrLNode::Ideal(PhaseGVN* phase, bool can_reshape) {
     Node* lshift = in(1)->in(2);
     Node* rshift = in(2)->in(2);
     Node* shift = rotate_shift(phase, lshift, rshift, 0x3F);
-    if (shift != NULL) {
+    if (shift != nullptr) {
       return new RotateLeftNode(in(1)->in(1), shift, TypeLong::LONG);
     }
-    return NULL;
+    return nullptr;
   }
   if (Matcher::match_rule_supported(Op_RotateRight) &&
       lopcode == Op_URShiftL && ropcode == Op_LShiftL && in(1)->in(1) == in(2)->in(1)) {
     Node* rshift = in(1)->in(2);
     Node* lshift = in(2)->in(2);
     Node* shift = rotate_shift(phase, rshift, lshift, 0x3F);
-    if (shift != NULL) {
+    if (shift != nullptr) {
       return new RotateRightNode(in(1)->in(1), shift, TypeLong::LONG);
     }
   }
-  return NULL;
+  return nullptr;
 }
 
 //------------------------------add_ring---------------------------------------
@@ -1038,15 +1038,15 @@ const Type* XorLNode::Value(PhaseGVN* phase) const {
 Node* MaxNode::build_min_max(Node* a, Node* b, bool is_max, bool is_unsigned, const Type* t, PhaseGVN& gvn) {
   bool is_int = gvn.type(a)->isa_int();
   assert(is_int || gvn.type(a)->isa_long(), "int or long inputs");
-  assert(is_int == (gvn.type(b)->isa_int() != NULL), "inconsistent inputs");
-  Node* hook = NULL;
+  assert(is_int == (gvn.type(b)->isa_int() != nullptr), "inconsistent inputs");
+  Node* hook = nullptr;
   if (gvn.is_IterGVN()) {
     // Make sure a and b are not destroyed
     hook = new Node(2);
     hook->init_req(0, a);
     hook->init_req(1, b);
   }
-  Node* res = NULL;
+  Node* res = nullptr;
   if (!is_unsigned) {
     if (is_max) {
       if (is_int) {
@@ -1090,7 +1090,7 @@ Node* MaxNode::build_min_max(Node* a, Node* b, bool is_max, bool is_unsigned, co
       }
     }
   }
-  if (hook != NULL) {
+  if (hook != nullptr) {
     hook->destruct(&gvn);
   }
   return res;
@@ -1099,21 +1099,21 @@ Node* MaxNode::build_min_max(Node* a, Node* b, bool is_max, bool is_unsigned, co
 Node* MaxNode::build_min_max_diff_with_zero(Node* a, Node* b, bool is_max, const Type* t, PhaseGVN& gvn) {
   bool is_int = gvn.type(a)->isa_int();
   assert(is_int || gvn.type(a)->isa_long(), "int or long inputs");
-  assert(is_int == (gvn.type(b)->isa_int() != NULL), "inconsistent inputs");
-  Node* zero = NULL;
+  assert(is_int == (gvn.type(b)->isa_int() != nullptr), "inconsistent inputs");
+  Node* zero = nullptr;
   if (is_int) {
     zero = gvn.intcon(0);
   } else {
     zero = gvn.longcon(0);
   }
-  Node* hook = NULL;
+  Node* hook = nullptr;
   if (gvn.is_IterGVN()) {
     // Make sure a and b are not destroyed
     hook = new Node(2);
     hook->init_req(0, a);
     hook->init_req(1, b);
   }
-  Node* res = NULL;
+  Node* res = nullptr;
   if (is_max) {
     if (is_int) {
       Node* cmp = gvn.transform(new CmpINode(a, b));
@@ -1139,7 +1139,7 @@ Node* MaxNode::build_min_max_diff_with_zero(Node* a, Node* b, bool is_max, const
       res = gvn.transform(new CMoveLNode(bol, sub, zero, t->is_long()));
     }
   }
-  if (hook != NULL) {
+  if (hook != nullptr) {
     hook->destruct(&gvn);
   }
   return res;
@@ -1164,12 +1164,20 @@ static bool can_overflow(const TypeInt* t, jint c) {
           (c > 0 && (java_add(t_hi, c) < t_hi)));
 }
 
+// Check if addition of a long with type 't' and a constant 'c' can overflow.
+static bool can_overflow(const TypeLong* t, jlong c) {
+  jlong t_lo = t->_lo;
+  jlong t_hi = t->_hi;
+  return ((c < 0 && (java_add(t_lo, c) > t_lo)) ||
+          (c > 0 && (java_add(t_hi, c) < t_hi)));
+}
+
 //=============================================================================
 //------------------------------Idealize---------------------------------------
 // MINs show up in range-check loop limit calculations.  Look for
 // "MIN2(x+c0,MIN2(y,x+c1))".  Pick the smaller constant: "MIN2(x+c0,y)"
 Node *MinINode::Ideal(PhaseGVN *phase, bool can_reshape) {
-  Node *progress = NULL;
+  Node *progress = nullptr;
   // Force a right-spline graph
   Node *l = in(1);
   Node *r = in(2);
@@ -1190,7 +1198,7 @@ Node *MinINode::Ideal(PhaseGVN *phase, bool can_reshape) {
   if( x->Opcode() == Op_AddI && // Check for "x+c0" and collect constant
       x->in(2)->is_Con() ) {
     const Type *t = x->in(2)->bottom_type();
-    if( t == Type::TOP ) return NULL;  // No progress
+    if( t == Type::TOP ) return nullptr;  // No progress
     x_off = t->is_int()->get_con();
     x = x->in(1);
   }
@@ -1202,7 +1210,7 @@ Node *MinINode::Ideal(PhaseGVN *phase, bool can_reshape) {
   if( y->Opcode() == Op_AddI && // Check for "y+c1" and collect constant
       y->in(2)->is_Con() ) {
     const Type *t = y->in(2)->bottom_type();
-    if( t == Type::TOP ) return NULL;  // No progress
+    if( t == Type::TOP ) return nullptr;  // No progress
     y_off = t->is_int()->get_con();
     y = y->in(1);
   }
@@ -1220,7 +1228,7 @@ Node *MinINode::Ideal(PhaseGVN *phase, bool can_reshape) {
     if( y->Opcode() == Op_AddI &&// Check for "y+c1" and collect constant
         y->in(2)->is_Con() ) {
       const Type *t = y->in(2)->bottom_type();
-      if( t == Type::TOP ) return NULL;  // No progress
+      if( t == Type::TOP ) return nullptr;  // No progress
       y_off = t->is_int()->get_con();
       y = y->in(1);
     }
@@ -1230,7 +1238,7 @@ Node *MinINode::Ideal(PhaseGVN *phase, bool can_reshape) {
 
     // Transform MIN2(x + c0, MIN2(x + c1, z)) into MIN2(x + MIN2(c0, c1), z)
     // if x == y and the additions can't overflow.
-    if (x == y && tx != NULL &&
+    if (x == y && tx != nullptr &&
         !can_overflow(tx, x_off) &&
         !can_overflow(tx, y_off)) {
       return new MinINode(phase->transform(new AddINode(x, phase->intcon(MIN2(x_off, y_off)))), r->in(2));
@@ -1238,13 +1246,13 @@ Node *MinINode::Ideal(PhaseGVN *phase, bool can_reshape) {
   } else {
     // Transform MIN2(x + c0, y + c1) into x + MIN2(c0, c1)
     // if x == y and the additions can't overflow.
-    if (x == y && tx != NULL &&
+    if (x == y && tx != nullptr &&
         !can_overflow(tx, x_off) &&
         !can_overflow(tx, y_off)) {
       return new AddINode(x,phase->intcon(MIN2(x_off,y_off)));
     }
   }
-  return NULL;
+  return nullptr;
 }
 
 //------------------------------add_ring---------------------------------------
@@ -1255,6 +1263,167 @@ const Type *MinINode::add_ring( const Type *t0, const Type *t1 ) const {
 
   // Otherwise just MIN them bits.
   return TypeInt::make( MIN2(r0->_lo,r1->_lo), MIN2(r0->_hi,r1->_hi), MAX2(r0->_widen,r1->_widen) );
+}
+
+// Collapse the "addition with overflow-protection" pattern, and the symmetrical
+// "subtraction with underflow-protection" pattern. These are created during the
+// unrolling, when we have to adjust the limit by subtracting the stride, but want
+// to protect against underflow: MaxL(SubL(limit, stride), min_jint).
+// If we have more than one of those in a sequence:
+//
+//   x  con2
+//   |  |
+//   AddL  clamp2
+//     |    |
+//    Max/MinL con1
+//          |  |
+//          AddL  clamp1
+//            |    |
+//           Max/MinL (n)
+//
+// We want to collapse it to:
+//
+//   x  con1  con2
+//   |    |    |
+//   |   AddLNode (new_con)
+//   |    |
+//  AddLNode  clamp1
+//        |    |
+//       Max/MinL (n)
+//
+// Note: we assume that SubL was already replaced by an AddL, and that the stride
+// has its sign flipped: SubL(limit, stride) -> AddL(limit, -stride).
+//
+// Proof MaxL collapsed version equivalent to original (MinL version similar):
+// is_sub_con ensures that con1, con2 ∈ [min_int, 0[
+//
+// Original:
+// - AddL2 underflow => x + con2 ∈ ]max_long - min_int, max_long], ALWAYS BAILOUT as x + con1 + con2 surely fails can_overflow (*)
+// - AddL2 no underflow => x + con2 ∈ [min_long, max_long]
+//   - MaxL2 clamp => min_int
+//     - AddL1 underflow: NOT POSSIBLE: cannot underflow since min_int + con1 ∈ [2 * min_int, min_int] always > min_long
+//     - AddL1 no underflow => min_int + con1 ∈ [2 * min_int, min_int]
+//       - MaxL1 clamp => min_int (RESULT 1)
+//       - MaxL1 no clamp: NOT POSSIBLE: min_int + con1 ∈ [2 * min_int, min_int] always <= min_int, so clamp always taken
+//   - MaxL2 no clamp => x + con2 ∈ [min_int, max_long]
+//     - AddL1 underflow: NOT POSSIBLE: cannot underflow since x + con2 + con1 ∈ [2 * min_int, max_long] always > min_long
+//     - AddL1 no underflow => x + con2 + con1 ∈ [2 * min_int, max_long]
+//       - MaxL1 clamp => min_int (RESULT 2)
+//       - MaxL1 no clamp => x + con2 + con1 ∈ ]min_int, max_long] (RESULT 3)
+//
+// Collapsed:
+// - AddL2 (cannot underflow) => con2 + con1 ∈ [2 * min_int, 0]
+//   - AddL1 underflow: NOT POSSIBLE: would have bailed out at can_overflow (*)
+//   - AddL1 no underflow => x + con2 + con1 ∈ [min_long, max_long]
+//     - MaxL clamp => min_int (RESULT 1 and RESULT 2)
+//     - MaxL no clamp => x + con2 + con1 ∈ ]min_int, max_long] (RESULT 3)
+//
+Node* fold_subI_no_underflow_pattern(Node* n, PhaseGVN* phase) {
+  assert(n->Opcode() == Op_MaxL || n->Opcode() == Op_MinL, "sanity");
+  // Check that the two clamps have the correct values.
+  jlong clamp = (n->Opcode() == Op_MaxL) ? min_jint : max_jint;
+  auto is_clamp = [&](Node* c) {
+    const TypeLong* t = phase->type(c)->isa_long();
+    return t != nullptr && t->is_con() &&
+           t->get_con() == clamp;
+  };
+  // Check that the constants are negative if MaxL, and positive if MinL.
+  auto is_sub_con = [&](Node* c) {
+    const TypeLong* t = phase->type(c)->isa_long();
+    return t != nullptr && t->is_con() &&
+           t->get_con() < max_jint && t->get_con() > min_jint &&
+           (t->get_con() < 0) == (n->Opcode() == Op_MaxL);
+  };
+  // Verify the graph level by level:
+  Node* add1   = n->in(1);
+  Node* clamp1 = n->in(2);
+  if (add1->Opcode() == Op_AddL && is_clamp(clamp1)) {
+    Node* max2 = add1->in(1);
+    Node* con1 = add1->in(2);
+    if (max2->Opcode() == n->Opcode() && is_sub_con(con1)) {
+      Node* add2   = max2->in(1);
+      Node* clamp2 = max2->in(2);
+      if (add2->Opcode() == Op_AddL && is_clamp(clamp2)) {
+        Node* x    = add2->in(1);
+        Node* con2 = add2->in(2);
+        if (is_sub_con(con2)) {
+          // Collapsed graph not equivalent if potential over/underflow -> bailing out (*)
+          if (can_overflow(phase->type(x)->is_long(), con1->get_long() + con2->get_long())) {
+            return nullptr;
+          }
+          Node* new_con = phase->transform(new AddLNode(con1, con2));
+          Node* new_sub = phase->transform(new AddLNode(x, new_con));
+          n->set_req_X(1, new_sub, phase);
+          return n;
+        }
+      }
+    }
+  }
+  return nullptr;
+}
+
+const Type* MaxLNode::add_ring(const Type* t0, const Type* t1) const {
+  const TypeLong* r0 = t0->is_long();
+  const TypeLong* r1 = t1->is_long();
+
+  return TypeLong::make(MAX2(r0->_lo, r1->_lo), MAX2(r0->_hi, r1->_hi), MAX2(r0->_widen, r1->_widen));
+}
+
+Node* MaxLNode::Identity(PhaseGVN* phase) {
+  const TypeLong* t1 = phase->type(in(1))->is_long();
+  const TypeLong* t2 = phase->type(in(2))->is_long();
+
+  // Can we determine maximum statically?
+  if (t1->_lo >= t2->_hi) {
+    return in(1);
+  } else if (t2->_lo >= t1->_hi) {
+    return in(2);
+  }
+
+  return MaxNode::Identity(phase);
+}
+
+Node* MaxLNode::Ideal(PhaseGVN* phase, bool can_reshape) {
+  Node* n = AddNode::Ideal(phase, can_reshape);
+  if (n != nullptr) {
+    return n;
+  }
+  if (can_reshape) {
+    return fold_subI_no_underflow_pattern(this, phase);
+  }
+  return nullptr;
+}
+
+const Type* MinLNode::add_ring(const Type* t0, const Type* t1) const {
+  const TypeLong* r0 = t0->is_long();
+  const TypeLong* r1 = t1->is_long();
+
+  return TypeLong::make(MIN2(r0->_lo, r1->_lo), MIN2(r0->_hi, r1->_hi), MIN2(r0->_widen, r1->_widen));
+}
+
+Node* MinLNode::Identity(PhaseGVN* phase) {
+  const TypeLong* t1 = phase->type(in(1))->is_long();
+  const TypeLong* t2 = phase->type(in(2))->is_long();
+
+  // Can we determine minimum statically?
+  if (t1->_lo >= t2->_hi) {
+    return in(2);
+  } else if (t2->_lo >= t1->_hi) {
+    return in(1);
+  }
+
+  return MaxNode::Identity(phase);
+}
+
+Node* MinLNode::Ideal(PhaseGVN* phase, bool can_reshape) {
+  Node* n = AddNode::Ideal(phase, can_reshape);
+  if (n != nullptr) {
+    return n;
+  }
+  if (can_reshape) {
+    return fold_subI_no_underflow_pattern(this, phase);
+  }
+  return nullptr;
 }
 
 //------------------------------add_ring---------------------------------------

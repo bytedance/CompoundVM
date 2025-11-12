@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -29,6 +29,7 @@ import jdk.test.lib.cli.*;
  * @test
  * @bug 8066821
  * @summary Test that various options are deprecated. See deprecated_jvm_flags in arguments.cpp.
+ * @requires vm.flagless
  * @modules java.base/jdk.internal.misc
  * @library /test/lib
  * @run driver VMDeprecatedOptions
@@ -80,7 +81,7 @@ public class VMDeprecatedOptions {
     // command line by -XX:+UnlockDiagnosticVMOptions.
     static void testDeprecatedDiagnostic(String option, String value)  throws Throwable {
         String XXoption = CommandLineOptionTest.prepareFlag(option, value);
-        ProcessBuilder processBuilder = ProcessTools.createJavaProcessBuilder(
+        ProcessBuilder processBuilder = ProcessTools.createLimitedTestJavaProcessBuilder(
             CommandLineOptionTest.UNLOCK_DIAGNOSTIC_VM_OPTIONS, XXoption, "-version");
         OutputAnalyzer output = new OutputAnalyzer(processBuilder.start());
         // check for option deprecation message:
@@ -93,7 +94,7 @@ public class VMDeprecatedOptions {
     // command line by -XX:+UnlockExperimentalVMOption.
     static void testDeprecatedExperimental(String option, String value)  throws Throwable {
         String XXoption = CommandLineOptionTest.prepareFlag(option, value);
-        ProcessBuilder processBuilder = ProcessTools.createJavaProcessBuilder(
+        ProcessBuilder processBuilder = ProcessTools.createLimitedTestJavaProcessBuilder(
             CommandLineOptionTest.UNLOCK_EXPERIMENTAL_VM_OPTIONS, XXoption, "-version");
         OutputAnalyzer output = new OutputAnalyzer(processBuilder.start());
         // check for option deprecation message:

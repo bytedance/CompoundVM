@@ -30,6 +30,7 @@
 #include "hb-open-type.hh"
 #include "hb-ot-maxp-table.hh"
 #include "hb-ot-hhea-table.hh"
+#include "hb-ot-os2-table.hh"
 #include "hb-ot-var-hvar-table.hh"
 #include "hb-ot-var-mvar-table.hh"
 #include "hb-ot-metrics.hh"
@@ -49,6 +50,9 @@ _glyf_get_leading_bearing_with_var_unscaled (hb_font_t *font, hb_codepoint_t gly
 
 HB_INTERNAL unsigned
 _glyf_get_advance_with_var_unscaled (hb_font_t *font, hb_codepoint_t glyph, bool is_vertical);
+
+HB_INTERNAL bool
+_glyf_get_leading_bearing_without_var_unscaled (hb_face_t *face, hb_codepoint_t gid, bool is_vertical, int *lsb);
 
 
 namespace OT {
@@ -80,7 +84,7 @@ struct hmtxvmtx
   bool subset_update_header (hb_subset_context_t *c,
                              unsigned int num_hmetrics,
                              const hb_hashmap_t<hb_codepoint_t, hb_pair_t<unsigned, int>> *mtx_map,
-                             const hb_map_t *bounds_map) const
+                             const hb_vector_t<unsigned> &bounds_vec) const
   {
     hb_blob_t *src_blob = hb_sanitize_context_t ().reference_table<H> (c->plan->source, H::tableTag);
     hb_blob_t *dest_blob = hb_blob_copy_writable_or_fail (src_blob);
@@ -92,7 +96,7 @@ struct hmtxvmtx
 
     unsigned int length;
     H *table = (H *) hb_blob_get_data (dest_blob, &length);
-    table->numberOfLongMetrics = num_hmetrics;
+    c->serializer->check_assign (table->numberOfLongMetrics, num_hmetrics, HB_SERIALIZE_ERROR_INT_OVERFLOW);
 
 #ifndef HB_NO_VAR
     if (c->plan->normalized_coords)
@@ -111,6 +115,7 @@ struct hmtxvmtx
         HB_ADD_MVAR_VAR (HB_OT_METRICS_TAG_VERTICAL_CARET_OFFSET,   caretOffset);
       }
 
+      bool empty = true;
       int min_lsb = 0x7FFF;
       int min_rsb = 0x7FFF;
       int max_extent = -0x7FFF;
@@ -122,9 +127,10 @@ struct hmtxvmtx
         int lsb = _.second.second;
         max_adv = hb_max (max_adv, adv);
 
-        if (bounds_map->has (gid))
+        if (bounds_vec[gid] != 0xFFFFFFFF)
         {
-          unsigned bound_width = bounds_map->get (gid);
+          empty = false;
+          unsigned bound_width = bounds_vec[gid];
           int rsb = adv - lsb - bound_width;
           int extent = lsb + bound_width;
           min_lsb = hb_min (min_lsb, lsb);
@@ -134,11 +140,34 @@ struct hmtxvmtx
       }
 
       table->advanceMax = max_adv;
-      if (!bounds_map->is_empty ())
+      if (!empty)
       {
         table->minLeadingBearing = min_lsb;
         table->minTrailingBearing = min_rsb;
         table->maxExtent = max_extent;
+      }
+
+      if (T::is_horizontal)
+      {
+        const auto &OS2 = *c->plan->source->table.OS2;
+        if (OS2.has_data () &&
+            table->ascender == OS2.sTypoAscender &&
+            table->descender == OS2.sTypoDescender &&
+            table->lineGap == OS2.sTypoLineGap)
+        {
+          table->ascender = static_cast<int> (roundf (OS2.sTypoAscender +
+                                                      MVAR.get_var (HB_OT_METRICS_TAG_HORIZONTAL_ASCENDER,
+                                                                    c->plan->normalized_coords.arrayZ,
+                                                                    c->plan->normalized_coords.length)));
+          table->descender = static_cast<int> (roundf (OS2.sTypoDescender +
+                                                       MVAR.get_var (HB_OT_METRICS_TAG_HORIZONTAL_DESCENDER,
+                                                                     c->plan->normalized_coords.arrayZ,
+                                                                     c->plan->normalized_coords.length)));
+          table->lineGap = static_cast<int> (roundf (OS2.sTypoLineGap +
+                                                     MVAR.get_var (HB_OT_METRICS_TAG_HORIZONTAL_LINE_GAP,
+                                                                   c->plan->normalized_coords.arrayZ,
+                                                                   c->plan->normalized_coords.length)));
+        }
       }
     }
 #endif
@@ -153,25 +182,32 @@ struct hmtxvmtx
            hb_requires (hb_is_iterator (Iterator))>
   void serialize (hb_serialize_context_t *c,
                   Iterator it,
-                  unsigned num_long_metrics)
+                  hb_array_t<const hb_codepoint_pair_t> new_to_old_gid_list,
+                  unsigned num_long_metrics,
+                  unsigned total_num_metrics)
   {
-    unsigned idx = 0;
-    for (auto _ : it)
+    LongMetric* long_metrics = c->allocate_size<LongMetric> (num_long_metrics * LongMetric::static_size);
+    FWORD* short_metrics = c->allocate_size<FWORD> ((total_num_metrics - num_long_metrics) * FWORD::static_size);
+    if (!long_metrics || !short_metrics) return;
+
+    short_metrics -= num_long_metrics;
+
+    for (auto _ : new_to_old_gid_list)
     {
-      if (idx < num_long_metrics)
+      hb_codepoint_t gid = _.first;
+      auto mtx = *it++;
+
+      if (gid < num_long_metrics)
       {
-        LongMetric lm;
-        lm.advance = _.first;
-        lm.sb = _.second;
-        if (unlikely (!c->embed<LongMetric> (&lm))) return;
+        LongMetric& lm = long_metrics[gid];
+        lm.advance = mtx.first;
+        lm.sb = mtx.second;
       }
+      // TODO(beyond-64k): This assumes that maxp.numGlyphs is 0xFFFF.
+      else if (gid < 0x10000u)
+        short_metrics[gid] = mtx.second;
       else
-      {
-        FWORD *sb = c->allocate_size<FWORD> (FWORD::static_size);
-        if (unlikely (!sb)) return;
-        *sb = _.second;
-      }
-      idx++;
+        ((UFWORD*) short_metrics)[gid] = mtx.first;
     }
   }
 
@@ -179,8 +215,7 @@ struct hmtxvmtx
   {
     TRACE_SUBSET (this);
 
-    T *table_prime = c->serializer->start_embed <T> ();
-    if (unlikely (!table_prime)) return_trace (false);
+    auto *table_prime = c->serializer->start_embed <T> ();
 
     accelerator_t _mtx (c->plan->source);
     unsigned num_long_metrics;
@@ -189,7 +224,9 @@ struct hmtxvmtx
       /* Determine num_long_metrics to encode. */
       auto& plan = c->plan;
 
-      num_long_metrics = plan->num_output_glyphs ();
+      // TODO Don't consider retaingid holes here.
+
+      num_long_metrics = hb_min (plan->num_output_glyphs (), 0xFFFFu);
       unsigned int last_advance = get_new_gid_advance_unscaled (plan, mtx_map, num_long_metrics - 1, _mtx);
       while (num_long_metrics > 1 &&
              last_advance == get_new_gid_advance_unscaled (plan, mtx_map, num_long_metrics - 2, _mtx))
@@ -199,30 +236,36 @@ struct hmtxvmtx
     }
 
     auto it =
-    + hb_range (c->plan->num_output_glyphs ())
-    | hb_map ([c, &_mtx, mtx_map] (unsigned _)
+    + hb_iter (c->plan->new_to_old_gid_list)
+    | hb_map ([c, &_mtx, mtx_map] (hb_codepoint_pair_t _)
               {
-                if (!mtx_map->has (_))
+                hb_codepoint_t new_gid = _.first;
+                hb_codepoint_t old_gid = _.second;
+
+                hb_pair_t<unsigned, int> *v = nullptr;
+                if (!mtx_map->has (new_gid, &v))
                 {
-                  hb_codepoint_t old_gid;
-                  if (!c->plan->old_gid_for_new_gid (_, &old_gid))
-                    return hb_pair (0u, 0);
                   int lsb = 0;
-                  (void) _mtx.get_leading_bearing_without_var_unscaled (old_gid, &lsb);
+                  if (!_mtx.get_leading_bearing_without_var_unscaled (old_gid, &lsb))
+                    (void) _glyf_get_leading_bearing_without_var_unscaled (c->plan->source, old_gid, !T::is_horizontal, &lsb);
                   return hb_pair (_mtx.get_advance_without_var_unscaled (old_gid), +lsb);
                 }
-                return mtx_map->get (_);
+                return *v;
               })
     ;
 
-    table_prime->serialize (c->serializer, it, num_long_metrics);
+    table_prime->serialize (c->serializer,
+                            it,
+                            c->plan->new_to_old_gid_list,
+                            num_long_metrics,
+                            c->plan->num_output_glyphs ());
 
     if (unlikely (c->serializer->in_error ()))
       return_trace (false);
 
     // Amend header num hmetrics
     if (unlikely (!subset_update_header (c, num_long_metrics, mtx_map,
-                                         T::is_horizontal ? &c->plan->bounds_width_map : &c->plan->bounds_height_map)))
+                                         T::is_horizontal ? c->plan->bounds_width_vec : c->plan->bounds_height_vec)))
       return_trace (false);
 
     return_trace (true);
@@ -355,7 +398,7 @@ struct hmtxvmtx
 
     unsigned get_advance_with_var_unscaled (hb_codepoint_t  glyph,
                                             hb_font_t      *font,
-                                            VariationStore::cache_t *store_cache = nullptr) const
+                                            ItemVariationStore::cache_t *store_cache = nullptr) const
     {
       unsigned int advance = get_advance_without_var_unscaled (glyph);
 
@@ -368,7 +411,8 @@ struct hmtxvmtx
                                                                         font->coords, font->num_coords,
                                                                         store_cache));
 
-      return _glyf_get_advance_with_var_unscaled (font, glyph, T::tableTag == HB_OT_TAG_vmtx);
+      unsigned glyf_advance = _glyf_get_advance_with_var_unscaled (font, glyph, T::tableTag == HB_OT_TAG_vmtx);
+      return glyf_advance ? glyf_advance : advance;
 #else
       return advance;
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -58,6 +58,8 @@ import javax.security.auth.Subject;
 
 import com.sun.security.auth.module.*;
 import com.sun.security.auth.callback.*;
+import jtreg.SkippedException;
+import org.testng.SkipException;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -113,7 +115,11 @@ public class Basic extends PKCS11Test {
     @Test
     public void testBasic() throws Exception {
         String[] args = {"sm", "Basic.policy"};
-        main(new Basic(), args);
+        try {
+            main(new Basic(), args);
+        } catch (SkippedException se) {
+            throw new SkipException("One or more tests are skipped");
+        }
     }
 
     private static class FooEntry implements KeyStore.Entry { }
@@ -136,7 +142,8 @@ public class Basic extends PKCS11Test {
 
         // get private keys
         KeyFactory kf = KeyFactory.getInstance("RSA");
-        KeyFactory dsaKf = KeyFactory.getInstance("DSA", "SUN");
+        KeyFactory dsaKf = KeyFactory.getInstance("DSA",
+                System.getProperty("test.provider.name", "SUN"));
 
         ObjectInputStream ois1 = new ObjectInputStream
                         (new FileInputStream(new File(DIR, "pk1.key")));

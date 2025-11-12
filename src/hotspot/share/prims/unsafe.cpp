@@ -135,13 +135,9 @@ static inline void assert_field_offset_sane(oop p, jlong field_offset) {
 
 static inline void* index_oop_from_field_offset_long(oop p, jlong field_offset) {
   assert_field_offset_sane(p, field_offset);
-  jlong byte_offset = field_offset_to_byte_offset(field_offset);
-
-  if (sizeof(char*) == sizeof(jint)) {   // (this constant folds!)
-    return cast_from_oop<address>(p) + (jint) byte_offset;
-  } else {
-    return cast_from_oop<address>(p) +        byte_offset;
-  }
+  uintptr_t base_address = cast_from_oop<uintptr_t>(p);
+  uintptr_t byte_offset  = (uintptr_t)field_offset_to_byte_offset(field_offset);
+  return (void*)(base_address + byte_offset);
 }
 #endif // HOTSPOT_TARGET_CLASSLIB
 
@@ -870,7 +866,6 @@ UNSAFE_ENTRY(jboolean, Unsafe_CompareAndSetLong(JNIEnv *env, jobject unsafe, job
 
 static void post_thread_park_event(EventThreadPark* event, const oop obj, jlong timeout_nanos, jlong until_epoch_millis) {
   assert(event != NULL, "invariant");
-  assert(event->should_commit(), "invariant");
   event->set_parkedClass((obj != NULL) ? obj->klass() : NULL);
   event->set_timeout(timeout_nanos);
   event->set_until(until_epoch_millis);
@@ -909,21 +904,22 @@ JVM_ENTRY(void, Unsafe_Unpark(JNIEnv *env, jobject unsafe, jobject jthread)) {
 UNSAFE_ENTRY(void, Unsafe_Unpark(JNIEnv *env, jobject unsafe, jobject jthread)) {
 #endif
   if (jthread != NULL) {
-    ThreadsListHandle tlh;
-    JavaThread* thr = NULL;
-    oop java_thread = NULL;
-    (void) tlh.cv_internal_thread_to_JavaThread(jthread, &thr, &java_thread);
-    if (java_thread != NULL) {
-      // This is a valid oop.
-      if (thr != NULL) {
-        // The JavaThread is alive.
-        Parker* p = thr->parker();
-        HOTSPOT_THREAD_UNPARK((uintptr_t) p);
-        p->unpark();
-      }
+    oop thread_oop = JNIHandles::resolve_non_null(jthread);
+    // Get the JavaThread* stored in the java.lang.Thread object _before_
+    // the embedded ThreadsListHandle is constructed so we know if the
+    // early life stage of the JavaThread* is protected. We use acquire
+    // here to ensure that if we see a non-nullptr value, then we also
+    // see the main ThreadsList updates from the JavaThread* being added.
+    FastThreadsListHandle ftlh(thread_oop, java_lang_Thread::thread_acquire(thread_oop));
+    JavaThread* thr = ftlh.protected_java_thread();
+    if (thr != nullptr) {
+      // The still live JavaThread* is protected by the FastThreadsListHandle
+      // so it is safe to access.
+      Parker* p = thr->parker();
+      HOTSPOT_THREAD_UNPARK((uintptr_t) p);
+      p->unpark();
     }
-  } // ThreadsListHandle is destroyed here.
-
+  } // FastThreadsListHandle is destroyed here.
 } UNSAFE_END
 
 #if HOTSPOT_TARGET_CLASSLIB == 8

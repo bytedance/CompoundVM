@@ -1,7 +1,7 @@
 // This project is a modified version of OpenJDK, licensed under GPL v2.
 // Modifications Copyright (C) 2025 ByteDance Inc.
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -28,7 +28,6 @@
 #define SHARE_RUNTIME_OS_HPP
 
 #include "jvm_md.h"
-#include "metaprogramming/integralConstant.hpp"
 #include "utilities/exceptions.hpp"
 #include "utilities/ostream.hpp"
 #include "utilities/macros.hpp"
@@ -171,6 +170,8 @@ class os: AllStatic {
   // Get summary strings for system information in buffer provided
   static void  get_summary_cpu_info(char* buf, size_t buflen);
   static void  get_summary_os_info(char* buf, size_t buflen);
+  // Returns number of bytes written on success, OS_ERR on failure.
+  static ssize_t pd_write(int fd, const void *buf, size_t nBytes);
 
   static void initialize_initial_active_processor_count();
 
@@ -368,6 +369,15 @@ class os: AllStatic {
   static bool   uncommit_memory(char* addr, size_t bytes, bool executable = false);
   static bool   release_memory(char* addr, size_t bytes);
 
+  // Does the platform support trimming the native heap?
+  static bool can_trim_native_heap();
+
+  // Trim the C-heap. Optionally returns working set size change (RSS+Swap) in *rss_change.
+  // Note: If trimming succeeded but no size change information could be obtained,
+  // rss_change.after will contain SIZE_MAX upon return.
+  struct size_change_t { size_t before; size_t after; };
+  static bool trim_native_heap(size_change_t* rss_change = nullptr);
+
   // A diagnostic function to print memory mappings in the given range.
   static void print_memory_mappings(char* addr, size_t bytes, outputStream* st);
   // Prints all mappings
@@ -559,6 +569,7 @@ class os: AllStatic {
   // JVM-interface-level instead of the os-call-level
   static int unlink(const char *path);
 #endif
+  static bool file_exists(const char* file);
   // This function, on Windows, canonicalizes a given path (see os_windows.cpp for details).
   // On Posix, this function is a noop: it does not change anything and just returns
   // the input pointer.
@@ -578,7 +589,8 @@ class os: AllStatic {
 
   static ssize_t read(int fd, void *buf, unsigned int nBytes);
   static ssize_t read_at(int fd, void *buf, unsigned int nBytes, jlong offset);
-  static size_t write(int fd, const void *buf, unsigned int nBytes);
+  // Writes the bytes completely. Returns true on success, false otherwise.
+  static bool write(int fd, const void *buf, size_t nBytes);
 
   // Reading directories.
   static DIR*           opendir(const char* dirname);
@@ -678,6 +690,10 @@ class os: AllStatic {
   static int vsnprintf(char* buf, size_t len, const char* fmt, va_list args) ATTRIBUTE_PRINTF(3, 0);
   static int snprintf(char* buf, size_t len, const char* fmt, ...) ATTRIBUTE_PRINTF(3, 4);
 
+  // Performs snprintf and asserts the result is non-negative (so there was not
+  // an encoding error) and that the output was not truncated.
+  static int snprintf_checked(char* buf, size_t len, const char* fmt, ...) ATTRIBUTE_PRINTF(3, 4);
+
   // Get host name in buffer provided
   static bool get_host_name(char* buf, size_t buflen);
 
@@ -692,12 +708,14 @@ class os: AllStatic {
   static void print_dll_info(outputStream* st);
   static void print_environment_variables(outputStream* st, const char** env_list);
   static void print_context(outputStream* st, const void* context);
+  static void print_tos_pc(outputStream* st, const void* context);
+  static void print_tos(outputStream* st, address sp);
+  static void print_instructions(outputStream* st, address pc, int unitsize = 1);
   static void print_register_info(outputStream* st, const void* context);
   static bool signal_sent_by_kill(const void* siginfo);
   static void print_siginfo(outputStream* st, const void* siginfo);
   static void print_signal_handlers(outputStream* st, char* buf, size_t buflen);
   static void print_date_and_time(outputStream* st, char* buf, size_t buflen);
-  static void print_instructions(outputStream* st, address pc, int unitsize);
 
   // helper for output of seconds in days , hours and months
   static void print_dhm(outputStream* st, const char* startStr, long sec);
@@ -916,7 +934,7 @@ class os: AllStatic {
 #ifndef PLATFORM_PRINT_NATIVE_STACK
   // No platform-specific code for printing the native stack.
   static bool platform_print_native_stack(outputStream* st, const void* context,
-                                          char *buf, int buf_size) {
+                                          char *buf, int buf_size, address& lastpc) {
     return false;
   }
 #endif

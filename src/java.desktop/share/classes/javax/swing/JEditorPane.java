@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -41,6 +41,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Serial;
 import java.io.StringReader;
@@ -618,35 +619,37 @@ public class JEditorPane extends JTextComponent {
         String charset = (String) getClientProperty("charset");
         try(Reader r = (charset != null) ? new InputStreamReader(in, charset) :
                 new InputStreamReader(in)) {
-            kit.read(r, doc, 0);
-        } catch (BadLocationException e) {
-            throw new IOException(e.getMessage());
-        } catch (ChangedCharSetException changedCharSetException) {
-            String charSetSpec = changedCharSetException.getCharSetSpec();
-            if (changedCharSetException.keyEqualsCharSet()) {
-                putClientProperty("charset", charSetSpec);
-            } else {
-                setCharsetFromContentTypeParameters(charSetSpec);
-            }
             try {
-                in.reset();
-            } catch (IOException exception) {
-                //mark was invalidated
-                in.close();
-                URL url = (URL)doc.getProperty(Document.StreamDescriptionProperty);
-                if (url != null) {
-                    URLConnection conn = url.openConnection();
-                    in = conn.getInputStream();
+                kit.read(r, doc, 0);
+            } catch (BadLocationException e) {
+                throw new IOException(e.getMessage());
+            } catch (ChangedCharSetException changedCharSetException) {
+                String charSetSpec = changedCharSetException.getCharSetSpec();
+                if (changedCharSetException.keyEqualsCharSet()) {
+                    putClientProperty("charset", charSetSpec);
                 } else {
-                    //there is nothing we can do to recover stream
-                    throw changedCharSetException;
+                    setCharsetFromContentTypeParameters(charSetSpec);
                 }
+                try {
+                    in.reset();
+                } catch (IOException exception) {
+                    //mark was invalidated
+                    in.close();
+                    URL url = (URL)doc.getProperty(Document.StreamDescriptionProperty);
+                    if (url != null) {
+                        URLConnection conn = url.openConnection();
+                        in = conn.getInputStream();
+                    } else {
+                        //there is nothing we can do to recover stream
+                        throw changedCharSetException;
+                    }
+                }
+                try {
+                    doc.remove(0, doc.getLength());
+                } catch (BadLocationException e) {}
+                doc.putProperty("IgnoreCharsetDirective", Boolean.valueOf(true));
+                read(in, doc);
             }
-            try {
-                doc.remove(0, doc.getLength());
-            } catch (BadLocationException e) {}
-            doc.putProperty("IgnoreCharsetDirective", Boolean.valueOf(true));
-            read(in, doc);
         }
     }
 
@@ -852,16 +855,12 @@ public class JEditorPane extends JTextComponent {
     private void handlePostData(HttpURLConnection conn, Object postData)
                                                             throws IOException {
         conn.setDoOutput(true);
-        DataOutputStream os = null;
-        try {
-            conn.setRequestProperty("Content-Type",
-                    "application/x-www-form-urlencoded");
-            os = new DataOutputStream(conn.getOutputStream());
-            os.writeBytes((String) postData);
-        } finally {
-            if (os != null) {
-                os.close();
-            }
+        conn.setRequestProperty("Content-Type",
+                "application/x-www-form-urlencoded");
+        try (OutputStream os = conn.getOutputStream();
+             DataOutputStream dos = new DataOutputStream(os))
+        {
+            dos.writeBytes((String)postData);
         }
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -31,6 +31,7 @@ import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontMetrics;
+import java.awt.IllegalComponentStateException;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.event.FocusListener;
@@ -54,6 +55,7 @@ import javax.accessibility.AccessibleRole;
 import javax.accessibility.AccessibleSelection;
 import javax.accessibility.AccessibleState;
 import javax.accessibility.AccessibleStateSet;
+import javax.accessibility.AccessibleValue;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import javax.swing.plaf.TabbedPaneUI;
@@ -2073,7 +2075,7 @@ public class JTabbedPane extends JComponent
     }
 
     private class Page extends AccessibleContext
-        implements Serializable, Accessible, AccessibleComponent {
+        implements Serializable, Accessible, AccessibleComponent, AccessibleValue {
         String title;
         Color background;
         Color foreground;
@@ -2167,7 +2169,6 @@ public class JTabbedPane extends JComponent
             return this;
         }
 
-
         // AccessibleContext methods
 
         public String getAccessibleName() {
@@ -2199,6 +2200,43 @@ public class JTabbedPane extends JComponent
                 states.add(AccessibleState.SELECTED);
             }
             return states;
+        }
+
+        @Override
+        public AccessibleValue getAccessibleValue() {
+            return this;
+        }
+
+        @Override
+        public Number getCurrentAccessibleValue() {
+            return (getPageIndex() == parent.getSelectedIndex() ?
+                    Integer.valueOf(1) : Integer.valueOf(0));
+        }
+
+        @Override
+        public boolean setCurrentAccessibleValue(Number n) {
+            if (getPageIndex() != parent.getSelectedIndex()) {
+                if (n.intValue() != 0) {
+                    // Set current page selected
+                    parent.setSelectedIndex(getPageIndex());
+                }
+            } else {
+                if (n.intValue() == 0) {
+                    // Can not "deselect" because what page should i select instead?
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        @Override
+        public Number getMinimumAccessibleValue() {
+            return Integer.valueOf(0);
+        }
+
+        @Override
+        public Number getMaximumAccessibleValue() {
+            return Integer.valueOf(1);
         }
 
         public int getAccessibleIndexInParent() {
@@ -2294,15 +2332,23 @@ public class JTabbedPane extends JComponent
         }
 
         public Point getLocationOnScreen() {
-             Point parentLocation = parent.getLocationOnScreen();
+             Point parentLocation;
+             try {
+                 parentLocation = parent.getLocationOnScreen();
+             } catch (IllegalComponentStateException icse) {
+                 return null;
+             }
              Point componentLocation = getLocation();
+             if (parentLocation == null || componentLocation == null) {
+                 return null;
+             }
              componentLocation.translate(parentLocation.x, parentLocation.y);
              return componentLocation;
         }
 
         public Point getLocation() {
              Rectangle r = getBounds();
-             return new Point(r.x, r.y);
+             return r == null ? null : new Point(r.x, r.y);
         }
 
         public void setLocation(Point p) {
@@ -2319,7 +2365,7 @@ public class JTabbedPane extends JComponent
 
         public Dimension getSize() {
             Rectangle r = getBounds();
-            return new Dimension(r.width, r.height);
+            return r == null ? null : new Dimension(r.width, r.height);
         }
 
         public void setSize(Dimension d) {
@@ -2359,7 +2405,7 @@ public class JTabbedPane extends JComponent
          * one exists and the page is disabled.  Otherwise, null
          * is returned.
          */
-        public AccessibleIcon [] getAccessibleIcon() {
+        public AccessibleIcon[] getAccessibleIcon() {
             AccessibleIcon accessibleIcon = null;
             if (enabled && icon instanceof ImageIcon) {
                 AccessibleContext ac =

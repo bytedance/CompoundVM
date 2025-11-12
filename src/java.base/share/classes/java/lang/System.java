@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1994, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1994, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -66,6 +66,7 @@ import java.util.WeakHashMap;
 import java.util.function.Supplier;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
+import jdk.internal.logger.LoggerFinderLoader.TemporaryLoggerFinder;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.util.StaticProperty;
 import jdk.internal.module.ModuleBootstrap;
@@ -725,6 +726,9 @@ public final class System {
      *     <td>Java Runtime Environment specification version, whose value is
      *     the {@linkplain Runtime.Version#feature feature} element of the
      *     {@linkplain Runtime#version() runtime version}</td></tr>
+     * <tr><th scope="row">{@systemProperty java.specification.maintenance.version}</th>
+     *     <td>Java Runtime Environment specification maintenance version,
+     *     may be interpreted as a positive integer <em>(optional, see below)</em></td></tr>
      * <tr><th scope="row">{@systemProperty java.specification.vendor}</th>
      *     <td>Java Runtime Environment specification  vendor</td></tr>
      * <tr><th scope="row">{@systemProperty java.specification.name}</th>
@@ -763,6 +767,16 @@ public final class System {
      *     the user's settings. Setting this system property has no effect.</td></tr>
      * </tbody>
      * </table>
+     * <p>
+     * The {@code java.specification.maintenance.version} property is
+     * defined if the specification implemented by this runtime at the
+     * time of its construction had undergone a <a
+     * href="https://jcp.org/en/procedures/jcp2#3.6.4">maintenance
+     * release</a>. When defined, its value identifies that
+     * maintenance release. To indicate the first maintenance release
+     * this property will have the value {@code "1"}, to indicate the
+     * second maintenance release this property will have the value
+     * {@code "2"}, and so on.
      * <p>
      * Multiple paths in a system property value are separated by the path
      * separator character of the platform.
@@ -1713,13 +1727,16 @@ public final class System {
             // We do not need to synchronize: LoggerFinderLoader will
             // always return the same instance, so if we don't have it,
             // just fetch it again.
-            if (service == null) {
+            LoggerFinder finder = service;
+            if (finder == null) {
                 PrivilegedAction<LoggerFinder> pa =
                         () -> LoggerFinderLoader.getLoggerFinder();
-                service = AccessController.doPrivileged(pa, null,
+                finder = AccessController.doPrivileged(pa, null,
                         LOGGERFINDER_PERMISSION);
+                if (finder instanceof TemporaryLoggerFinder) return finder;
+                service = finder;
             }
-            return service;
+            return finder;
         }
 
     }
@@ -2453,7 +2470,7 @@ public final class System {
             }
 
             public String getLoaderNameID(ClassLoader loader) {
-                return loader.nameAndId();
+                return loader != null ? loader.nameAndId() : "null";
             }
         });
     }

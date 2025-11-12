@@ -30,6 +30,7 @@ import java.util.stream.*;
  * @test
  * @bug 8242263
  * @summary Exercise DiagnoseSyncOnValueBasedClasses diagnostic flag
+ * @requires vm.flagless
  * @library /test/lib
  * @run driver/timeout=180000 SyncOnValueBasedClassTest
  */
@@ -86,14 +87,14 @@ public class SyncOnValueBasedClassTest {
     public static void main(String[] args) throws Exception {
         generateTests();
         for (int i = 0; i < fatalTests.length; i++) {
-            ProcessBuilder pb = ProcessTools.createJavaProcessBuilder(fatalTests[i]);
+            ProcessBuilder pb = ProcessTools.createLimitedTestJavaProcessBuilder(fatalTests[i]);
             OutputAnalyzer output = ProcessTools.executeProcess(pb);
             output.shouldContain("fatal error: Synchronizing on object");
             output.shouldNotContain("synchronization on value based class did not fail");
             output.shouldNotHaveExitValue(0);
         }
         for (int i = 0; i < logTests.length; i++) {
-            ProcessBuilder pb = ProcessTools.createJavaProcessBuilder(logTests[i]);
+            ProcessBuilder pb = ProcessTools.createLimitedTestJavaProcessBuilder(logTests[i]);
             OutputAnalyzer output = ProcessTools.executeProcess(pb);
             output.shouldHaveExitValue(0);
             checkOutput(output);

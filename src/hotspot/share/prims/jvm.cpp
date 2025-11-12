@@ -1,7 +1,7 @@
 // This project is a modified version of OpenJDK, licensed under GPL v2.
 // Modifications Copyright (C) 2025 ByteDance Inc.
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -2879,7 +2879,7 @@ void jio_print(const char* s, size_t len) {
     jio_fprintf(defaultStream::output_stream(), "%.*s", (int)len, s);
   } else {
     // Make an unused local variable to avoid warning from gcc compiler.
-    size_t count = ::write(defaultStream::output_fd(), s, (int)len);
+    bool dummy = os::write(defaultStream::output_fd(), s, len);
   }
 }
 
@@ -3031,12 +3031,10 @@ JVM_ENTRY(void, JVM_StopThread(JNIEnv* env, jobject jthread, jobject throwable))
   }
 JVM_END
 
-
 JVM_ENTRY(jboolean, JVM_IsThreadAlive(JNIEnv* env, jobject jthread))
   oop thread_oop = JNIHandles::resolve_non_null(jthread);
   return java_lang_Thread::is_alive(thread_oop);
 JVM_END
-
 
 JVM_ENTRY(void, JVM_SuspendThread(JNIEnv* env, jobject jthread))
   ThreadsListHandle tlh(thread);

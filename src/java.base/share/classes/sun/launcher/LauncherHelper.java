@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2007, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -87,6 +87,7 @@ import jdk.internal.module.ModuleBootstrap;
 import jdk.internal.module.Modules;
 import jdk.internal.platform.Container;
 import jdk.internal.platform.Metrics;
+import sun.util.calendar.ZoneInfoFile;
 
 
 public final class LauncherHelper {
@@ -166,7 +167,11 @@ public final class LauncherHelper {
                 printProperties();
                 break;
             case "locale":
-                printLocale();
+                printLocale(false);
+                break;
+            case "security":
+                var opt = opts.length > 2 ? opts[2].trim() : "all";
+                SecuritySettings.printSecuritySettings(opt, ostream);
                 break;
             case "system":
                 if (System.getProperty("os.name").contains("Linux")) {
@@ -176,7 +181,8 @@ public final class LauncherHelper {
             default:
                 printVmSettings(initialHeapSize, maxHeapSize, stackSize);
                 printProperties();
-                printLocale();
+                printLocale(true);
+                SecuritySettings.printSecuritySummarySettings(ostream);
                 if (System.getProperty("os.name").contains("Linux")) {
                     printSystemMetrics();
                 }
@@ -271,16 +277,26 @@ public final class LauncherHelper {
     /*
      * prints the locale subopt/section
      */
-    private static void printLocale() {
+    private static void printLocale(boolean summaryMode) {
         Locale locale = Locale.getDefault();
-        ostream.println(LOCALE_SETTINGS);
+        if (!summaryMode) {
+            ostream.println(LOCALE_SETTINGS);
+        } else {
+            ostream.println("Locale settings summary:");
+            ostream.println(INDENT + "Use \"-XshowSettings:locale\" " +
+                    "option for verbose locale settings options");
+        }
         ostream.println(INDENT + "default locale = " +
                 locale.getDisplayName());
         ostream.println(INDENT + "default display locale = " +
                 Locale.getDefault(Category.DISPLAY).getDisplayName());
         ostream.println(INDENT + "default format locale = " +
                 Locale.getDefault(Category.FORMAT).getDisplayName());
-        printLocales();
+        ostream.println(INDENT + "tzdata version = " +
+                ZoneInfoFile.getVersion());
+        if (!summaryMode) {
+            printLocales();
+        }
         ostream.println();
     }
 
@@ -312,9 +328,10 @@ public final class LauncherHelper {
                 ostream.print(INDENT + INDENT);
             }
         }
+        ostream.println();
     }
 
-    public static void printSystemMetrics() {
+    private static void printSystemMetrics() {
         Metrics c = Container.metrics();
 
         ostream.println("Operating System Metrics:");

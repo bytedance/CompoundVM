@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -26,6 +26,7 @@
  * @test id=current-int
  * @bug 8224137
  * @summary Run invokeinterface invocation tests
+ * @requires vm.flagless
  * @library /test/lib
  * @modules java.base/jdk.internal.org.objectweb.asm
  *          java.base/jdk.internal.misc
@@ -72,7 +73,7 @@ public class invokeinterfaceTests {
     public static void runTest(String classFileVersion, String option) throws Throwable {
         System.out.println("\ninvokeinterface invocation tests, option: " + option +
                            ", class file version: " + classFileVersion);
-        ProcessBuilder pb = ProcessTools.createJavaProcessBuilder("-Xmx128M", option,
+        ProcessBuilder pb = ProcessTools.createLimitedTestJavaProcessBuilder("-Xmx128M", option,
             "--add-exports", "java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED",
             "invokeinterface.Generator", "--classfile_version=" + classFileVersion);
         OutputAnalyzer output = new OutputAnalyzer(pb.start());

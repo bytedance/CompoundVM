@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -39,7 +39,6 @@ import javax.management.MBeanServer;
 import javax.management.ObjectName;
 
 import jdk.test.lib.process.OutputAnalyzer;
-import jdk.test.lib.process.ProcessTools;
 import jtreg.SkippedException;
 
 public class TestAggressiveHeap {
@@ -66,7 +65,7 @@ public class TestAggressiveHeap {
         " *bool +UseParallelGC *= *true +\\{product\\} *\\{command line\\}";
 
     private static void testFlag() throws Exception {
-        ProcessBuilder pb = GCArguments.createJavaProcessBuilder(
+        ProcessBuilder pb = GCArguments.createTestJavaProcessBuilder(
             option, heapSizeOption, "-XX:+PrintFlagsFinal", "-version");
 
         OutputAnalyzer output = new OutputAnalyzer(pb.start());

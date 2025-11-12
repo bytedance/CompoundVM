@@ -557,6 +557,21 @@ void ClassLoaderData::unload() {
   // after erroneous classes are released.
   classes_do(InstanceKlass::unload_class);
 
+  // Method::clear_jmethod_ids only sets the jmethod_ids to NULL without
+  // releasing the memory for related JNIMethodBlocks and JNIMethodBlockNodes.
+  // This is done intentionally because native code (e.g. JVMTI agent) holding
+  // jmethod_ids may access them after the associated classes and class loader
+  // are unloaded. The Java Native Interface Specification says "method ID
+  // does not prevent the VM from unloading the class from which the ID has
+  // been derived. After the class is unloaded, the method or field ID becomes
+  // invalid". In real world usages, the native code may rely on jmethod_ids
+  // being NULL after class unloading. Hence, it is unsafe to free the memory
+  // from the VM side without knowing when native code is going to stop using
+  // them.
+  if (_jmethod_ids != NULL) {
+    Method::clear_jmethod_ids(this);
+  }
+
   // Clean up global class iterator for compiler
   ClassLoaderDataGraph::adjust_saved_class(this);
 }
@@ -701,20 +716,7 @@ ClassLoaderData::~ClassLoaderData() {
     _metaspace = NULL;
     delete m;
   }
-  // Method::clear_jmethod_ids only sets the jmethod_ids to NULL without
-  // releasing the memory for related JNIMethodBlocks and JNIMethodBlockNodes.
-  // This is done intentionally because native code (e.g. JVMTI agent) holding
-  // jmethod_ids may access them after the associated classes and class loader
-  // are unloaded. The Java Native Interface Specification says "method ID
-  // does not prevent the VM from unloading the class from which the ID has
-  // been derived. After the class is unloaded, the method or field ID becomes
-  // invalid". In real world usages, the native code may rely on jmethod_ids
-  // being NULL after class unloading. Hence, it is unsafe to free the memory
-  // from the VM side without knowing when native code is going to stop using
-  // them.
-  if (_jmethod_ids != NULL) {
-    Method::clear_jmethod_ids(this);
-  }
+
   // Delete lock
   delete _metaspace_lock;
 
@@ -826,6 +828,7 @@ void ClassLoaderData::add_to_deallocate_list(Metadata* m) {
       _deallocate_list = new (ResourceObj::C_HEAP, mtClass) GrowableArray<Metadata*>(100, mtClass);
     }
     _deallocate_list->append_if_missing(m);
+    ResourceMark rm;
     log_debug(class, loader, data)("deallocate added for %s", m->print_value_string());
     ClassLoaderDataGraph::set_should_clean_deallocate_lists();
   }
@@ -978,7 +981,11 @@ void ClassLoaderData::print_on(outputStream* out) const {
     _holder.print_on(out);
     out->print_cr("");
   }
-  out->print_cr(" - class loader        " INTPTR_FORMAT, p2i(_class_loader.ptr_raw()));
+  if (!_unloading) {
+    out->print_cr(" - class loader        " INTPTR_FORMAT, p2i(_class_loader.peek()));
+  } else {
+    out->print_cr(" - class loader        <unloading, oop is bad>");
+  }
   out->print_cr(" - metaspace           " INTPTR_FORMAT, p2i(_metaspace));
   out->print_cr(" - unloading           %s", _unloading ? "true" : "false");
   out->print_cr(" - class mirror holder %s", _has_class_mirror_holder ? "true" : "false");

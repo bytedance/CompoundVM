@@ -94,10 +94,12 @@ class oopDesc;
 #define BOOL_TO_STR(_b_) ((_b_) ? "true" : "false")
 
 // Format 32-bit quantities.
-#define INT32_FORMAT           "%" PRId32
-#define UINT32_FORMAT          "%" PRIu32
-#define INT32_FORMAT_W(width)  "%" #width PRId32
-#define UINT32_FORMAT_W(width) "%" #width PRIu32
+#define INT32_FORMAT             "%"          PRId32
+#define INT32_FORMAT_X_0         "0x%08"      PRIx32
+#define INT32_FORMAT_W(width)    "%"   #width PRId32
+#define UINT32_FORMAT            "%"          PRIu32
+#define UINT32_FORMAT_X_0        "0x%08"      PRIx32
+#define UINT32_FORMAT_W(width)   "%"   #width PRIu32
 
 #define PTR32_FORMAT           "0x%08" PRIx32
 #define PTR32_FORMAT_W(width)  "0x%" #width PRIx32
@@ -141,6 +143,7 @@ class oopDesc;
 #define INTPTR_FORMAT_W(width)   "%" #width PRIxPTR
 
 #define SSIZE_FORMAT             "%"   PRIdPTR
+#define SSIZE_PLUS_FORMAT        "%+"  PRIdPTR
 #define SIZE_FORMAT              "%"   PRIuPTR
 #define SIZE_FORMAT_HEX          "0x%" PRIxPTR
 #define SSIZE_FORMAT_W(width)    "%"   #width PRIdPTR
@@ -324,6 +327,9 @@ inline T byte_size_in_proper_unit(T s) {
   }
 }
 
+#define PROPERFMT             SIZE_FORMAT "%s"
+#define PROPERFMTARGS(s)      byte_size_in_proper_unit(s), proper_unit_for_byte_size(s)
+
 inline const char* exact_unit_for_byte_size(size_t s) {
 #ifdef _LP64
   if (s >= G && (s % G) == 0) {
@@ -353,6 +359,9 @@ inline size_t byte_size_in_exact_unit(size_t s) {
   }
   return s;
 }
+
+#define EXACTFMT            SIZE_FORMAT "%s"
+#define EXACTFMTARGS(s)     byte_size_in_exact_unit(s), exact_unit_for_byte_size(s)
 
 // Memory size transition formatting.
 

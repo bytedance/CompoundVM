@@ -24,7 +24,7 @@
 #include "precompiled.hpp"
 #include "memory/allocation.hpp"
 #include "memory/resourceArea.hpp"
-#include "runtime/os.hpp"
+#include "runtime/os.inline.hpp"
 #include "runtime/thread.hpp"
 #include "services/memTracker.hpp"
 #include "utilities/globalDefinitions.hpp"
@@ -33,6 +33,8 @@
 #include "utilities/align.hpp"
 #include "unittest.hpp"
 #include "runtime/frame.inline.hpp"
+
+using testing::HasSubstr;
 
 static size_t small_page_size() {
   return os::vm_page_size();
@@ -167,7 +169,7 @@ static void do_test_print_hex_dump(address addr, size_t len, int unitsize, const
   os::print_hex_dump(&ss, addr, addr + len, unitsize);
 //  tty->print_cr("expected: %s", expected);
 //  tty->print_cr("result: %s", buf);
-  ASSERT_NE(strstr(buf, expected), (char*)NULL);
+  EXPECT_THAT(buf, HasSubstr(expected));
 }
 
 TEST_VM(os, test_print_hex_dump) {
@@ -352,30 +354,76 @@ TEST_VM(os, jio_snprintf) {
   test_snprintf(jio_snprintf, false);
 }
 
+#ifdef __APPLE__
+// Not all macOS versions can use os::reserve_memory (i.e. anon_mmap) API
+// to reserve executable memory, so before attempting to use it,
+// we need to verify that we can do so by asking for a tiny executable
+// memory chunk.
+static inline bool can_reserve_executable_memory(void) {
+  bool executable = true;
+  size_t len = 128;
+  char* p = os::reserve_memory(len, executable);
+  bool exec_supported = (p != NULL);
+  if (exec_supported) {
+    os::release_memory(p, len);
+  }
+  return exec_supported;
+}
+#endif
+
 // Test that os::release_memory() can deal with areas containing multiple mappings.
 #define PRINT_MAPPINGS(s) { tty->print_cr("%s", s); os::print_memory_mappings((char*)p, total_range_len, tty); }
 //#define PRINT_MAPPINGS
+
+// Release a range allocated with reserve_multiple carefully, to not trip mapping
+// asserts on Windows in os::release_memory()
+static void carefully_release_multiple(address start, int num_stripes, size_t stripe_len) {
+  for (int stripe = 0; stripe < num_stripes; stripe++) {
+    address q = start + (stripe * stripe_len);
+    EXPECT_TRUE(os::release_memory((char*)q, stripe_len));
+  }
+}
 
 #ifndef _AIX // JDK-8257041
 // Reserve an area consisting of multiple mappings
 //  (from multiple calls to os::reserve_memory)
 static address reserve_multiple(int num_stripes, size_t stripe_len) {
   assert(is_aligned(stripe_len, os::vm_allocation_granularity()), "Sanity");
-  size_t total_range_len = num_stripes * stripe_len;
-  // Reserve a large contiguous area to get the address space...
-  address p = (address)os::reserve_memory(total_range_len);
-  EXPECT_NE(p, (address)NULL);
-  // .. release it...
-  EXPECT_TRUE(os::release_memory((char*)p, total_range_len));
-  // ... re-reserve in the same spot multiple areas...
-  for (int stripe = 0; stripe < num_stripes; stripe++) {
-    address q = p + (stripe * stripe_len);
-    // Commit, alternatingly with or without exec permission,
-    //  to prevent kernel from folding these mappings.
-    const bool executable = stripe % 2 == 0;
-    q = (address)os::attempt_reserve_memory_at((char*)q, stripe_len, executable);
-    EXPECT_NE(q, (address)NULL);
-    EXPECT_TRUE(os::commit_memory((char*)q, stripe_len, executable));
+
+#ifdef __APPLE__
+  // Workaround: try reserving executable memory to figure out
+  // if such operation is supported on this macOS version
+  const bool exec_supported = can_reserve_executable_memory();
+#endif
+
+  address p = NULL;
+  for (int tries = 0; tries < 256 && p == NULL; tries ++) {
+    size_t total_range_len = num_stripes * stripe_len;
+    // Reserve a large contiguous area to get the address space...
+    p = (address)os::reserve_memory(total_range_len);
+    EXPECT_NE(p, (address)NULL);
+    // .. release it...
+    EXPECT_TRUE(os::release_memory((char*)p, total_range_len));
+    // ... re-reserve in the same spot multiple areas...
+    for (int stripe = 0; stripe < num_stripes; stripe++) {
+      address q = p + (stripe * stripe_len);
+      // Commit, alternatingly with or without exec permission,
+      //  to prevent kernel from folding these mappings.
+#ifdef __APPLE__
+      const bool executable = exec_supported ? (stripe % 2 == 0) : false;
+#else
+      const bool executable = stripe % 2 == 0;
+#endif
+      q = (address)os::attempt_reserve_memory_at((char*)q, stripe_len, executable);
+      if (q == NULL) {
+        // Someone grabbed that area concurrently. Cleanup, then retry.
+        tty->print_cr("reserve_multiple: retry (%d)...", stripe);
+        carefully_release_multiple(p, stripe, stripe_len);
+        p = NULL;
+      } else {
+        EXPECT_TRUE(os::commit_memory((char*)q, stripe_len, executable));
+      }
+    }
   }
   return p;
 }
@@ -398,14 +446,6 @@ static address reserve_one_commit_multiple(int num_stripes, size_t stripe_len) {
 }
 
 #ifdef _WIN32
-// Release a range allocated with reserve_multiple carefully, to not trip mapping
-// asserts on Windows in os::release_memory()
-static void carefully_release_multiple(address start, int num_stripes, size_t stripe_len) {
-  for (int stripe = 0; stripe < num_stripes; stripe++) {
-    address q = start + (stripe * stripe_len);
-    EXPECT_TRUE(os::release_memory((char*)q, stripe_len));
-  }
-}
 struct NUMASwitcher {
   const bool _b;
   NUMASwitcher(bool v): _b(UseNUMAInterleaving) { UseNUMAInterleaving = v; }
@@ -414,11 +454,7 @@ struct NUMASwitcher {
 #endif
 
 #ifndef _AIX // JDK-8257041
-#if defined(__APPLE__) && !defined(AARCH64) // JDK-8267339
-  TEST_VM(os, DISABLED_release_multi_mappings) {
-#else
   TEST_VM(os, release_multi_mappings) {
-#endif
 
   // With NMT enabled, this will trigger JDK-8263464. For now disable the test if NMT=on.
   if (MemTracker::tracking_level() > NMT_off) {
@@ -466,7 +502,9 @@ struct NUMASwitcher {
 
   // ...re-reserve the middle stripes. This should work unless release silently failed.
   address p2 = (address)os::attempt_reserve_memory_at((char*)p_middle_stripes, middle_stripe_len);
+
   ASSERT_EQ(p2, p_middle_stripes);
+
   PRINT_MAPPINGS("C");
 
   // Clean up. Release all mappings.
@@ -510,26 +548,29 @@ TEST_VM(os, release_bad_ranges) {
 TEST_VM(os, release_one_mapping_multi_commits) {
   // Test that we can release an area consisting of interleaved
   //  committed and uncommitted regions:
-  const size_t stripe_len = 4 * M;
-  const int num_stripes = 4;
+  const size_t stripe_len = os::vm_allocation_granularity();
+  const int num_stripes = 6;
   const size_t total_range_len = stripe_len * num_stripes;
 
   // reserve address space...
   address p = reserve_one_commit_multiple(num_stripes, stripe_len);
-  ASSERT_NE(p, (address)NULL);
   PRINT_MAPPINGS("A");
+  ASSERT_NE(p, (address)nullptr);
 
-  // .. release it...
-  ASSERT_TRUE(os::release_memory((char*)p, total_range_len));
+  // // make things even more difficult by trying to reserve at the border of the region
+  address border = p + num_stripes * stripe_len;
+  address p2 = (address)os::attempt_reserve_memory_at((char*)border, stripe_len);
   PRINT_MAPPINGS("B");
 
-  // re-reserve it. This should work unless release failed.
-  address p2 = (address)os::attempt_reserve_memory_at((char*)p, total_range_len);
-  ASSERT_EQ(p2, p);
-  PRINT_MAPPINGS("C");
+  ASSERT_TRUE(p2 == nullptr || p2 == border);
 
   ASSERT_TRUE(os::release_memory((char*)p, total_range_len));
-  PRINT_MAPPINGS("D");
+  PRINT_MAPPINGS("C");
+
+  if (p2 != nullptr) {
+    ASSERT_TRUE(os::release_memory((char*)p2, stripe_len));
+    PRINT_MAPPINGS("D");
+  }
 }
 
 static void test_show_mappings(address start, size_t size) {
@@ -730,7 +771,7 @@ TEST_VM(os, pagesizes_test_print) {
   char buffer[256];
   stringStream ss(buffer, sizeof(buffer));
   pss.print_on(&ss);
-  ASSERT_EQ(strcmp(expected, buffer), 0);
+  EXPECT_STREQ(expected, buffer);
 }
 
 TEST_VM(os, dll_address_to_function_and_library_name) {
@@ -739,9 +780,9 @@ TEST_VM(os, dll_address_to_function_and_library_name) {
   stringStream st(output, sizeof(output));
 
 #define EXPECT_CONTAINS(haystack, needle) \
-  EXPECT_NE(::strstr(haystack, needle), (char*)NULL)
+  EXPECT_THAT(haystack, HasSubstr(needle));
 #define EXPECT_DOES_NOT_CONTAIN(haystack, needle) \
-  EXPECT_EQ(::strstr(haystack, needle), (char*)NULL)
+  EXPECT_THAT(haystack, Not(HasSubstr(needle)));
 // #define LOG(...) tty->print_cr(__VA_ARGS__); // enable if needed
 #define LOG(...)
 
@@ -852,3 +893,27 @@ TEST_VM(os, is_first_C_frame) {
   EXPECT_FALSE(os::is_first_C_frame(&cur_frame));
 #endif // _WIN32
 }
+
+#ifdef __GLIBC__
+TEST_VM(os, trim_native_heap) {
+  EXPECT_TRUE(os::can_trim_native_heap());
+  os::size_change_t sc;
+  sc.before = sc.after = (size_t)-1;
+  EXPECT_TRUE(os::trim_native_heap(&sc));
+  tty->print_cr(SIZE_FORMAT "->" SIZE_FORMAT, sc.before, sc.after);
+  // Regardless of whether we freed memory, both before and after
+  // should be somewhat believable numbers (RSS).
+  const size_t min = 5 * M;
+  const size_t max = LP64_ONLY(20 * G) NOT_LP64(3 * G);
+  ASSERT_LE(min, sc.before);
+  ASSERT_GT(max, sc.before);
+  ASSERT_LE(min, sc.after);
+  ASSERT_GT(max, sc.after);
+  // Should also work
+  EXPECT_TRUE(os::trim_native_heap());
+}
+#else
+TEST_VM(os, trim_native_heap) {
+  EXPECT_FALSE(os::can_trim_native_heap());
+}
+#endif // __GLIBC__

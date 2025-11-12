@@ -114,6 +114,7 @@
 #include "runtime/threadWXSetters.inline.hpp"
 #include "runtime/timer.hpp"
 #include "runtime/timerTrace.hpp"
+#include "runtime/trimNativeHeap.hpp"
 #include "runtime/vframe.inline.hpp"
 #include "runtime/vframeArray.hpp"
 #include "runtime/vframe_hp.hpp"
@@ -655,7 +656,9 @@ void Thread::print_on_error(outputStream* st, char* buf, int buflen) const {
   else if (is_GC_task_thread())       { st->print("GCTaskThread"); }
   else if (is_Watcher_thread())       { st->print("WatcherThread"); }
   else if (is_ConcurrentGC_thread())  { st->print("ConcurrentGCThread"); }
-  else                                { st->print("Thread"); }
+  else if (this == AsyncLogWriter::instance()) {
+    st->print("%s", this->name());
+  } else                                { st->print("Thread"); }
 
   if (is_Named_thread()) {
     st->print(" \"%s\"", name());
@@ -697,15 +700,6 @@ void Thread::print_owned_locks_on(outputStream* st) const {
   }
 }
 #endif // ASSERT
-
-// We had to move these methods here, because vm threads get into ObjectSynchronizer::enter
-// However, there is a note in JavaThread::is_lock_owned() about the VM threads not being
-// used for compilation in the future. If that change is made, the need for these methods
-// should be revisited, and they should be removed if possible.
-
-bool Thread::is_lock_owned(address adr) const {
-  return is_in_full_stack(adr);
-}
 
 bool Thread::set_as_starting_thread() {
   assert(_starting_thread == NULL, "already initialized: "
@@ -1022,7 +1016,6 @@ void JavaThread::check_for_valid_safepoint_state() {
 JavaThread::JavaThread() :
   // Initialize fields
 
-  _in_asgct(false),
   _on_thread_list(false),
   DEBUG_ONLY(_java_call_counter(0) COMMA)
   _entry_point(nullptr),
@@ -1039,8 +1032,6 @@ JavaThread::JavaThread() :
   _current_pending_monitor_is_from_java(true),
   _current_waiting_monitor(NULL),
   _Stalled(0),
-
-  _monitor_chunks(nullptr),
 
   _suspend_flags(0),
   _async_exception_condition(_no_async_condition),
@@ -1345,8 +1336,9 @@ static void ensure_join(JavaThread* thread) {
   // Thread is exiting. So set thread_status field in  java.lang.Thread class to TERMINATED.
   java_lang_Thread::set_thread_status(threadObj(), JavaThreadStatus::TERMINATED);
   // Clear the native thread instance - this makes isAlive return false and allows the join()
-  // to complete once we've done the notify_all below
-  java_lang_Thread::set_thread(threadObj(), NULL);
+  // to complete once we've done the notify_all below. Needs a release() to obey Java Memory Model
+  // requirements.
+  java_lang_Thread::release_set_thread(threadObj(), NULL);
   lock.notify_all(thread);
   // Ignore pending exception (ThreadDeath), since we are exiting anyway
   thread->clear_pending_exception();
@@ -1577,13 +1569,7 @@ JavaThread* JavaThread::active() {
 }
 
 bool JavaThread::is_lock_owned(address adr) const {
-  if (Thread::is_lock_owned(adr)) return true;
-
-  for (MonitorChunk* chunk = monitor_chunks(); chunk != NULL; chunk = chunk->next()) {
-    if (chunk->contains(adr)) return true;
-  }
-
-  return false;
+  return is_in_full_stack(adr);
 }
 
 oop JavaThread::exception_oop() const {
@@ -1593,23 +1579,6 @@ oop JavaThread::exception_oop() const {
 void JavaThread::set_exception_oop(oop o) {
   Atomic::store(&_exception_oop, o);
 }
-
-void JavaThread::add_monitor_chunk(MonitorChunk* chunk) {
-  chunk->set_next(monitor_chunks());
-  set_monitor_chunks(chunk);
-}
-
-void JavaThread::remove_monitor_chunk(MonitorChunk* chunk) {
-  guarantee(monitor_chunks() != NULL, "must be non empty");
-  if (monitor_chunks() == chunk) {
-    set_monitor_chunks(chunk->next());
-  } else {
-    MonitorChunk* prev = monitor_chunks();
-    while (prev->next() != chunk) prev = prev->next();
-    prev->set_next(chunk->next());
-  }
-}
-
 
 // Asynchronous exceptions support
 //
@@ -1998,13 +1967,6 @@ void JavaThread::oops_do_no_frames(OopClosure* f, CodeBlobClosure* cf) {
 
   DEBUG_ONLY(verify_frame_info();)
 
-  if (has_last_Java_frame()) {
-    // Traverse the monitor chunks
-    for (MonitorChunk* chunk = monitor_chunks(); chunk != NULL; chunk = chunk->next()) {
-      chunk->oops_do(f);
-    }
-  }
-
   assert(vframe_array_head() == NULL, "deopt in progress at a safepoint!");
   // If we have deferred set_locals there might be oops waiting to be
   // written
@@ -2265,7 +2227,6 @@ void JavaThread::prepare(jobject jni_thread, ThreadPriority prio) {
   assert(InstanceKlass::cast(thread_oop->klass())->is_linked(),
          "must be initialized");
   set_threadObj(thread_oop());
-  java_lang_Thread::set_thread(thread_oop(), this);
 
   if (prio == NoPriority) {
     prio = java_lang_Thread::priority(thread_oop());
@@ -2281,6 +2242,11 @@ void JavaThread::prepare(jobject jni_thread, ThreadPriority prio) {
   // added to the Threads list for if a GC happens, then the java_thread oop
   // will not be visited by GC.
   Threads::add(this);
+  // Publish the JavaThread* in java.lang.Thread after the JavaThread* is
+  // on a ThreadsList. We don't want to wait for the release when the
+  // Theads_lock is dropped somewhere in the caller since the JavaThread*
+  // is already visible to JVM/TI via the ThreadsList.
+  java_lang_Thread::release_set_thread(thread_oop(), this);
 }
 
 oop JavaThread::current_park_blocker() {
@@ -3099,6 +3065,10 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   }
 #endif
 
+  if (NativeHeapTrimmer::enabled()) {
+    NativeHeapTrimmer::initialize();
+  }
+
   // Always call even when there are not JVMTI environments yet, since environments
   // may be attached late and JVMTI must track phases of VM execution
   JvmtiExport::enter_live_phase();
@@ -3411,10 +3381,10 @@ void JavaThread::invoke_shutdown_hooks() {
 
 // Threads::destroy_vm() is normally called from jni_DestroyJavaVM() when
 // the program falls off the end of main(). Another VM exit path is through
-// vm_exit() when the program calls System.exit() to return a value or when
-// there is a serious error in VM. The two shutdown paths are not exactly
-// the same, but they share Shutdown.shutdown() at Java level and before_exit()
-// and VM_Exit op at VM level.
+// vm_exit(), when the program calls System.exit() to return a value, or when
+// there is a serious error in VM.
+// These two separate shutdown paths are not exactly the same, but they share
+// Shutdown.shutdown() at Java level and before_exit() and VM_Exit op at VM level.
 //
 // Shutdown sequence:
 //   + Shutdown native memory tracking if it is on
@@ -3589,7 +3559,7 @@ void Threads::add(JavaThread* p, bool force_daemon) {
   ObjectSynchronizer::inc_in_use_list_ceiling();
 
   // Possible GC point.
-  Events::log(p, "Thread added: " INTPTR_FORMAT, p2i(p));
+  Events::log(Thread::current(), "Thread added: " INTPTR_FORMAT, p2i(p));
 
   // Make new thread known to active EscapeBarrier
   EscapeBarrier::thread_added(p);
@@ -3637,7 +3607,7 @@ void Threads::remove(JavaThread* p, bool is_daemon) {
   ObjectSynchronizer::dec_in_use_list_ceiling();
 
   // Since Events::log uses a lock, we grab it outside the Threads_lock
-  Events::log(p, "Thread exited: " INTPTR_FORMAT, p2i(p));
+  Events::log(Thread::current(), "Thread exited: " INTPTR_FORMAT, p2i(p));
 }
 
 // Operations on the Threads list for GC.  These are not explicitly locked,
@@ -3840,14 +3810,7 @@ void Threads::print_on(outputStream* st, bool print_stacks,
   }
 
   PrintOnClosure cl(st);
-  cl.do_thread(VMThread::vm_thread());
-  Universe::heap()->gc_threads_do(&cl);
-  if (StringDedup::is_enabled()) {
-    StringDedup::threads_do(&cl);
-  }
-  cl.do_thread(WatcherThread::watcher_thread());
-  cl.do_thread(AsyncLogWriter::instance());
-
+  non_java_threads_do(&cl);
   st->flush();
 }
 
@@ -4015,3 +3978,46 @@ void JavaThread::verify_cross_modify_fence_failure(JavaThread *thread) {
    report_vm_error(__FILE__, __LINE__, "Cross modify fence failure", "%p", thread);
 }
 #endif
+
+// Starts the target JavaThread as a daemon of the given priority, and
+// bound to the given java.lang.Thread instance.
+// The Threads_lock is held for the duration.
+void JavaThread::start_internal_daemon(JavaThread* current, JavaThread* target,
+                                       Handle thread_oop, ThreadPriority prio) {
+
+  assert(target->osthread()!= NULL, "target thread is not properly initialized");
+
+  MutexLocker mu(current, Threads_lock);
+
+  // Initialize the fields of the thread_oop first.
+  if (prio != NoPriority) {
+    java_lang_Thread::set_priority(thread_oop(), prio);
+    // Note: we don't call os::set_priority here. Possibly we should,
+    // else all threads should call it themselves when they first run.
+  }
+
+  java_lang_Thread::set_daemon(thread_oop());
+
+  // Now bind the thread_oop to the target JavaThread.
+  target->set_threadObj(thread_oop());
+
+  Threads::add(target); // target is now visible for safepoint/handshake
+  // Publish the JavaThread* in java.lang.Thread after the JavaThread* is
+  // on a ThreadsList. We don't want to wait for the release when the
+  // Theads_lock is dropped when the 'mu' destructor is run since the
+  // JavaThread* is already visible to JVM/TI via the ThreadsList.
+  java_lang_Thread::release_set_thread(thread_oop(), target); // isAlive == true now
+  Thread::start(target);
+}
+
+void JavaThread::vm_exit_on_osthread_failure(JavaThread* thread) {
+  // At this point it may be possible that no osthread was created for the
+  // JavaThread due to lack of resources. However, since this must work
+  // for critical system threads just check and abort if this fails.
+  if (thread->osthread() == nullptr) {
+    // This isn't really an OOM condition, but historically this is what
+    // we report.
+    vm_exit_during_initialization("java.lang.OutOfMemoryError",
+                                  os::native_thread_creation_failed_msg());
+  }
+}

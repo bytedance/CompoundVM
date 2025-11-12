@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -41,7 +41,7 @@ public class BadBSMUseTest {
     public static void main(String args[]) throws Throwable {
         // 1. Test a CONSTANT_Dynamic_info's bootstrap_method_attr_index points
         //    at a BSM meant for a CONSTANT_InvokeDynamic_info
-        ProcessBuilder pb = ProcessTools.createJavaProcessBuilder("CondyUsesIndyBSM");
+        ProcessBuilder pb = ProcessTools.createTestJavaProcessBuilder("CondyUsesIndyBSM");
         OutputAnalyzer oa = new OutputAnalyzer(pb.start());
         oa.shouldContain("In Indybsm target CallSite method foo");
         oa.shouldContain("BootstrapMethodError: bootstrap method initialization exception");
@@ -49,7 +49,7 @@ public class BadBSMUseTest {
 
         // 2. Test a CONSTANT_InvokeDynamic_info's bootstrap_method_attr_index points
         //    at a BSM meant for a CONSTANT_Dynamic_info
-        pb = ProcessTools.createJavaProcessBuilder("IndyUsesCondyBSM");
+        pb = ProcessTools.createTestJavaProcessBuilder("IndyUsesCondyBSM");
         oa = new OutputAnalyzer(pb.start());
         oa.shouldContain("In Condybsm");
         oa.shouldContain("BootstrapMethodError: bootstrap method initialization exception");

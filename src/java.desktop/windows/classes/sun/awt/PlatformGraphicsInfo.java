@@ -54,5 +54,4 @@ public class PlatformGraphicsInfo {
             "\nThe application does not have desktop access,\n" +
             "but this program performed an operation which requires it.";
     }
-
 }

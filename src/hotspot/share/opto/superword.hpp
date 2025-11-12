@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2007, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -99,7 +99,7 @@ class DepMem : public ResourceObj {
   DepEdge* _out_head; // Head of list of out edges, null terminated
 
  public:
-  DepMem(Node* node) : _node(node), _in_head(NULL), _out_head(NULL) {}
+  DepMem(Node* node) : _node(node), _in_head(nullptr), _out_head(nullptr) {}
 
   Node*    node()                { return _node;     }
   DepEdge* in_head()             { return _in_head;  }
@@ -122,9 +122,9 @@ class DepGraph {
   DepMem* _tail;
 
  public:
-  DepGraph(Arena* a) : _arena(a), _map(a, 8,  0, NULL) {
-    _root = new (_arena) DepMem(NULL);
-    _tail = new (_arena) DepMem(NULL);
+  DepGraph(Arena* a) : _arena(a), _map(a, 8,  0, nullptr) {
+    _root = new (_arena) DepMem(nullptr);
+    _tail = new (_arena) DepMem(nullptr);
   }
 
   DepMem* root() { return _root; }
@@ -197,7 +197,7 @@ class SWNodeInfo {
   const Type* _velt_type; // vector element type
   Node_List*  _my_pack;   // pack containing this node
 
-  SWNodeInfo() : _alignment(-1), _depth(0), _velt_type(NULL), _my_pack(NULL) {}
+  SWNodeInfo() : _alignment(-1), _depth(0), _velt_type(nullptr), _my_pack(nullptr) {}
   static const SWNodeInfo initial;
 };
 
@@ -210,11 +210,11 @@ class CMoveKit {
   CMoveKit(Arena* a, SuperWord* sw) : _sw(sw)  {_dict = new Dict(cmpkey, hashkey, a);}
   void*     _2p(Node* key)        const  { return (void*)(intptr_t)key; } // 2 conversion functions to make gcc happy
   Dict*     dict()                const  { return _dict; }
-  void map(Node* key, Node_List* val)    { assert(_dict->operator[](_2p(key)) == NULL, "key existed"); _dict->Insert(_2p(key), (void*)val); }
+  void map(Node* key, Node_List* val)    { assert(_dict->operator[](_2p(key)) == nullptr, "key existed"); _dict->Insert(_2p(key), (void*)val); }
   void unmap(Node* key)                  { _dict->Delete(_2p(key)); }
   Node_List* pack(Node* key)      const  { return (Node_List*)_dict->operator[](_2p(key)); }
   Node* is_Bool_candidate(Node* nd) const; // if it is the right candidate return corresponding CMove* ,
-  Node* is_CmpD_candidate(Node* nd) const; // otherwise return NULL
+  Node* is_CmpD_candidate(Node* nd) const; // otherwise return null
   Node_List* make_cmovevd_pack(Node_List* cmovd_pk);
   bool test_cmpd_pack(Node_List* cmpd_pk, Node_List* cmovd_pk);
 };//class CMoveKit
@@ -227,7 +227,7 @@ class OrderedPair {
   Node* _p1;
   Node* _p2;
  public:
-  OrderedPair() : _p1(NULL), _p2(NULL) {}
+  OrderedPair() : _p1(nullptr), _p2(nullptr) {}
   OrderedPair(Node* p1, Node* p2) {
     if (p1->_idx < p2->_idx) {
       _p1 = p1; _p2 = p2;
@@ -341,7 +341,7 @@ class SuperWord : public ResourceObj {
   int iv_stride() const            { return lp()->stride_con(); }
 
   CountedLoopNode* pre_loop_head() const {
-    assert(_pre_loop_end != NULL && _pre_loop_end->loopnode() != NULL, "should find head from pre loop end");
+    assert(_pre_loop_end != nullptr && _pre_loop_end->loopnode() != nullptr, "should find head from pre loop end");
     return _pre_loop_end->loopnode();
   }
   void set_pre_loop_end(CountedLoopEndNode* pre_loop_end) {
@@ -350,8 +350,8 @@ class SuperWord : public ResourceObj {
   }
   CountedLoopEndNode* pre_loop_end() const {
 #ifdef ASSERT
-    assert(_lp != NULL, "sanity");
-    assert(_pre_loop_end != NULL, "should be set when fetched");
+    assert(_lp != nullptr, "sanity");
+    assert(_pre_loop_end != nullptr, "should be set when fetched");
     Node* found_pre_end = find_pre_loop_end(_lp);
     assert(_pre_loop_end == found_pre_end && _pre_loop_end == pre_loop_head()->loopexit(),
            "should find the pre loop end and must be the same result");
@@ -374,7 +374,7 @@ class SuperWord : public ResourceObj {
   Node* ctrl(Node* n) const { return _phase->has_ctrl(n) ? _phase->get_ctrl(n) : n; }
 
   // block accessors
-  bool in_bb(Node* n)      { return n != NULL && n->outcnt() > 0 && ctrl(n) == _bb; }
+  bool in_bb(Node* n)      { return n != nullptr && n->outcnt() > 0 && ctrl(n) == _bb; }
   int  bb_idx(Node* n)     { assert(in_bb(n), "must be"); return _bb_idx.at(n->_idx); }
   void set_bb_idx(Node* n, int i) { _bb_idx.at_put_grow(n->_idx, i); }
 
@@ -408,7 +408,7 @@ class SuperWord : public ResourceObj {
   bool same_velt_type(Node* n1, Node* n2);
 
   // my_pack
-  Node_List* my_pack(Node* n)                 { return !in_bb(n) ? NULL : _node_info.adr_at(bb_idx(n))->_my_pack; }
+  Node_List* my_pack(Node* n)                 { return !in_bb(n) ? nullptr : _node_info.adr_at(bb_idx(n))->_my_pack; }
   void set_my_pack(Node* n, Node_List* p)     { int i = bb_idx(n); grow_node_info(i); _node_info.adr_at(i)->_my_pack = p; }
   // is pack good for converting into one vector node replacing 12 nodes of Cmp, Bool, CMov
   bool is_cmov_pack(Node_List* p);
@@ -572,19 +572,64 @@ class SuperWord : public ResourceObj {
 
 //------------------------------SWPointer---------------------------
 // Information about an address for dependence checking and vector alignment
+//
+// We parse and represent pointers of the simple form:
+//
+//   pointer   = adr + offset + invar + scale * ConvI2L(iv)
+//
+// Where:
+//
+//   adr: the base address of an array (base = adr)
+//        OR
+//        some address to off-heap memory (base = TOP)
+//
+//   offset: a constant offset
+//   invar:  a runtime variable, which is invariant during the loop
+//   scale:  scaling factor
+//   iv:     loop induction variable
+//
+// But more precisely, we parse the composite-long-int form:
+//
+//   pointer   = adr + long_offset + long_invar + long_scale * ConvI2L(int_offset + inv_invar + int_scale * iv)
+//
+//   pointer   = adr + long_offset + long_invar + long_scale * ConvI2L(int_index)
+//   int_index =       int_offset  + int_invar  + int_scale  * iv
+//
+// However, for aliasing and adjacency checks (e.g. SWPointer::cmp()) we always use the simple form to make
+// decisions. Hence, we must make sure to only create a "valid" SWPointer if the optimisations based on the
+// simple form produce the same result as the compound-long-int form would. Intuitively, this depends on
+// if the int_index overflows, but the precise conditions are given in SWPointer::is_safe_to_use_as_simple_form().
+//
+//   ConvI2L(int_index) = ConvI2L(int_offset  + int_invar  + int_scale  * iv)
+//                      = Convi2L(int_offset) + ConvI2L(int_invar) + ConvI2L(int_scale) * ConvI2L(iv)
+//
+//   scale  = long_scale * ConvI2L(int_scale)
+//   offset = long_offset + long_scale * ConvI2L(int_offset)
+//   invar  = long_invar  + long_scale * ConvI2L(int_invar)
+//
+//   pointer   = adr + offset + invar + scale * ConvI2L(iv)
+//
 class SWPointer {
  protected:
   MemNode*   _mem;           // My memory reference node
   SuperWord* _slp;           // SuperWord class
 
-  Node* _base;               // NULL if unsafe nonheap reference
-  Node* _adr;                // address pointer
+  // Components of the simple form:
+  Node* _base;               // Base address of an array OR null if some off-heap memory.
+  Node* _adr;                // Same as _base if an array pointer OR some off-heap memory pointer.
   int   _scale;              // multiplier for iv (in bytes), 0 if no loop iv
   int   _offset;             // constant offset (in bytes)
 
-  Node* _invar;              // invariant offset (in bytes), NULL if none
+  Node* _invar;              // invariant offset (in bytes), null if none
   bool  _negate_invar;       // if true then use: (0 - _invar)
   Node* _invar_scale;        // multiplier for invariant
+
+  // The int_index components of the compound-long-int form. Used to decide if it is safe to use the
+  // simple form rather than the compound-long-int form that was parsed.
+  bool  _has_int_index_after_convI2L;
+  int   _int_index_after_convI2L_offset;
+  Node* _int_index_after_convI2L_invar;
+  int   _int_index_after_convI2L_scale;
 
   Node_Stack* _nstack;       // stack used to record a swpointer trace of variants
   bool        _analyze_only; // Used in loop unrolling only for swpointer trace
@@ -604,6 +649,8 @@ class SWPointer {
   // Match: offset is (k [+/- invariant])
   bool offset_plus_k(Node* n, bool negate = false);
 
+  bool is_safe_to_use_as_simple_form(Node* base, Node* adr) const;
+
  public:
   enum CMP {
     Less          = 1,
@@ -618,7 +665,7 @@ class SWPointer {
   // the pattern match of an address expression.
   SWPointer(SWPointer* p);
 
-  bool valid()  { return _adr != NULL; }
+  bool valid()  { return _adr != nullptr; }
   bool has_iv() { return _scale != 0; }
 
   Node* base()             { return _base; }
@@ -639,10 +686,43 @@ class SWPointer {
               _negate_invar == q._negate_invar);
   }
 
+  // We compute if and how two SWPointers can alias at runtime, i.e. if the two addressed regions of memory can
+  // ever overlap. There are essentially 3 relevant return states:
+  //  - NotComparable:  Synonymous to "unknown aliasing".
+  //                    We have no information about how the two SWPointers can alias. They could overlap, refer
+  //                    to another location in the same memory object, or point to a completely different object.
+  //                    -> Memory edge required. Aliasing unlikely but possible.
+  //
+  //  - Less / Greater: Synonymous to "never aliasing".
+  //                    The two SWPointers may point into the same memory object, but be non-aliasing (i.e. we
+  //                    know both address regions inside the same memory object, but these regions are non-
+  //                    overlapping), or the SWPointers point to entirely different objects.
+  //                    -> No memory edge required. Aliasing impossible.
+  //
+  //  - Equal:          Synonymous to "overlap, or point to different memory objects".
+  //                    The two SWPointers either overlap on the same memory object, or point to two different
+  //                    memory objects.
+  //                    -> Memory edge required. Aliasing likely.
+  //
+  // In a future refactoring, we can simplify to two states:
+  //  - NeverAlias:     instead of Less / Greater
+  //  - MayAlias:       instead of Equal / NotComparable
+  //
+  // Two SWPointer are "comparable" (Less / Greater / Equal), iff all of these conditions apply:
+  //   1) Both are valid, i.e. expressible in the compound-long-int or simple form.
+  //   2) The adr are identical, or both are array bases of different arrays.
+  //   3) They have identical scale.
+  //   4) They have identical invar.
+  //   5) The difference in offsets is limited: abs(offset0 - offset1) < 2^31.
   int cmp(SWPointer& q) {
     if (valid() && q.valid() &&
         (_adr == q._adr || (_base == _adr && q._base == q._adr)) &&
         _scale == q._scale   && invar_equals(q)) {
+      jlong difference = abs(java_subtract((jlong)_offset, (jlong)q._offset));
+      jlong max_diff = (jlong)1 << 31;
+      if (difference >= max_diff) {
+        return NotComparable;
+      }
       bool overlap = q._offset <   _offset +   memory_size() &&
                        _offset < q._offset + q.memory_size();
       return overlap ? Equal : (_offset < q._offset ? Less : Greater);
@@ -729,6 +809,13 @@ class SWPointer {
 
   } _tracer;//TRacer;
 #endif
+
+  static bool try_AddI_no_overflow(int offset1, int offset2, int& result);
+  static bool try_SubI_no_overflow(int offset1, int offset2, int& result);
+  static bool try_AddSubI_no_overflow(int offset1, int offset2, bool is_sub, int& result);
+  static bool try_LShiftI_no_overflow(int offset1, int offset2, int& result);
+  static bool try_MulI_no_overflow(int offset1, int offset2, int& result);
+
 };
 
 #endif // SHARE_OPTO_SUPERWORD_HPP

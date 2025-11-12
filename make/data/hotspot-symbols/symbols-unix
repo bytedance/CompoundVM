@@ -156,7 +156,6 @@ JVM_IsRecord
 JVM_IsSameClassPackage
 JVM_IsSharingEnabled
 JVM_IsSupportedJNIVersion
-JVM_IsThreadAlive
 JVM_IsVMGeneratedMethodIx
 JVM_LatestUserDefinedLoader
 JVM_LoadLibrary
@@ -194,6 +193,7 @@ JVM_SetThreadPriority
 JVM_Sleep
 JVM_StartThread
 JVM_StopThread
+JVM_IsThreadAlive
 JVM_SupportsCX8
 JVM_SuspendThread
 JVM_TotalMemory

@@ -73,6 +73,30 @@ struct CPALV1Tail
   }
 
   public:
+  void collect_name_ids (const void *base,
+                         unsigned palette_count,
+                         unsigned color_count,
+                         const hb_map_t *color_index_map,
+                         hb_set_t *nameids_to_retain /* OUT */) const
+  {
+    if (paletteLabelsZ)
+    {
+      + (base+paletteLabelsZ).as_array (palette_count)
+      | hb_sink (nameids_to_retain)
+      ;
+    }
+
+    if (colorLabelsZ)
+    {
+      const hb_array_t<const NameID> colorLabels = (base+colorLabelsZ).as_array (color_count);
+      for (unsigned i = 0; i < color_count; i++)
+      {
+        if (!color_index_map->has (i)) continue;
+        nameids_to_retain->add (colorLabels[i]);
+      }
+    }
+  }
+
   bool serialize (hb_serialize_context_t *c,
                   unsigned palette_count,
                   unsigned color_count,
@@ -95,13 +119,10 @@ struct CPALV1Tail
     if (colorLabelsZ)
     {
       c->push ();
-      for (const auto _ : colorLabels)
+      for (unsigned i = 0; i < color_count; i++)
       {
-        const hb_codepoint_t *v;
-        if (!color_index_map->has (_, &v)) continue;
-        NameID new_color_idx;
-        new_color_idx = *v;
-        if (!c->copy<NameID> (new_color_idx))
+        if (!color_index_map->has (i)) continue;
+        if (!c->copy<NameID> (colorLabels[i]))
         {
           c->pop_discard ();
           return_trace (false);
@@ -166,6 +187,14 @@ struct CPAL
   hb_ot_name_id_t get_color_name_id (unsigned int color_index) const
   { return v1 ().get_color_name_id (this, color_index, numColors); }
 
+  hb_array_t<const BGRAColor> get_palette_colors (unsigned int palette_index) const
+  {
+    if (unlikely (palette_index >= numPalettes))
+      return hb_array_t<const BGRAColor> ();
+    unsigned int start_index = colorRecordIndicesZ[palette_index];
+    hb_array_t<const BGRAColor> all_colors ((this+colorRecordsZ).arrayZ, numColorRecords);
+    return all_colors.sub_array (start_index, numColors);
+  }
   unsigned int get_palette_colors (unsigned int  palette_index,
                                    unsigned int  start_offset,
                                    unsigned int *color_count, /* IN/OUT.  May be NULL. */
@@ -189,10 +218,21 @@ struct CPAL
     return numColors;
   }
 
+  void collect_name_ids (const hb_map_t *color_index_map,
+                         hb_set_t *nameids_to_retain /* OUT */) const
+  {
+    if (version == 1)
+    {
+      hb_barrier ();
+      v1 ().collect_name_ids (this, numPalettes, numColors, color_index_map, nameids_to_retain);
+    }
+  }
+
   private:
   const CPALV1Tail& v1 () const
   {
     if (version == 0) return Null (CPALV1Tail);
+    hb_barrier ();
     return StructAfter<CPALV1Tail> (*this);
   }
 
@@ -284,7 +324,10 @@ struct CPAL
       return_trace (false);
 
     if (version == 1)
+    {
+      hb_barrier ();
       return_trace (v1 ().serialize (c->serializer, numPalettes, numColors, this, color_index_map));
+    }
 
     return_trace (true);
   }
@@ -293,6 +336,7 @@ struct CPAL
   {
     TRACE_SANITIZE (this);
     return_trace (c->check_struct (this) &&
+                  hb_barrier () &&
                   (this+colorRecordsZ).sanitize (c, numColorRecords) &&
                   colorRecordIndicesZ.sanitize (c, numPalettes) &&
                   (version == 0 || v1 ().sanitize (c, this, numPalettes, numColors)));

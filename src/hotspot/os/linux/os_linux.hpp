@@ -31,9 +31,7 @@
 static bool zero_page_read_protected() { return true; }
 
 class Linux {
-  friend class CgroupSubsystem;
   friend class os;
-  friend class OSContainer;
   friend class TestReserveMemorySpecial;
 
   static int (*_pthread_getcpuclockid)(pthread_t, clockid_t *);
@@ -50,8 +48,6 @@ class Linux {
   static GrowableArray<int>* _cpu_to_node;
   static GrowableArray<int>* _nindex_to_node;
 
-  static size_t _default_large_page_size;
-
  protected:
 
   static julong _physical_memory;
@@ -59,7 +55,6 @@ class Linux {
   static int _page_size;
 
   static julong available_memory();
-  static int active_processor_count();
 
   static void initialize_system_info();
 
@@ -74,10 +69,6 @@ class Linux {
   static void rebuild_nindex_to_node_map();
   static GrowableArray<int>* cpu_to_node()    { return _cpu_to_node; }
   static GrowableArray<int>* nindex_to_node()  { return _nindex_to_node; }
-
-  static size_t default_large_page_size();
-  static size_t scan_default_large_page_size();
-  static os::PageSizes scan_multiple_page_support();
 
   static bool setup_large_page_type(size_t page_size);
   static bool transparent_huge_pages_sanity_check(bool warn, size_t pages_size);
@@ -113,6 +104,7 @@ class Linux {
     bool     has_steal_ticks;
   };
 
+  static int active_processor_count();
   // which_logical_cpu=-1 returns accumulated ticks for all cpus.
   static bool get_tick_information(CPUPerfTicks* pticks, int which_logical_cpu);
   static bool _stack_is_executable;
@@ -153,6 +145,8 @@ class Linux {
 
   // Return default guard size for the specified thread type
   static size_t default_guard_size(os::ThreadType thr_type);
+
+  static bool adjustStackSizeForGuardPages(); // See comments in os_linux.cpp
 
   static void capture_initial_stack(size_t max_size);
 

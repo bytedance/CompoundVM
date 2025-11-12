@@ -64,6 +64,8 @@
 #pragma GCC diagnostic error   "-Wbitwise-instead-of-logical"
 #pragma GCC diagnostic error   "-Wcast-align"
 #pragma GCC diagnostic error   "-Wcast-function-type"
+#pragma GCC diagnostic error   "-Wcast-function-type-strict"
+#pragma GCC diagnostic error   "-Wconstant-conversion"
 #pragma GCC diagnostic error   "-Wcomma"
 #pragma GCC diagnostic error   "-Wdelete-non-virtual-dtor"
 #pragma GCC diagnostic error   "-Wembedded-directive"
@@ -82,6 +84,7 @@
 #pragma GCC diagnostic error   "-Wredundant-decls"
 #pragma GCC diagnostic error   "-Wreorder"
 #pragma GCC diagnostic error   "-Wsign-compare"
+#pragma GCC diagnostic error   "-Wstrict-flex-arrays"
 #pragma GCC diagnostic error   "-Wstrict-prototypes"
 #pragma GCC diagnostic error   "-Wstring-conversion"
 #pragma GCC diagnostic error   "-Wswitch-enum"
@@ -128,6 +131,7 @@
 #pragma GCC diagnostic ignored "-Wclass-memaccess"
 #pragma GCC diagnostic ignored "-Wcast-function-type-strict" // https://github.com/harfbuzz/harfbuzz/pull/3859#issuecomment-1295409126
 #pragma GCC diagnostic ignored "-Wdangling-reference" // https://github.com/harfbuzz/harfbuzz/issues/4043
+#pragma GCC diagnostic ignored "-Wdangling-pointer" // Trigerred by hb_decycler_node_t().
 #pragma GCC diagnostic ignored "-Wformat-nonliteral"
 #pragma GCC diagnostic ignored "-Wformat-zero-length"
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
@@ -176,6 +180,11 @@
 #define HB_EXTERN __declspec (dllexport) extern
 #endif
 
+// https://github.com/harfbuzz/harfbuzz/pull/4619
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS 1
+#endif
+
 #include "hb.h"
 #define HB_H_IN
 #include "hb-ot.h"
@@ -209,6 +218,12 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <winapifamily.h>
+#endif
+
+#ifndef PRId32
+# define PRId32 "d"
+# define PRIu32 "u"
+# define PRIx32 "x"
 #endif
 
 #define HB_PASTE1(a,b) a##b
@@ -246,9 +261,17 @@ extern "C" void  hb_free_impl(void *ptr);
  * Compiler attributes
  */
 
-#if (defined(__GNUC__) || defined(__clang__)) && defined(__OPTIMIZE__)
-#define likely(expr) (__builtin_expect (!!(expr), 1))
-#define unlikely(expr) (__builtin_expect (!!(expr), 0))
+// gcc 10 has __has_builtin but not earlier versions. Sanction any gcc >= 5
+// clang defines it so no need.
+#ifdef __has_builtin
+#define hb_has_builtin __has_builtin
+#else
+#define hb_has_builtin(x) ((defined(__GNUC__) && __GNUC__ >= 5))
+#endif
+
+#if defined(__OPTIMIZE__) && hb_has_builtin(__builtin_expect)
+#define likely(expr) __builtin_expect (bool(expr), 1)
+#define unlikely(expr) __builtin_expect (bool(expr), 0)
 #else
 #define likely(expr) (expr)
 #define unlikely(expr) (expr)
@@ -259,7 +282,9 @@ extern "C" void  hb_free_impl(void *ptr);
 #define __attribute__(x)
 #endif
 
-#if defined(__GNUC__) && (__GNUC__ >= 3)
+#if defined(__MINGW32__) && (__GNUC__ >= 3)
+#define HB_PRINTF_FUNC(format_idx, arg_idx) __attribute__((__format__ (gnu_printf, format_idx, arg_idx)))
+#elif defined(__GNUC__) && (__GNUC__ >= 3)
 #define HB_PRINTF_FUNC(format_idx, arg_idx) __attribute__((__format__ (__printf__, format_idx, arg_idx)))
 #else
 #define HB_PRINTF_FUNC(format_idx, arg_idx)
@@ -305,6 +330,14 @@ extern "C" void  hb_free_impl(void *ptr);
 #if defined(__SUNPRO_CC) && (__SUNPRO_CC < 0x5140)
 /* https://github.com/harfbuzz/harfbuzz/issues/630 */
 #define __restrict
+#endif
+
+#ifndef HB_ALWAYS_INLINE
+#if defined(_MSC_VER)
+#define HB_ALWAYS_INLINE __forceinline
+#else
+#define HB_ALWAYS_INLINE __attribute__((always_inline)) inline
+#endif
 #endif
 
 /*
@@ -499,6 +532,12 @@ static_assert ((sizeof (hb_codepoint_t) == 4), "");
 static_assert ((sizeof (hb_position_t) == 4), "");
 static_assert ((sizeof (hb_mask_t) == 4), "");
 static_assert ((sizeof (hb_var_int_t) == 4), "");
+
+
+/* Pie time. */
+// https://github.com/harfbuzz/harfbuzz/issues/4166
+#define HB_PI 3.14159265358979f
+#define HB_2_PI (2.f * HB_PI)
 
 
 /* Headers we include for everyone.  Keep topologically sorted by dependency.

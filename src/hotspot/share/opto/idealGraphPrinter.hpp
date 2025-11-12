@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2007, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -93,6 +93,7 @@ class IdealGraphPrinter : public CHeapObj<mtCompiler> {
   bool _traverse_outs;
   Compile *C;
   double _max_freq;
+  bool _append;
 
   void print_method(ciMethod *method, int bci, InlineTree *tree);
   void print_inline_tree(InlineTree *tree);
@@ -110,13 +111,13 @@ class IdealGraphPrinter : public CHeapObj<mtCompiler> {
   void head(const char *name);
   void text(const char *s);
   void init(const char* file_name, bool use_multiple_files, bool append);
-  void init_file_stream(const char* file_name, bool use_multiple_files, bool append);
+  void init_file_stream(const char* file_name, bool use_multiple_files);
   void init_network_stream();
   IdealGraphPrinter();
   ~IdealGraphPrinter();
 
  public:
-  IdealGraphPrinter(Compile* compile, const char* file_name = NULL, bool append = false);
+  IdealGraphPrinter(Compile* compile, const char* file_name = nullptr, bool append = false);
   static void clean_up();
   static IdealGraphPrinter *printer();
 

@@ -24,6 +24,7 @@
  */
 
 #include "precompiled.hpp"
+#include "register_aarch64.hpp"
 #include "runtime/arguments.hpp"
 #include "runtime/globals_extension.hpp"
 #include "runtime/java.hpp"
@@ -143,10 +144,18 @@ void VM_Version::initialize() {
     }
   }
 
-  // Ampere CPUs: Ampere-1 and Ampere-1A
-  if (_cpu == CPU_AMPERE && ((_model == CPU_MODEL_AMPERE_1) || (_model == CPU_MODEL_AMPERE_1A))) {
+  // Ampere CPUs
+  if (_cpu == CPU_AMPERE && ((_model == CPU_MODEL_AMPERE_1)  ||
+                             (_model == CPU_MODEL_AMPERE_1A) ||
+                             (_model == CPU_MODEL_AMPERE_1B))) {
     if (FLAG_IS_DEFAULT(UseSIMDForMemoryOps)) {
       FLAG_SET_DEFAULT(UseSIMDForMemoryOps, true);
+    }
+    if (FLAG_IS_DEFAULT(OnSpinWaitInst)) {
+      FLAG_SET_DEFAULT(OnSpinWaitInst, "isb");
+    }
+    if (FLAG_IS_DEFAULT(OnSpinWaitInstCount)) {
+      FLAG_SET_DEFAULT(OnSpinWaitInstCount, 2);
     }
   }
 
@@ -204,10 +213,9 @@ void VM_Version::initialize() {
     }
   }
 
-  // Neoverse N1, N2 and V1
-  if (_cpu == CPU_ARM && ((_model == 0xd0c || _model2 == 0xd0c)
-                          || (_model == 0xd49 || _model2 == 0xd49)
-                          || (_model == 0xd40 || _model2 == 0xd40))) {
+  // Neoverse N1, N2, V1, V2
+  if (_cpu == CPU_ARM && (model_is(0xd0c) || model_is(0xd49) ||
+                          model_is(0xd40) || model_is(0xd4f))) {
     if (FLAG_IS_DEFAULT(UseSIMDForMemoryOps)) {
       FLAG_SET_DEFAULT(UseSIMDForMemoryOps, true);
     }
@@ -230,8 +238,8 @@ void VM_Version::initialize() {
   if (_cpu == CPU_ARM && (_model == 0xd07 || _model2 == 0xd07)) _features |= CPU_STXR_PREFETCH;
 
   char buf[512];
-  sprintf(buf, "0x%02x:0x%x:0x%03x:%d", _cpu, _variant, _model, _revision);
-  if (_model2) sprintf(buf+strlen(buf), "(0x%03x)", _model2);
+  int buf_used_len = os::snprintf_checked(buf, sizeof(buf), "0x%02x:0x%x:0x%03x:%d", _cpu, _variant, _model, _revision);
+  if (_model2) os::snprintf_checked(buf + buf_used_len, sizeof(buf) - buf_used_len, "(0x%03x)", _model2);
 #define ADD_FEATURE_IF_SUPPORTED(id, name, bit) if (_features & CPU_##id) strcat(buf, ", " name);
   CPU_FEATURE_FLAGS(ADD_FEATURE_IF_SUPPORTED)
 #undef ADD_FEATURE_IF_SUPPORTED
@@ -393,12 +401,25 @@ void VM_Version::initialize() {
     if (FLAG_IS_DEFAULT(UseSVE)) {
       FLAG_SET_DEFAULT(UseSVE, (_features & CPU_SVE2) ? 2 : 1);
     }
-    if (UseSVE > 0) {
-      _initial_sve_vector_length = get_current_sve_vector_length();
-    }
   } else if (UseSVE > 0) {
     warning("UseSVE specified, but not supported on current CPU. Disabling SVE.");
     FLAG_SET_DEFAULT(UseSVE, 0);
+  }
+
+  if (UseSVE > 0) {
+    int vl = get_current_sve_vector_length();
+    if (vl < 0) {
+      warning("Unable to get SVE vector length on this system. "
+              "Disabling SVE. Specify -XX:UseSVE=0 to shun this warning.");
+      FLAG_SET_DEFAULT(UseSVE, 0);
+    } else if ((vl == 0) || ((vl % FloatRegisterImpl::sve_vl_min) != 0) || !is_power_of_2(vl)) {
+      warning("Detected SVE vector length (%d) should be a power of two and a multiple of %d. "
+              "Disabling SVE. Specify -XX:UseSVE=0 to shun this warning.",
+              vl, FloatRegisterImpl::sve_vl_min);
+      FLAG_SET_DEFAULT(UseSVE, 0);
+    } else {
+      _initial_sve_vector_length = vl;
+    }
   }
 
   // This machine allows unaligned memory accesses

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2025, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -42,6 +42,7 @@ import java.io.UncheckedIOException;
 import java.lang.System.Logger.Level;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.net.URI;
 import java.net.URLPermission;
 import java.net.http.HttpClient;
@@ -150,6 +151,18 @@ public final class Utils {
 
     public static final BiPredicate<String, String>
             ALLOWED_HEADERS = (header, unused) -> !DISALLOWED_HEADERS_SET.contains(header);
+
+    private static final Set<String> DISALLOWED_REDIRECT_HEADERS_SET = getDisallowedRedirectHeaders();
+
+    private static Set<String> getDisallowedRedirectHeaders() {
+        Set<String> headers = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        headers.addAll(Set.of("Authorization", "Cookie", "Origin", "Referer", "Host"));
+
+        return Collections.unmodifiableSet(headers);
+    }
+
+    public static final BiPredicate<String, String>
+            ALLOWED_REDIRECT_HEADERS = (header, unused) -> !DISALLOWED_REDIRECT_HEADERS_SET.contains(header);
 
     public static final BiPredicate<String, String> VALIDATE_USER_HEADER =
             (name, value) -> {
@@ -273,6 +286,17 @@ public final class Utils {
                       : ! PROXY_AUTH_DISABLED_SCHEMES.isEmpty();
     }
 
+    /**
+     * Creates a new {@link Proxy} instance for the given proxy iff it is
+     * neither null, {@link Proxy#NO_PROXY Proxy.NO_PROXY}, nor already a
+     * {@code Proxy} instance.
+     */
+    public static Proxy copyProxy(Proxy proxy) {
+        return proxy == null || proxy.getClass() == Proxy.class
+                ? proxy
+                : new Proxy(proxy.type(), proxy.address());
+    }
+
     // WebSocket connection Upgrade headers
     private static final String HEADER_CONNECTION = "Connection";
     private static final String HEADER_UPGRADE    = "Upgrade";
@@ -392,22 +416,37 @@ public final class Utils {
     }
 
 
+    private static final boolean[] LOWER_CASE_CHARS = new boolean[128];
+
     // ABNF primitives defined in RFC 7230
     private static final boolean[] tchar      = new boolean[256];
     private static final boolean[] fieldvchar = new boolean[256];
 
     static {
-        char[] allowedTokenChars =
-                ("!#$%&'*+-.^_`|~0123456789" +
-                 "abcdefghijklmnopqrstuvwxyz" +
-                 "ABCDEFGHIJKLMNOPQRSTUVWXYZ").toCharArray();
-        for (char c : allowedTokenChars) {
+        char[] lcase = ("!#$%&'*+-.^_`|~0123456789" +
+                "abcdefghijklmnopqrstuvwxyz").toCharArray();
+        for (char c : lcase) {
+            tchar[c] = true;
+            LOWER_CASE_CHARS[c] = true;
+        }
+        char[] ucase = ("ABCDEFGHIJKLMNOPQRSTUVWXYZ").toCharArray();
+        for (char c : ucase) {
             tchar[c] = true;
         }
         for (char c = 0x21; c <= 0xFF; c++) {
             fieldvchar[c] = true;
         }
         fieldvchar[0x7F] = false; // a little hole (DEL) in the range
+    }
+
+    public static boolean isValidLowerCaseName(String token) {
+        for (int i = 0; i < token.length(); i++) {
+            char c = token.charAt(i);
+            if (c > 255 || !LOWER_CASE_CHARS[c]) {
+                return false;
+            }
+        }
+        return !token.isEmpty();
     }
 
     /*
@@ -524,6 +563,19 @@ public final class Utils {
     public static int getIntegerProperty(String name, int defaultValue) {
         return AccessController.doPrivileged((PrivilegedAction<Integer>) () ->
                 Integer.parseInt(System.getProperty(name, String.valueOf(defaultValue))));
+    }
+
+    public static int getIntegerNetProperty(String property, int min, int max, int defaultValue, boolean log) {
+        int value =  Utils.getIntegerNetProperty(property, defaultValue);
+        // use default value if misconfigured
+        if (value < min || value > max) {
+            if (log && Log.errors()) {
+                Log.logError("Property value for {0}={1} not in [{2}..{3}]: " +
+                        "using default={4}", property, value, min, max, defaultValue);
+            }
+            value = defaultValue;
+        }
+        return value;
     }
 
     public static SSLParameters copySSLParameters(SSLParameters p) {
