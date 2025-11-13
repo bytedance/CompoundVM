@@ -639,6 +639,14 @@ bool C2Compiler::is_intrinsic_supported(vmIntrinsics::ID id) {
   case vmIntrinsics::_arraycopy:
   case vmIntrinsics::_arraySort:
   case vmIntrinsics::_arrayPartition:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_sgetChars:
+  case vmIntrinsics::_sequals:
+  case vmIntrinsics::_scompareTo:
+  case vmIntrinsics::_sindexOf:
+  case vmIntrinsics::_sindexOfI:
+  case vmIntrinsics::_sindexOfChar:
+#else
   case vmIntrinsics::_indexOfL:
   case vmIntrinsics::_indexOfU:
   case vmIntrinsics::_indexOfUL:
@@ -647,6 +655,7 @@ bool C2Compiler::is_intrinsic_supported(vmIntrinsics::ID id) {
   case vmIntrinsics::_indexOfIUL:
   case vmIntrinsics::_indexOfU_char:
   case vmIntrinsics::_indexOfL_char:
+#endif
   case vmIntrinsics::_toBytesStringU:
   case vmIntrinsics::_getCharsStringU:
   case vmIntrinsics::_getCharStringU:
