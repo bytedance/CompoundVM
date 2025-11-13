@@ -131,6 +131,17 @@ class methodHandle;
   do_intrinsic(_putOrderedObject,         sun_misc_Unsafe,     putOrderedObject_name, putReference_signature,               F_RN) \
   do_intrinsic(_putOrderedInt,            sun_misc_Unsafe,     putOrderedInt_name, putInt_signature,                        F_RN) \
   do_intrinsic(_putOrderedLong,           sun_misc_Unsafe,     putOrderedLong_name, putLong_signature,                      F_RN) \
+                                                                                                                        \
+  do_intrinsic(_sgetChars,                java_lang_String, getCharsU_name, sgetChars_signature,                 F_S)   \
+   do_signature(sgetChars_signature,                             "([CII[CI)V")                                          \
+  do_intrinsic(_sequals,                  java_lang_String, equals_name, equalsC_signature,                      F_S)   \
+  do_intrinsic(_scompareTo,               java_lang_String, compareTo_name, scompareTo_indexOf_signature,        F_S)   \
+  do_intrinsic(_sindexOf,                 java_lang_String, indexOf_name, scompareTo_indexOf_signature,          F_S)   \
+  do_intrinsic(_sindexOfI,                java_lang_String, indexOf_name, sindexOfI_signature,                   F_S)   \
+  do_intrinsic(_sindexOfChar,             java_lang_String, indexOfChar_name, sindexOfChar_signature,            F_S)   \
+   do_signature(scompareTo_indexOf_signature,                    "([C[C)I")                                             \
+   do_signature(sindexOfI_signature,                             "([CI[CII)I")                                          \
+   do_signature(sindexOfChar_signature,                          "([CIII)I")                                            \
 
 #else
 #define COMPAREANDSETINT compareAndSetInt_name

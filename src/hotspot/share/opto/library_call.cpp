@@ -288,6 +288,15 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_arraySort:                return inline_array_sort();
   case vmIntrinsics::_arrayPartition:           return inline_array_partition();
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  case vmIntrinsics::_sgetChars:                return inline_string_getCharsU();
+  // String.equals(), Arrays.equals() both are comparing char[], and have identical signature
+  case vmIntrinsics::_sequals:                  return inline_array_equals(StrIntrinsicNode::UU);
+  case vmIntrinsics::_scompareTo:               return inline_string_compareTo(StrIntrinsicNode::UU);
+  case vmIntrinsics::_sindexOf:                 return inline_string_indexOf(StrIntrinsicNode::UU);
+  case vmIntrinsics::_sindexOfI:                return inline_string_indexOfI(StrIntrinsicNode::UU);
+  case vmIntrinsics::_sindexOfChar:             return inline_string_indexOfChar(StrIntrinsicNode::U);
+#else
   case vmIntrinsics::_compareToL:               return inline_string_compareTo(StrIntrinsicNode::LL);
   case vmIntrinsics::_compareToU:               return inline_string_compareTo(StrIntrinsicNode::UU);
   case vmIntrinsics::_compareToLU:              return inline_string_compareTo(StrIntrinsicNode::LU);
@@ -303,11 +312,12 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_indexOfL_char:            return inline_string_indexOfChar(StrIntrinsicNode::L);
 
   case vmIntrinsics::_equalsL:                  return inline_string_equals(StrIntrinsicNode::LL);
+  case vmIntrinsics::_getCharsStringU:          return inline_string_getCharsU();
+#endif
 
   case vmIntrinsics::_vectorizedHashCode:       return inline_vectorizedHashCode();
 
   case vmIntrinsics::_toBytesStringU:           return inline_string_toBytesU();
-  case vmIntrinsics::_getCharsStringU:          return inline_string_getCharsU();
   case vmIntrinsics::_getCharStringU:           return inline_string_char_access(!is_store);
   case vmIntrinsics::_putCharStringU:           return inline_string_char_access( is_store);
 
@@ -949,10 +959,12 @@ void LibraryCallKit::generate_string_range_check(Node* array, Node* offset, Node
   }
   RegionNode* bailout = new RegionNode(1);
   record_for_igvn(bailout);
+#if HOTSPOT_TARGET_CLASSLIB != 8
   if (char_count) {
     // Convert char count to byte count
     count = _gvn.transform(new LShiftINode(count, intcon(1)));
   }
+#endif
 
   // Offset and count must not be negative
   generate_negative_guard(offset, bailout);
@@ -1010,16 +1022,31 @@ Node* LibraryCallKit::generate_virtual_thread(Node* tls_output) {
 // characters (depending on 'is_byte'). cnt1 and cnt2 are pointing to Int nodes
 // containing the lengths of str1 and str2.
 Node* LibraryCallKit::make_string_method_node(int opcode, Node* str1_start, Node* cnt1, Node* str2_start, Node* cnt2, StrIntrinsicNode::ArgEnc ae) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings && ae == StrIntrinsicNode::UU, "classlib8 requires CHARS");
+#endif
   Node* result = nullptr;
   switch (opcode) {
   case Op_StrIndexOf:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    result = new StrIndexOfNode(control(), memory(TypeAryPtr::CHARS),
+                                str1_start, cnt1, str2_start, cnt2, ae);
+#else
     result = new StrIndexOfNode(control(), memory(TypeAryPtr::BYTES),
                                 str1_start, cnt1, str2_start, cnt2, ae);
+#endif
     break;
   case Op_StrComp:
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    result = new StrCompNode(control(), memory(TypeAryPtr::CHARS),
+                             str1_start, cnt1, str2_start, cnt2, ae);
+#else
     result = new StrCompNode(control(), memory(TypeAryPtr::BYTES),
                              str1_start, cnt1, str2_start, cnt2, ae);
+#endif
     break;
+  // This call is made from StringLatin1.java/StringUTF16.java, which does not exist in cvm8,
+  // so no change is needed in this branch
   case Op_StrEquals:
     // We already know that cnt1 == cnt2 here (checked in 'inline_string_equals').
     // Use the constant length if there is one because optimized match rule may exist.
@@ -1046,6 +1073,15 @@ bool LibraryCallKit::inline_string_compareTo(StrIntrinsicNode::ArgEnc ae) {
   arg1 = must_be_not_null(arg1, true);
   arg2 = must_be_not_null(arg2, true);
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // Get start addr and length of first argument
+  Node* arg1_start  = array_element_address(arg1, intcon(0), T_CHAR);
+  Node* arg1_cnt    = load_array_length(arg1);
+
+  // Get start addr and length of second argument
+  Node* arg2_start  = array_element_address(arg2, intcon(0), T_CHAR);
+  Node* arg2_cnt    = load_array_length(arg2);
+#else
   // Get start addr and length of first argument
   Node* arg1_start  = array_element_address(arg1, intcon(0), T_BYTE);
   Node* arg1_cnt    = load_array_length(arg1);
@@ -1053,6 +1089,7 @@ bool LibraryCallKit::inline_string_compareTo(StrIntrinsicNode::ArgEnc ae) {
   // Get start addr and length of second argument
   Node* arg2_start  = array_element_address(arg2, intcon(0), T_BYTE);
   Node* arg2_cnt    = load_array_length(arg2);
+#endif
 
   Node* result = make_string_method_node(Op_StrComp, arg1_start, arg1_cnt, arg2_start, arg2_cnt, ae);
   set_result(result);
@@ -1225,6 +1262,15 @@ bool LibraryCallKit::inline_string_indexOf(StrIntrinsicNode::ArgEnc ae) {
   src = must_be_not_null(src, true);
   tgt = must_be_not_null(tgt, true);
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // Get start addr and length of source string
+  Node* src_start = array_element_address(src, intcon(0), T_CHAR);
+  Node* src_count = load_array_length(src);
+
+  // Get start addr and length of substring
+  Node* tgt_start = array_element_address(tgt, intcon(0), T_CHAR);
+  Node* tgt_count = load_array_length(tgt);
+#else
   // Get start addr and length of source string
   Node* src_start = array_element_address(src, intcon(0), T_BYTE);
   Node* src_count = load_array_length(src);
@@ -1232,10 +1278,12 @@ bool LibraryCallKit::inline_string_indexOf(StrIntrinsicNode::ArgEnc ae) {
   // Get start addr and length of substring
   Node* tgt_start = array_element_address(tgt, intcon(0), T_BYTE);
   Node* tgt_count = load_array_length(tgt);
+#endif
 
   Node* result = nullptr;
   bool call_opt_stub = (StubRoutines::_string_indexof_array[ae] != nullptr);
 
+#if HOTSPOT_TARGET_CLASSLIB != 8
   if (ae == StrIntrinsicNode::UU || ae == StrIntrinsicNode::UL) {
     // Divide src size by 2 if String is UTF16 encoded
     src_count = _gvn.transform(new RShiftINode(src_count, intcon(1)));
@@ -1244,6 +1292,7 @@ bool LibraryCallKit::inline_string_indexOf(StrIntrinsicNode::ArgEnc ae) {
     // Divide substring size by 2 if String is UTF16 encoded
     tgt_count = _gvn.transform(new RShiftINode(tgt_count, intcon(1)));
   }
+#endif
 
   if (call_opt_stub) {
     Node* call = make_runtime_call(RC_LEAF, OptoRuntime::string_IndexOf_Type(),
@@ -1286,10 +1335,18 @@ bool LibraryCallKit::inline_string_indexOfI(StrIntrinsicNode::ArgEnc ae) {
   tgt = must_be_not_null(tgt, true);
 
   // Multiply byte array index by 2 if String is UTF16 encoded
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings && ae == StrIntrinsicNode::UU, "classlib-8 requires T_CHAR");
+  Node* src_offset =  from_index;
+  src_count = _gvn.transform(new SubINode(src_count, from_index));
+  Node* src_start = array_element_address(src, src_offset, T_CHAR);
+  Node* tgt_start = array_element_address(tgt, intcon(0), T_CHAR);
+#else
   Node* src_offset = (ae == StrIntrinsicNode::LL) ? from_index : _gvn.transform(new LShiftINode(from_index, intcon(1)));
   src_count = _gvn.transform(new SubINode(src_count, from_index));
   Node* src_start = array_element_address(src, src_offset, T_BYTE);
   Node* tgt_start = array_element_address(tgt, intcon(0), T_BYTE);
+#endif
 
   // Range checks
   generate_string_range_check(src, src_offset, src_count, ae != StrIntrinsicNode::LL);
@@ -1384,8 +1441,14 @@ bool LibraryCallKit::inline_string_indexOfChar(StrIntrinsicNode::ArgEnc ae) {
 
   src = must_be_not_null(src, true);
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  assert(!CompactStrings && ae == StrIntrinsicNode::U, "classlib8 requires CHARS");
+  Node* src_offset = from_index;
+  Node* src_start = array_element_address(src, src_offset, T_CHAR);
+#else
   Node* src_offset = ae == StrIntrinsicNode::L ? from_index : _gvn.transform(new LShiftINode(from_index, intcon(1)));
   Node* src_start = array_element_address(src, src_offset, T_BYTE);
+#endif
   Node* src_count = _gvn.transform(new SubINode(max, from_index));
 
   // Range checks
@@ -1406,7 +1469,11 @@ bool LibraryCallKit::inline_string_indexOfChar(StrIntrinsicNode::ArgEnc ae) {
   RegionNode* region = new RegionNode(3);
   Node* phi = new PhiNode(region, TypeInt::INT);
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  Node* result = new StrIndexOfCharNode(control(), memory(TypeAryPtr::CHARS), src_start, src_count, int_ch, ae);
+#else
   Node* result = new StrIndexOfCharNode(control(), memory(TypeAryPtr::BYTES), src_start, src_count, int_ch, ae);
+#endif
   C->set_has_split_ifs(true); // Has chance for split-if optimization
   _gvn.transform(result);
 
@@ -1651,7 +1718,9 @@ bool LibraryCallKit::inline_string_getCharsU() {
 
   // Get length and convert char[] offset to byte[] offset
   Node* length = _gvn.transform(new SubINode(src_end, src_begin));
+#if HOTSPOT_TARGET_CLASSLIB != 8
   src_begin = _gvn.transform(new LShiftINode(src_begin, intcon(1)));
+#endif
 
   // Range checks
   generate_string_range_check(src, src_begin, length, true);
@@ -1662,13 +1731,21 @@ bool LibraryCallKit::inline_string_getCharsU() {
 
   if (!stopped()) {
     // Calculate starting addresses.
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    Node* src_start = array_element_address(src, src_begin, T_CHAR);
+#else
     Node* src_start = array_element_address(src, src_begin, T_BYTE);
+#endif
     Node* dst_start = array_element_address(dst, dst_begin, T_CHAR);
 
     // Check if array addresses are aligned to HeapWordSize
     const TypeInt* tsrc = gvn().type(src_begin)->is_int();
     const TypeInt* tdst = gvn().type(dst_begin)->is_int();
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    bool aligned = tsrc->is_con() && ((arrayOopDesc::base_offset_in_bytes(T_CHAR) + tsrc->get_con() * type2aelembytes(T_CHAR)) % HeapWordSize == 0) &&
+#else
     bool aligned = tsrc->is_con() && ((arrayOopDesc::base_offset_in_bytes(T_BYTE) + tsrc->get_con() * type2aelembytes(T_BYTE)) % HeapWordSize == 0) &&
+#endif
                    tdst->is_con() && ((arrayOopDesc::base_offset_in_bytes(T_CHAR) + tdst->get_con() * type2aelembytes(T_CHAR)) % HeapWordSize == 0);
 
     // Figure out which arraycopy runtime method to call (disjoint, uninitialized).
