@@ -2046,6 +2046,22 @@ bool Arguments::check_vm_args_consistency() {
   }
 #endif
 
+#if !defined(X86) && !defined(AARCH64)
+  if (LockingMode == LM_LIGHTWEIGHT) {
+    FLAG_SET_CMDLINE(LockingMode, LM_LEGACY);
+    warning("New lightweight locking not supported on this platform");
+  }
+#endif
+
+  if (UseHeavyMonitors) {
+    if (FLAG_IS_CMDLINE(LockingMode) && LockingMode != LM_MONITOR) {
+      jio_fprintf(defaultStream::error_stream(),
+                  "Conflicting -XX:+UseHeavyMonitors and -XX:LockingMode=%d flags", LockingMode);
+      return false;
+    }
+    FLAG_SET_CMDLINE(LockingMode, LM_MONITOR);
+  }
+
   return status;
 }
 
@@ -3239,6 +3255,61 @@ jint Arguments::finalize_vm_init_args(bool patch_mod_javabase) {
   UNSUPPORTED_OPTION(ShowRegistersOnAssert);
 #endif // CAN_SHOW_REGISTERS_ON_ASSERT
 
+#ifdef _LP64
+  if (UseCompactObjectHeaders && UseZGC) {
+    if (FLAG_IS_CMDLINE(UseCompactObjectHeaders)) {
+      warning("ZGC does not work with compact object headers, disabling UseCompactObjectHeaders");
+    }
+    FLAG_SET_DEFAULT(UseCompactObjectHeaders, false);
+  }
+
+  if (UseCompactObjectHeaders && FLAG_IS_CMDLINE(UseCompressedClassPointers) && !UseCompressedClassPointers) {
+    // If user specifies -UseCompressedClassPointers, disable compact headers with a warning.
+    warning("Compact object headers require compressed class pointers. Disabling compact object headers.");
+    FLAG_SET_DEFAULT(UseCompactObjectHeaders, false);
+  }
+  if (UseCompactObjectHeaders && LockingMode == LM_LEGACY) {
+    FLAG_SET_DEFAULT(LockingMode, LM_LIGHTWEIGHT);
+  }
+  if (UseCompactObjectHeaders && UseBiasedLocking) {
+    FLAG_SET_DEFAULT(UseBiasedLocking, false);
+  }
+  if (UseCompactObjectHeaders && !UseAltGCForwarding) {
+    FLAG_SET_DEFAULT(UseAltGCForwarding, true);
+  }
+#endif
+
+  if (UseObjectMonitorTable && LockingMode != LM_LIGHTWEIGHT) {
+    // ObjectMonitorTable requires lightweight locking.
+    FLAG_SET_DEFAULT(LockingMode, LM_LIGHTWEIGHT);
+  }
+
+#ifdef _LP64
+  if (UseCompactObjectHeaders && FLAG_IS_CMDLINE(UseCompressedClassPointers) && !UseCompressedClassPointers) {
+    warning("Compact object headers require compressed class pointers. Disabling compact object headers.");
+    FLAG_SET_DEFAULT(UseCompactObjectHeaders, false);
+  }
+  if (UseCompactObjectHeaders && LockingMode != LM_LIGHTWEIGHT) {
+    FLAG_SET_DEFAULT(LockingMode, LM_LIGHTWEIGHT);
+  }
+  if (UseCompactObjectHeaders && !UseObjectMonitorTable) {
+    // If UseCompactObjectHeaders is on the command line, turn on UseObjectMonitorTable.
+    if (FLAG_IS_CMDLINE(UseCompactObjectHeaders)) {
+      FLAG_SET_DEFAULT(UseObjectMonitorTable, true);
+
+    // If UseObjectMonitorTable is on the command line, turn off UseCompactObjectHeaders.
+    } else if (FLAG_IS_CMDLINE(UseObjectMonitorTable)) {
+      FLAG_SET_DEFAULT(UseCompactObjectHeaders, false);
+    // If neither on the command line, the defaults are incompatible, but turn on UseObjectMonitorTable.
+    } else {
+      FLAG_SET_DEFAULT(UseObjectMonitorTable, true);
+    }
+  }
+  if (UseCompactObjectHeaders && !UseCompressedClassPointers) {
+    FLAG_SET_DEFAULT(UseCompressedClassPointers, true);
+  }
+#endif
+
   return JNI_OK;
 }
 
@@ -4123,9 +4194,6 @@ jint Arguments::apply_ergo() {
 #ifdef COMPILER1
       || !UseFastLocking
 #endif // COMPILER1
-#if INCLUDE_JVMCI
-      || !JVMCIUseFastLocking
-#endif
     ) {
     if (!FLAG_IS_DEFAULT(UseBiasedLocking) && UseBiasedLocking) {
       // flag set to true on command line; warn the user that they

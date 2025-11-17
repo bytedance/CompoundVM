@@ -105,7 +105,7 @@ bool oopDesc::is_oop(oop obj, bool ignore_mark_word) {
   }
 
   // Header verification: the mark is typically non-zero. If we're
-  // at a safepoint, it must not be zero.
+  // at a safepoint, it must not be zero, except when using the new lightweight locking.
   // Outside of a safepoint, the header could be changing (for example,
   // another thread could be inflating a lock on this object).
   if (ignore_mark_word) {
@@ -114,7 +114,7 @@ bool oopDesc::is_oop(oop obj, bool ignore_mark_word) {
   if (obj->mark().value() != 0) {
     return true;
   }
-  return !SafepointSynchronize::is_at_safepoint();
+  return LockingMode == LM_LIGHTWEIGHT || !SafepointSynchronize::is_at_safepoint();
 }
 
 // used only for asserts and guarantees
@@ -139,26 +139,29 @@ bool oopDesc::is_objArray_noinline()          const { return is_objArray();     
 bool oopDesc::is_typeArray_noinline()         const { return is_typeArray();           }
 
 bool oopDesc::has_klass_gap() {
-  // Only has a klass gap when compressed class pointers are used.
-  return UseCompressedClassPointers;
+  // Only has a klass gap when compressed class pointers are used, but
+  // only if not using compact headers..
+  return UseCompressedClassPointers && !UseCompactObjectHeaders;
 }
 
 #if INCLUDE_CDS_JAVA_HEAP
 void oopDesc::set_narrow_klass(narrowKlass nk) {
   assert(DumpSharedSpaces, "Used by CDS only. Do not abuse!");
   assert(UseCompressedClassPointers, "must be");
+  assert(!UseCompactObjectHeaders, "not with compact headers");
   _metadata._compressed_klass = nk;
 }
 #endif
 
 void* oopDesc::load_klass_raw(oop obj) {
-  if (UseCompressedClassPointers) {
-    narrowKlass narrow_klass = obj->_metadata._compressed_klass;
-    if (narrow_klass == 0) return NULL;
-    return (void*)CompressedKlassPointers::decode_raw(narrow_klass);
-  } else {
-    return obj->_metadata._klass;
-  }
+  // TODO: Remove method altogether and replace with calls to obj->klass() ?
+  // OTOH, we may eventually get rid of locking in header, and then no
+  // longer have to deal with that anymore.
+#ifdef _LP64
+  return obj->klass();
+#else
+  return obj->_metadata._klass;
+#endif
 }
 
 void* oopDesc::load_oop_raw(oop obj, int offset) {

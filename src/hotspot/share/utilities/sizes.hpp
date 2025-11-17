@@ -52,6 +52,7 @@ constexpr int      in_bytes(ByteSize x)  { return static_cast<int>(x); }
 
 constexpr ByteSize operator + (ByteSize x, ByteSize y) { return in_ByteSize(in_bytes(x) + in_bytes(y)); }
 constexpr ByteSize operator - (ByteSize x, ByteSize y) { return in_ByteSize(in_bytes(x) - in_bytes(y)); }
+constexpr ByteSize operator - (ByteSize x, int      y) { return in_ByteSize(in_bytes(x) - y          ); }
 constexpr ByteSize operator * (ByteSize x, int      y) { return in_ByteSize(in_bytes(x) * y          ); }
 
 // Use the following #define to get C++ field member offsets

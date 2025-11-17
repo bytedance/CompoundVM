@@ -741,7 +741,6 @@ JRT_ENTRY_NO_ASYNC(void, InterpreterRuntime::monitorenter(JavaThread* current, B
 #endif
 JRT_END
 
-
 JRT_LEAF(void, InterpreterRuntime::monitorexit(BasicObjectLock* elem))
   oop obj = elem->obj();
   assert(Universe::heap()->is_in(obj), "must be an object");

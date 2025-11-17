@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2023 Red Hat, Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,25 +23,10 @@
  *
  */
 
-#include "precompiled.hpp"
-#include "asm/macroAssembler.hpp"
-#include "opto/compile.hpp"
-#include "opto/node.hpp"
-#include "opto/output.hpp"
-#include "runtime/sharedRuntime.hpp"
-
-#define __ masm.
-void C2SafepointPollStubTable::emit_stub_impl(MacroAssembler& masm, C2SafepointPollStub* entry) const {
-  assert(SharedRuntime::polling_page_return_handler_blob() != NULL,
-         "polling page return stub not created yet");
-  address stub = SharedRuntime::polling_page_return_handler_blob()->entry_point();
-
-  RuntimeAddress callback_addr(stub);
-
-  __ bind(entry->_stub_label);
-  InternalAddress safepoint_pc(masm.pc() - masm.offset() + entry->_safepoint_offset);
-  __ adr(rscratch1, safepoint_pc);
-  __ str(rscratch1, Address(rthread, JavaThread::saved_exception_pc_offset()));
-  __ far_jump(callback_addr);
-}
-#undef __
+/* @test
+ * @summary Run a subset of gtests with the native trimmer activated.
+ * @library /test/lib
+ * @modules java.base/jdk.internal.misc
+ *          java.xml
+ * @run main/native GTestWrapper --gtest_filter=os.trim* -Xlog:trimnative -XX:+UnlockExperimentalVMOptions -XX:TrimNativeHeapInterval=100
+ */

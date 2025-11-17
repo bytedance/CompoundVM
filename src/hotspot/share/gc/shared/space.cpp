@@ -29,6 +29,7 @@
 #include "gc/shared/collectedHeap.inline.hpp"
 #include "gc/shared/genCollectedHeap.hpp"
 #include "gc/shared/genOopClosures.inline.hpp"
+#include "gc/shared/slidingForwarding.inline.hpp"
 #include "gc/shared/space.hpp"
 #include "gc/shared/space.inline.hpp"
 #include "gc/shared/spaceDecorator.inline.hpp"
@@ -346,6 +347,7 @@ void CompactibleSpace::clear(bool mangle_space) {
   _compaction_top = bottom();
 }
 
+template <bool ALT_FWD>
 HeapWord* CompactibleSpace::forward(oop q, size_t size,
                                     CompactPoint* cp, HeapWord* compact_top) {
   // q is alive
@@ -370,13 +372,13 @@ HeapWord* CompactibleSpace::forward(oop q, size_t size,
 
   // store the forwarding pointer into the mark word
   if (cast_from_oop<HeapWord*>(q) != compact_top) {
-    q->forward_to(cast_to_oop(compact_top));
+    SlidingForwarding::forward_to<ALT_FWD>(q, cast_to_oop(compact_top));
     assert(q->is_gc_marked(), "encoding the pointer should preserve the mark");
   } else {
     // if the object isn't moving we can just set the mark to the default
     // mark and handle it specially later on.
     q->init_mark();
-    assert(q->forwardee() == NULL, "should be forwarded to NULL");
+    assert(SlidingForwarding::is_not_forwarded(q), "should not be forwarded");
   }
 
   compact_top += size;
@@ -393,7 +395,11 @@ HeapWord* CompactibleSpace::forward(oop q, size_t size,
 #if INCLUDE_SERIALGC
 
 void ContiguousSpace::prepare_for_compaction(CompactPoint* cp) {
-  scan_and_forward(this, cp);
+  if (UseAltGCForwarding) {
+    scan_and_forward<true>(this, cp);
+  } else {
+    scan_and_forward<false>(this, cp);
+  }
 }
 
 void CompactibleSpace::adjust_pointers() {
@@ -402,11 +408,19 @@ void CompactibleSpace::adjust_pointers() {
     return;   // Nothing to do.
   }
 
-  scan_and_adjust_pointers(this);
+  if (UseAltGCForwarding) {
+    scan_and_adjust_pointers<true>(this);
+  } else {
+    scan_and_adjust_pointers<false>(this);
+  }
 }
 
 void CompactibleSpace::compact() {
-  scan_and_compact(this);
+  if (UseAltGCForwarding) {
+    scan_and_compact<true>(this);
+  } else {
+    scan_and_compact<false>(this);
+  }
 }
 
 #endif // INCLUDE_SERIALGC
@@ -586,22 +600,30 @@ void ContiguousSpace::allocate_temporary_filler(int factor) {
   }
   size = align_object_size(size);
 
-  const size_t array_header_size = typeArrayOopDesc::header_size(T_INT);
+  const size_t array_header_size = (arrayOopDesc::base_offset_in_bytes(T_INT) + BytesPerWord) / BytesPerWord;
   if (size >= align_object_size(array_header_size)) {
     size_t length = (size - array_header_size) * (HeapWordSize / sizeof(jint));
     // allocate uninitialized int array
     typeArrayOop t = (typeArrayOop) cast_to_oop(allocate(size));
     assert(t != NULL, "allocation should succeed");
-    t->set_mark(markWord::prototype());
-    t->set_klass(Universe::intArrayKlassObj());
+    if (UseCompactObjectHeaders) {
+      t->set_mark(Universe::intArrayKlassObj()->prototype_header());
+    } else {
+      t->set_mark(markWord::prototype());
+      t->set_klass(Universe::intArrayKlassObj());
+    }
     t->set_length((int)length);
   } else {
     assert(size == CollectedHeap::min_fill_size(),
            "size for smallest fake object doesn't match");
     instanceOop obj = (instanceOop) cast_to_oop(allocate(size));
-    obj->set_mark(markWord::prototype());
-    obj->set_klass_gap(0);
-    obj->set_klass(vmClasses::Object_klass());
+    if (UseCompactObjectHeaders) {
+      obj->set_mark(vmClasses::Object_klass()->prototype_header());
+    } else {
+      obj->set_mark(markWord::prototype());
+      obj->set_klass_gap(0);
+      obj->set_klass(vmClasses::Object_klass());
+    }
   }
 }
 

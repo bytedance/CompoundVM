@@ -721,7 +721,9 @@ void MachEpilogNode::emit(CodeBuffer &cbuf, PhaseRegAlloc *ra_) const {
     Label dummy_label;
     Label* code_stub = &dummy_label;
     if (!C->output()->in_scratch_emit_size()) {
-      code_stub = &C->output()->safepoint_poll_table()->add_safepoint(__ offset());
+      C2SafepointPollStub* stub = new (C->comp_arena()) C2SafepointPollStub(__ offset());
+      C->output()->add_stub(stub);
+      code_stub = &stub->entry();
     }
     __ relocate(relocInfo::poll_return_type);
     __ safepoint_poll(*code_stub, thread, true /* at_return */, true /* in_nmethod */);
@@ -13695,15 +13697,16 @@ instruct RethrowException()
 
 // inlined locking and unlocking
 
-instruct cmpFastLockRTM(eFlagsReg cr, eRegP object, eBXRegP box, eAXRegI tmp, eDXRegI scr, rRegI cx1, rRegI cx2) %{
+instruct cmpFastLockRTM(eFlagsReg cr, eRegP object, eBXRegP box, eAXRegI tmp, eDXRegI scr, rRegI cx1, rRegI cx2, eRegP thread) %{
   predicate(Compile::current()->use_rtm());
   match(Set cr (FastLock object box));
-  effect(TEMP tmp, TEMP scr, TEMP cx1, TEMP cx2, USE_KILL box);
+  effect(TEMP tmp, TEMP scr, TEMP cx1, TEMP cx2, USE_KILL box, TEMP thread);
   ins_cost(300);
   format %{ "FASTLOCK $object,$box\t! kills $box,$tmp,$scr,$cx1,$cx2" %}
   ins_encode %{
+    __ get_thread($thread$$Register);
     __ fast_lock($object$$Register, $box$$Register, $tmp$$Register,
-                 $scr$$Register, $cx1$$Register, $cx2$$Register,
+                 $scr$$Register, $cx1$$Register, $cx2$$Register, $thread$$Register,
                  _counters, _rtm_counters, _stack_rtm_counters,
                  ((Method*)(ra_->C->method()->constant_encoding()))->method_data(),
                  true, ra_->C->profile_rtm());
@@ -13711,20 +13714,22 @@ instruct cmpFastLockRTM(eFlagsReg cr, eRegP object, eBXRegP box, eAXRegI tmp, eD
   ins_pipe(pipe_slow);
 %}
 
-instruct cmpFastLock(eFlagsReg cr, eRegP object, eBXRegP box, eAXRegI tmp, eRegP scr) %{
-  predicate(!Compile::current()->use_rtm());
+instruct cmpFastLock(eFlagsReg cr, eRegP object, eBXRegP box, eAXRegI tmp, eRegP scr, eRegP thread) %{
+  predicate(LockingMode != LM_LIGHTWEIGHT && !Compile::current()->use_rtm());
   match(Set cr (FastLock object box));
-  effect(TEMP tmp, TEMP scr, USE_KILL box);
+  effect(TEMP tmp, TEMP scr, USE_KILL box, TEMP thread);
   ins_cost(300);
   format %{ "FASTLOCK $object,$box\t! kills $box,$tmp,$scr" %}
   ins_encode %{
+    __ get_thread($thread$$Register);
     __ fast_lock($object$$Register, $box$$Register, $tmp$$Register,
-                 $scr$$Register, noreg, noreg, _counters, NULL, NULL, NULL, false, false);
+                 $scr$$Register, noreg, noreg, $thread$$Register, _counters, NULL, NULL, NULL, false, false);
   %}
   ins_pipe(pipe_slow);
 %}
 
 instruct cmpFastUnlock(eFlagsReg cr, eRegP object, eAXRegP box, eRegP tmp ) %{
+  predicate(LockingMode != LM_LIGHTWEIGHT);
   match(Set cr (FastUnlock object box));
   effect(TEMP tmp, USE_KILL box);
   ins_cost(300);
@@ -13735,7 +13740,31 @@ instruct cmpFastUnlock(eFlagsReg cr, eRegP object, eAXRegP box, eRegP tmp ) %{
   ins_pipe(pipe_slow);
 %}
 
+instruct cmpFastLockLightweight(eFlagsReg cr, eRegP object, eBXRegP box, eAXRegI eax_reg, eRegP tmp, eRegP thread) %{
+  predicate(LockingMode == LM_LIGHTWEIGHT);
+  match(Set cr (FastLock object box));
+  effect(TEMP eax_reg, TEMP tmp, USE_KILL box, TEMP thread);
+  ins_cost(300);
+  format %{ "FASTLOCK $object,$box\t! kills $box,$eax_reg,$tmp" %}
+  ins_encode %{
+    __ get_thread($thread$$Register);
+    __ fast_lock_lightweight($object$$Register, $box$$Register, $eax_reg$$Register, $tmp$$Register, $thread$$Register);
+  %}
+  ins_pipe(pipe_slow);
+%}
 
+instruct cmpFastUnlockLightweight(eFlagsReg cr, eRegP object, eAXRegP eax_reg, eRegP tmp, eRegP thread) %{
+  predicate(LockingMode == LM_LIGHTWEIGHT);
+  match(Set cr (FastUnlock object eax_reg));
+  effect(TEMP tmp, USE_KILL eax_reg, TEMP thread);
+  ins_cost(300);
+  format %{ "FASTUNLOCK $object,$eax_reg\t! kills $eax_reg,$tmp" %}
+  ins_encode %{
+    __ get_thread($thread$$Register);
+    __ fast_unlock_lightweight($object$$Register, $eax_reg$$Register, $tmp$$Register, $thread$$Register);
+  %}
+  ins_pipe(pipe_slow);
+%}
 
 // ============================================================================
 // Safepoint Instruction

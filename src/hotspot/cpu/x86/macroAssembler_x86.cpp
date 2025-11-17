@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -53,6 +53,12 @@
 #include "runtime/thread.hpp"
 #include "utilities/macros.hpp"
 #include "crc32c.h"
+
+#ifdef COMPILER2
+#include "opto/c2_CodeStubs.hpp"
+#include "opto/compile.hpp"
+#include "opto/output.hpp"
+#endif
 
 #ifdef PRODUCT
 #define BLOCK_COMMENT(str) /* nothing */
@@ -3771,11 +3777,24 @@ void MacroAssembler::eden_allocate(Register thread, Register obj,
 // Preserves the contents of address, destroys the contents length_in_bytes and temp.
 void MacroAssembler::zero_memory(Register address, Register length_in_bytes, int offset_in_bytes, Register temp) {
   assert(address != length_in_bytes && address != temp && temp != length_in_bytes, "registers must be different");
-  assert((offset_in_bytes & (BytesPerWord - 1)) == 0, "offset must be a multiple of BytesPerWord");
+  assert((offset_in_bytes & (BytesPerInt - 1)) == 0, "offset must be a multiple of BytesPerInt");
   Label done;
 
   testptr(length_in_bytes, length_in_bytes);
   jcc(Assembler::zero, done);
+
+  // Emit single 32bit store to clear leading bytes, if necessary.
+  xorptr(temp, temp);    // use _zero reg to clear memory (shorter code)
+#ifdef _LP64
+  if (!is_aligned(offset_in_bytes, BytesPerWord)) {
+    movl(Address(address, offset_in_bytes), temp);
+    offset_in_bytes += BytesPerInt;
+    decrement(length_in_bytes, BytesPerInt);
+  }
+  assert((offset_in_bytes & (BytesPerWord - 1)) == 0, "offset must be a multiple of BytesPerWord");
+  testptr(length_in_bytes, length_in_bytes);
+  jcc(Assembler::zero, done);
+#endif
 
   // initialize topmost word, divide index by 2, check if odd and test if zero
   // note: for the remaining code to work, index must be a multiple of BytesPerWord
@@ -3789,7 +3808,6 @@ void MacroAssembler::zero_memory(Register address, Register length_in_bytes, int
   }
 #endif
   Register index = length_in_bytes;
-  xorptr(temp, temp);    // use _zero reg to clear memory (shorter code)
   if (UseIncDec) {
     shrptr(index, 3);  // divide by 8/16 and set carry flag if bit 2 was set
   } else {
@@ -4733,16 +4751,33 @@ void MacroAssembler::load_method_holder(Register holder, Register method) {
   movptr(holder, Address(holder, ConstantPool::pool_holder_offset_in_bytes())); // InstanceKlass*
 }
 
-void MacroAssembler::load_klass(Register dst, Register src, Register tmp) {
+#ifdef _LP64
+void MacroAssembler::load_nklass_compact(Register dst, Register src) {
+  assert(UseCompactObjectHeaders, "expect compact object headers");
+  if (markWord::klass_shift == 32) {
+    movl(dst, Address(src, oopDesc::mark_offset_in_bytes() + 4));
+  } else {
+    movq(dst, Address(src, oopDesc::mark_offset_in_bytes()));
+    shrq(dst, markWord::klass_shift);
+  }
+}
+#endif
+
+void MacroAssembler::load_klass(Register dst, Register src, Register tmp, bool null_check_src) {
   assert_different_registers(src, tmp);
   assert_different_registers(dst, tmp);
 #ifdef _LP64
-  if (UseCompressedClassPointers) {
+  if (UseCompactObjectHeaders) {
+    load_nklass_compact(dst, src);
+    decode_klass_not_null(dst, tmp);
+  } else if (UseCompressedClassPointers) {
     movl(dst, Address(src, oopDesc::klass_offset_in_bytes()));
     decode_klass_not_null(dst, tmp);
   } else
 #endif
+  {
     movptr(dst, Address(src, oopDesc::klass_offset_in_bytes()));
+  }
 }
 
 void MacroAssembler::load_prototype_header(Register dst, Register src, Register tmp) {
@@ -4751,6 +4786,7 @@ void MacroAssembler::load_prototype_header(Register dst, Register src, Register 
 }
 
 void MacroAssembler::store_klass(Register dst, Register src, Register tmp) {
+  assert(!UseCompactObjectHeaders, "not with compact headers");
   assert_different_registers(src, tmp);
   assert_different_registers(dst, tmp);
 #ifdef _LP64
@@ -4759,7 +4795,46 @@ void MacroAssembler::store_klass(Register dst, Register src, Register tmp) {
     movl(Address(dst, oopDesc::klass_offset_in_bytes()), src);
   } else
 #endif
-    movptr(Address(dst, oopDesc::klass_offset_in_bytes()), src);
+   movptr(Address(dst, oopDesc::klass_offset_in_bytes()), src);
+}
+
+void MacroAssembler::cmp_klass(Register klass, Register obj, Register tmp) {
+#ifdef _LP64
+  if (UseCompactObjectHeaders) {
+    // NOTE: We need to deal with possible ObjectMonitor in object header.
+    // Eventually we might be able to do simple movl & cmpl like in
+    // the CCP path below.
+    load_nklass_compact(tmp, obj);
+    cmpl(klass, tmp);
+  } else if (UseCompressedClassPointers) {
+    cmpl(klass, Address(obj, oopDesc::klass_offset_in_bytes()));
+  } else
+#endif
+  {
+    cmpptr(klass, Address(obj, oopDesc::klass_offset_in_bytes()));
+  }
+}
+
+void MacroAssembler::cmp_klass(Register src, Register dst, Register tmp1, Register tmp2) {
+#ifdef _LP64
+  if (UseCompactObjectHeaders) {
+    // NOTE: We need to deal with possible ObjectMonitor in object header.
+    // Eventually we might be able to do simple movl & cmpl like in
+    // the CCP path below.
+    assert(tmp2 != noreg, "need tmp2");
+    assert_different_registers(src, dst, tmp1, tmp2);
+    load_nklass_compact(tmp1, src);
+    load_nklass_compact(tmp2, dst);
+    cmpl(tmp1, tmp2);
+  } else if (UseCompressedClassPointers) {
+    movl(tmp1, Address(src, oopDesc::klass_offset_in_bytes()));
+    cmpl(tmp1, Address(dst, oopDesc::klass_offset_in_bytes()));
+  } else
+#endif
+  {
+    movptr(tmp1, Address(src, oopDesc::klass_offset_in_bytes()));
+    cmpptr(tmp1, Address(dst, oopDesc::klass_offset_in_bytes()));
+  }
 }
 
 void MacroAssembler::access_load_at(BasicType type, DecoratorSet decorators, Register dst, Address src,
@@ -4809,6 +4884,7 @@ void MacroAssembler::store_heap_oop_null(Address dst) {
 
 #ifdef _LP64
 void MacroAssembler::store_klass_gap(Register dst, Register src) {
+  assert(!UseCompactObjectHeaders, "Don't use with compact headers");
   if (UseCompressedClassPointers) {
     // Store to klass gap in destination
     movl(Address(dst, oopDesc::klass_gap_offset_in_bytes()), src);
@@ -8686,3 +8762,115 @@ void MacroAssembler::get_thread(Register thread) {
 }
 
 #endif // !WIN32 || _LP64
+
+// Implements lightweight-locking.
+//
+// obj: the object to be locked
+// reg_rax: rax
+// thread: the thread which attempts to lock obj
+// tmp: a temporary register
+void MacroAssembler::lightweight_lock(Register basic_lock, Register obj, Register reg_rax, Register thread, Register tmp, Label& slow) {
+  assert(reg_rax == rax, "");
+  assert_different_registers(basic_lock, obj, reg_rax, thread, tmp);
+
+  Label push;
+  const Register top = tmp;
+
+  // Preload the markWord. It is important that this is the first
+  // instruction emitted as it is part of C1's null check semantics.
+  movptr(reg_rax, Address(obj, oopDesc::mark_offset_in_bytes()));
+
+  if (UseObjectMonitorTable) {
+    // Clear cache in case fast locking succeeds.
+    movptr(Address(basic_lock, BasicObjectLock::lock_offset() + in_ByteSize((BasicLock::object_monitor_cache_offset_in_bytes()))), 0);
+  }
+
+  // Load top.
+  movl(top, Address(thread, JavaThread::lock_stack_top_offset()));
+
+  // Check if the lock-stack is full.
+  cmpl(top, LockStack::end_offset());
+  jcc(Assembler::greaterEqual, slow);
+
+  // Check for recursion.
+  cmpptr(obj, Address(thread, top, Address::times_1, -oopSize));
+  jcc(Assembler::equal, push);
+
+  // Check header for monitor (0b10).
+  testptr(reg_rax, markWord::monitor_value);
+  jcc(Assembler::notZero, slow);
+
+  // Try to lock. Transition lock bits 0b01 => 0b00
+  movptr(tmp, reg_rax);
+  andptr(tmp, ~(int32_t)markWord::unlocked_value);
+  orptr(reg_rax, markWord::unlocked_value);
+  lock(); cmpxchgptr(tmp, Address(obj, oopDesc::mark_offset_in_bytes()));
+  jcc(Assembler::notEqual, slow);
+
+  // Restore top, CAS clobbers register.
+  movl(top, Address(thread, JavaThread::lock_stack_top_offset()));
+
+  bind(push);
+  // After successful lock, push object on lock-stack.
+  movptr(Address(thread, top), obj);
+  incrementl(top, oopSize);
+  movl(Address(thread, JavaThread::lock_stack_top_offset()), top);
+}
+
+// Implements lightweight-unlocking.
+//
+// obj: the object to be unlocked
+// reg_rax: rax
+// thread: the thread
+// tmp: a temporary register
+void MacroAssembler::lightweight_unlock(Register obj, Register reg_rax, Register thread, Register tmp, Label& slow) {
+  assert(reg_rax == rax, "");
+  assert_different_registers(obj, reg_rax, thread, tmp);
+
+  Label unlocked, push_and_slow;
+  const Register top = tmp;
+
+  // Check if obj is top of lock-stack.
+  movl(top, Address(thread, JavaThread::lock_stack_top_offset()));
+  cmpptr(obj, Address(thread, top, Address::times_1, -oopSize));
+  jcc(Assembler::notEqual, slow);
+
+  // Pop lock-stack.
+  DEBUG_ONLY(movptr(Address(thread, top, Address::times_1, -oopSize), 0);)
+  subl(Address(thread, JavaThread::lock_stack_top_offset()), oopSize);
+
+  // Check if recursive.
+  cmpptr(obj, Address(thread, top, Address::times_1, -2 * oopSize));
+  jcc(Assembler::equal, unlocked);
+
+  // Not recursive. Check header for monitor (0b10).
+  movptr(reg_rax, Address(obj, oopDesc::mark_offset_in_bytes()));
+  testptr(reg_rax, markWord::monitor_value);
+  jcc(Assembler::notZero, push_and_slow);
+
+#ifdef ASSERT
+  // Check header not unlocked (0b01).
+  Label not_unlocked;
+  testptr(reg_rax, markWord::unlocked_value);
+  jcc(Assembler::zero, not_unlocked);
+  stop("lightweight_unlock already unlocked");
+  bind(not_unlocked);
+#endif
+
+  // Try to unlock. Transition lock bits 0b00 => 0b01
+  movptr(tmp, reg_rax);
+  orptr(tmp, markWord::unlocked_value);
+  lock(); cmpxchgptr(tmp, Address(obj, oopDesc::mark_offset_in_bytes()));
+  jcc(Assembler::equal, unlocked);
+
+  bind(push_and_slow);
+  // Restore lock-stack and handle the unlock in runtime.
+#ifdef ASSERT
+  movl(top, Address(thread, JavaThread::lock_stack_top_offset()));
+  movptr(Address(thread, top), obj);
+#endif
+  addl(Address(thread, JavaThread::lock_stack_top_offset()), oopSize);
+  jmp(slow);
+
+  bind(unlocked);
+}

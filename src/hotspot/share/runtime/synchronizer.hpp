@@ -1,7 +1,7 @@
 // This project is a modified version of OpenJDK, licensed under GPL v2.
 // Modifications Copyright (C) 2025 ByteDance Inc.
 /*
- * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -36,6 +36,8 @@
 class LogStream;
 class ObjectMonitor;
 class ThreadsList;
+class Thread;
+class JavaThread;
 
 class MonitorList {
   friend class VMStructs;
@@ -92,7 +94,18 @@ class ObjectSynchronizer : AllStatic {
   // This is the "slow path" version of monitor enter and exit.
   static void enter(Handle obj, BasicLock* lock, JavaThread* current);
   static void exit(oop obj, BasicLock* lock, JavaThread* current);
+  // Used to enter a monitor for another thread. This requires that the
+  // locking_thread is suspended, and that entering on a potential
+  // inflated monitor may only contend with deflation. That is the obj being
+  // locked on is either already locked by the locking_thread or cannot
+  // escape the locking_thread.
+  static void enter_for(Handle obj, BasicLock* lock, JavaThread* locking_thread);
+private:
+  // Shared implementation for enter and enter_for. Performs all but
+  // inflated monitor enter.
+  static bool enter_fast_impl(Handle obj, BasicLock* lock, JavaThread* locking_thread);
 
+public:
   // Used only to handle jni locks or other unmatched monitor enter/exit
   // Internally they will use heavy weight monitor.
   static void jni_enter(Handle obj, JavaThread* current);
@@ -122,9 +135,20 @@ class ObjectSynchronizer : AllStatic {
 
   // Inflate light weight monitor to heavy weight monitor
   static ObjectMonitor* inflate(Thread* current, oop obj, const InflateCause cause);
+  // Used to inflate a monitor as if it was done from the thread JavaThread.
+  static ObjectMonitor* inflate_for(JavaThread* thread, oop obj, const InflateCause cause);
+
+private:
+  // Shared implementation between the different LockingMode.
+  static ObjectMonitor* inflate_impl(oop obj, const InflateCause cause);
+
+public:
   // This version is only for internal use
   static void inflate_helper(oop obj);
   static const char* inflate_cause_name(const InflateCause cause);
+
+  inline static ObjectMonitor* read_monitor(markWord mark);
+  inline static ObjectMonitor* read_monitor(Thread* current, oop obj, markWord mark);
 
   // Returns the identity hash value for an oop
   // NOTE: It may cause monitor inflation
@@ -172,10 +196,11 @@ class ObjectSynchronizer : AllStatic {
   static void chk_in_use_entry(ObjectMonitor* n, outputStream* out,
                                int* error_cnt_p);
   static void do_final_audit_and_print_stats();
-  static void log_in_use_monitor_details(outputStream* out);
+  static void log_in_use_monitor_details(outputStream* out, bool log_all);
 
  private:
   friend class SynchronizerTest;
+  friend class LightweightSynchronizer;
 
   static MonitorList _in_use_list;
   static volatile bool _is_async_deflation_requested;
@@ -188,7 +213,7 @@ class ObjectSynchronizer : AllStatic {
   static size_t get_gvars_size();
   static u_char* get_gvars_stw_random_addr();
 
-  static void handle_sync_on_value_based_class(Handle obj, JavaThread* current);
+  static void handle_sync_on_value_based_class(Handle obj, JavaThread* locking_thread);
 };
 
 // ObjectLocker enforces balanced locking and can never throw an

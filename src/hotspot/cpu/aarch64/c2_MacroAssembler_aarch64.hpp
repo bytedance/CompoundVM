@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -28,6 +28,12 @@
 // C2_MacroAssembler contains high-level macros for C2
 
  public:
+  // Code used by cmpFastLock and cmpFastUnlock mach instructions in .ad file.
+  void fast_lock(Register object, Register box, Register tmp, Register tmp2, Register tmp3);
+  void fast_unlock(Register object, Register box, Register tmp, Register tmp2);
+  // Code used by cmpFastLockLightweight and cmpFastUnlockLightweight mach instructions in .ad file.
+  void fast_lock_lightweight(Register object, Register t1, Register t2, Register t3);
+  void fast_unlock_lightweight(Register object, Register t1, Register t2, Register t3);
 
   void string_compare(Register str1, Register str2,
                       Register cnt1, Register cnt2, Register result,
@@ -52,5 +58,7 @@
   // SIMD&FP comparison
   void neon_compare(FloatRegister dst, BasicType bt, FloatRegister src1,
                     FloatRegister src2, int cond, bool isQ);
+
+  void load_nklass_compact(Register dst, Register obj, Register index, int scale, int disp);
 
 #endif // CPU_AARCH64_C2_MACROASSEMBLER_AARCH64_HPP

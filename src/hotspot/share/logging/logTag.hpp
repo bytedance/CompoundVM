@@ -117,6 +117,7 @@
   LOG_TAG(module) \
   LOG_TAG(monitorinflation) \
   LOG_TAG(monitormismatch) \
+  LOG_TAG(monitortable) \
   LOG_TAG(nestmates) \
   LOG_TAG(nmethod) \
   LOG_TAG(nmt) \
@@ -187,6 +188,7 @@
   LOG_TAG(timer) \
   LOG_TAG(tlab) \
   LOG_TAG(tracking) \
+  LOG_TAG(trimnative) /* trim native heap */ \
   LOG_TAG(unload) /* Trace unloading of classes */ \
   LOG_TAG(unshareable) \
   LOG_TAG(update) \

@@ -205,11 +205,6 @@ class ConcurrentHashTable : public CHeapObj<F> {
   InternalTable* _table;      // Active table.
   InternalTable* _new_table;  // Table we are resizing to.
 
-  // Default sizes
-  static const size_t DEFAULT_MAX_SIZE_LOG2 = 21;
-  static const size_t DEFAULT_START_SIZE_LOG2 = 13;
-  static const size_t DEFAULT_GROW_HINT = 4; // Chain length
-
   const size_t _log2_size_limit;  // The biggest size.
   const size_t _log2_start_size;  // Start size.
   const size_t _grow_hint;        // Number of linked items
@@ -372,6 +367,11 @@ class ConcurrentHashTable : public CHeapObj<F> {
   void delete_in_bucket(Thread* thread, Bucket* bucket, LOOKUP_FUNC& lookup_f);
 
  public:
+  // Default sizes
+  static const size_t DEFAULT_MAX_SIZE_LOG2 = 21;
+  static const size_t DEFAULT_START_SIZE_LOG2 = 13;
+  static const size_t DEFAULT_GROW_HINT = 4; // Chain length
+
   ConcurrentHashTable(size_t log2size = DEFAULT_START_SIZE_LOG2,
                       size_t log2size_limit = DEFAULT_MAX_SIZE_LOG2,
                       size_t grow_hint = DEFAULT_GROW_HINT,

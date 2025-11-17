@@ -437,7 +437,7 @@ int LIR_Assembler::emit_unwind_handler() {
   if (method()->is_synchronized()) {
     monitor_address(0, FrameMap::r0_opr);
     stub = new MonitorExitStub(FrameMap::r0_opr, true, 0);
-    __ unlock_object(r5, r4, r0, *stub->entry());
+    __ unlock_object(r5, r4, r0, r6, *stub->entry());
     __ bind(*stub->continuation());
   }
 
@@ -984,14 +984,7 @@ void LIR_Assembler::mem2reg(LIR_Opr src, LIR_Opr dest, BasicType type, LIR_Patch
       __ ldr(dest->as_register(), as_Address(from_addr));
       break;
     case T_ADDRESS:
-      // FIXME: OMG this is a horrible kludge.  Any offset from an
-      // address that matches klass_offset_in_bytes() will be loaded
-      // as a word, not a long.
-      if (UseCompressedClassPointers && addr->disp() == oopDesc::klass_offset_in_bytes()) {
-        __ ldrw(dest->as_register(), as_Address(from_addr));
-      } else {
-        __ ldr(dest->as_register(), as_Address(from_addr));
-      }
+      __ ldr(dest->as_register(), as_Address(from_addr));
       break;
     case T_INT:
       __ ldrw(dest->as_register(), as_Address(from_addr));
@@ -1029,10 +1022,6 @@ void LIR_Assembler::mem2reg(LIR_Opr src, LIR_Opr dest, BasicType type, LIR_Patch
     if (!UseZGC) {
       // Load barrier has not yet been applied, so ZGC can't verify the oop here
       __ verify_oop(dest->as_register());
-    }
-  } else if (type == T_ADDRESS && addr->disp() == oopDesc::klass_offset_in_bytes()) {
-    if (UseCompressedClassPointers) {
-      __ decode_klass_not_null(dest->as_register());
     }
   }
 }
@@ -1249,7 +1238,7 @@ void LIR_Assembler::emit_alloc_array(LIR_OpAllocArray* op) {
                       len,
                       tmp1,
                       tmp2,
-                      arrayOopDesc::header_size(op->type()),
+                      arrayOopDesc::base_offset_in_bytes(op->type()),
                       array_element_size(op->type()),
                       op->klass()->as_register(),
                       *op->stub()->entry());
@@ -2366,12 +2355,12 @@ void LIR_Assembler::emit_arraycopy(LIR_OpArrayCopy* op) {
     if (basic_type != T_OBJECT) {
       // Simple test for basic type arrays
       if (UseCompressedClassPointers) {
-        __ ldrw(tmp, src_klass_addr);
-        __ ldrw(rscratch1, dst_klass_addr);
+        __ load_nklass(tmp, src);
+        __ load_nklass(rscratch1, dst);
         __ cmpw(tmp, rscratch1);
       } else {
-        __ ldr(tmp, src_klass_addr);
-        __ ldr(rscratch1, dst_klass_addr);
+        __ ldr(tmp, Address(src, oopDesc::klass_offset_in_bytes()));
+        __ ldr(rscratch1, Address(dst, oopDesc::klass_offset_in_bytes()));
         __ cmp(tmp, rscratch1);
       }
       __ br(Assembler::NE, *stub->entry());
@@ -2495,36 +2484,14 @@ void LIR_Assembler::emit_arraycopy(LIR_OpArrayCopy* op) {
     // but not necessarily exactly of type default_type.
     Label known_ok, halt;
     __ mov_metadata(tmp, default_type->constant_encoding());
-    if (UseCompressedClassPointers) {
-      __ encode_klass_not_null(tmp);
-    }
 
     if (basic_type != T_OBJECT) {
-
-      if (UseCompressedClassPointers) {
-        __ ldrw(rscratch1, dst_klass_addr);
-        __ cmpw(tmp, rscratch1);
-      } else {
-        __ ldr(rscratch1, dst_klass_addr);
-        __ cmp(tmp, rscratch1);
-      }
+      __ cmp_klass(dst, tmp, rscratch1);
       __ br(Assembler::NE, halt);
-      if (UseCompressedClassPointers) {
-        __ ldrw(rscratch1, src_klass_addr);
-        __ cmpw(tmp, rscratch1);
-      } else {
-        __ ldr(rscratch1, src_klass_addr);
-        __ cmp(tmp, rscratch1);
-      }
+      __ cmp_klass(src, tmp, rscratch1);
       __ br(Assembler::EQ, known_ok);
     } else {
-      if (UseCompressedClassPointers) {
-        __ ldrw(rscratch1, dst_klass_addr);
-        __ cmpw(tmp, rscratch1);
-      } else {
-        __ ldr(rscratch1, dst_klass_addr);
-        __ cmp(tmp, rscratch1);
-      }
+      __ cmp_klass(dst, tmp, rscratch1);
       __ br(Assembler::EQ, known_ok);
       __ cmp(src, dst);
       __ br(Assembler::EQ, known_ok);
@@ -2572,29 +2539,57 @@ void LIR_Assembler::emit_lock(LIR_OpLock* op) {
   Register obj = op->obj_opr()->as_register();  // may not be an oop
   Register hdr = op->hdr_opr()->as_register();
   Register lock = op->lock_opr()->as_register();
-  if (!UseFastLocking) {
+  Register temp = op->scratch_opr()->as_register();
+  if (LockingMode == LM_MONITOR) {
+    if (op->info() != NULL) {
+      add_debug_info_for_null_check_here(op->info());
+      __ null_check(obj, -1);
+    }
     __ b(*op->stub()->entry());
   } else if (op->code() == lir_lock) {
-    Register scratch = noreg;
-    if (UseBiasedLocking) {
-      scratch = op->scratch_opr()->as_register();
-    }
     assert(BasicLock::displaced_header_offset_in_bytes() == 0, "lock_reg must point to the displaced header");
     // add debug info for NullPointerException only if one is possible
-    int null_check_offset = __ lock_object(hdr, obj, lock, scratch, *op->stub()->entry());
+    int null_check_offset = __ lock_object(hdr, obj, lock, temp, *op->stub()->entry());
     if (op->info() != NULL) {
       add_debug_info_for_null_check(null_check_offset, op->info());
     }
     // done
   } else if (op->code() == lir_unlock) {
     assert(BasicLock::displaced_header_offset_in_bytes() == 0, "lock_reg must point to the displaced header");
-    __ unlock_object(hdr, obj, lock, *op->stub()->entry());
+    __ unlock_object(hdr, obj, lock, temp, *op->stub()->entry());
   } else {
     Unimplemented();
   }
   __ bind(*op->stub()->continuation());
 }
 
+void LIR_Assembler::emit_load_klass(LIR_OpLoadKlass* op) {
+  Register obj = op->obj()->as_pointer_register();
+  Register result = op->result_opr()->as_pointer_register();
+
+  CodeEmitInfo* info = op->info();
+  if (info != NULL) {
+    add_debug_info_for_null_check_here(info);
+  }
+
+  if (UseCompressedClassPointers) {
+    if (UseCompactObjectHeaders) {
+      // Check if we can take the (common) fast path, if obj is unlocked.
+      __ ldr(result, Address(obj, oopDesc::mark_offset_in_bytes()));
+      __ tst(result, markWord::monitor_value);
+      __ br(Assembler::NE, *op->stub()->entry());
+      __ bind(*op->stub()->continuation());
+
+      // Shift to get proper narrow Klass*.
+      __ lsr(result, result, markWord::klass_shift);
+    } else {
+      __ ldrw(result, Address (obj, oopDesc::klass_offset_in_bytes()));
+    }
+    __ decode_klass_not_null(result);
+  } else {
+    __ ldr(result, Address (obj, oopDesc::klass_offset_in_bytes()));
+  }
+}
 
 void LIR_Assembler::emit_profile_call(LIR_OpProfileCall* op) {
   ciMethod* method = op->profiled_method();

@@ -45,6 +45,7 @@
 #include "gc/shared/modRefBarrierSet.hpp"
 #include "gc/shared/referencePolicy.hpp"
 #include "gc/shared/referenceProcessorPhaseTimes.hpp"
+#include "gc/shared/slidingForwarding.hpp"
 #include "gc/shared/space.hpp"
 #include "gc/shared/strongRootsScope.hpp"
 #include "gc/shared/weakProcessor.hpp"
@@ -93,6 +94,8 @@ void GenMarkSweep::invoke_at_safepoint(ReferenceProcessor* rp, bool clear_all_so
 
   mark_sweep_phase1(clear_all_softrefs);
 
+  SlidingForwarding::begin();
+
   mark_sweep_phase2();
 
   // Don't add any more derived pointers during phase3
@@ -110,6 +113,8 @@ void GenMarkSweep::invoke_at_safepoint(ReferenceProcessor* rp, bool clear_all_so
   // Set saved marks for allocation profiler (and other things? -- dld)
   // (Should this be in general part?)
   gch->save_marks();
+
+  SlidingForwarding::end();
 
   deallocate_stacks();
 
@@ -271,18 +276,31 @@ void GenMarkSweep::mark_sweep_phase3() {
   // Need new claim bits for the pointer adjustment tracing.
   ClassLoaderDataGraph::clear_claimed_marks();
 
-  {
-    StrongRootsScope srs(0);
-
-    gch->full_process_roots(true,  // this is the adjust phase
-                            GenCollectedHeap::SO_AllCodeCache,
-                            false, // all roots
-                            &adjust_pointer_closure,
-                            &adjust_cld_closure);
+  if (UseAltGCForwarding) {
+    AdjustPointerClosure<true> adjust_pointer_closure;
+    CLDToOopClosure adjust_cld_closure(&adjust_pointer_closure, ClassLoaderData::_claim_strong);
+    {
+      StrongRootsScope srs(0);
+      gch->full_process_roots(true,  // this is the adjust phase
+                              GenCollectedHeap::SO_AllCodeCache,
+                              false, // all roots
+                              &adjust_pointer_closure,
+                              &adjust_cld_closure);
+    }
+    gch->gen_process_weak_roots(&adjust_pointer_closure);
+  } else {
+    AdjustPointerClosure<false> adjust_pointer_closure;
+    CLDToOopClosure adjust_cld_closure(&adjust_pointer_closure, ClassLoaderData::_claim_strong);
+    {
+      StrongRootsScope srs(0);
+      gch->full_process_roots(true,  // this is the adjust phase
+                              GenCollectedHeap::SO_AllCodeCache,
+                              false, // all roots
+                              &adjust_pointer_closure,
+                              &adjust_cld_closure);
+    }
+    gch->gen_process_weak_roots(&adjust_pointer_closure);
   }
-
-  gch->gen_process_weak_roots(&adjust_pointer_closure);
-
   adjust_marks();
   GenAdjustPointersClosure blk;
   gch->generation_iterate(&blk, true);

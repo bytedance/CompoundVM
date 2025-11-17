@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -29,31 +29,72 @@
 
 #include "logging/log.hpp"
 #include "oops/access.inline.hpp"
+#include "oops/markWord.hpp"
 #include "runtime/atomic.hpp"
+#include "runtime/globals.hpp"
+#include "runtime/lockStack.inline.hpp"
 #include "runtime/synchronizer.hpp"
+#include "utilities/debug.hpp"
+#include "utilities/globalDefinitions.hpp"
 
-inline intptr_t ObjectMonitor::is_entered(JavaThread* current) const {
-  void* owner = owner_raw();
-  if (current == owner || current->is_lock_owned((address)owner)) {
-    return 1;
+inline bool ObjectMonitor::is_entered(JavaThread* current) const {
+  if (LockingMode == LM_LIGHTWEIGHT) {
+    if (is_owner_anonymous()) {
+      return current->lock_stack().contains(object());
+    } else {
+      return current == owner_raw();
+    }
+  } else {
+    void* owner = owner_raw();
+    if (current == owner || current->is_lock_owned((address)owner)) {
+      return true;
+    }
   }
-  return 0;
+  return false;
+}
+
+inline uintptr_t ObjectMonitor::metadata() const {
+  return Atomic::load(&_metadata);
+}
+
+inline void ObjectMonitor::set_metadata(uintptr_t value) {
+  Atomic::store(&_metadata, value);
+}
+
+inline volatile uintptr_t* ObjectMonitor::metadata_addr() {
+  // TODO: Re-add the asserts
+  //STATIC_ASSERT(std::is_standard_layout<ObjectMonitor>::value);
+  //STATIC_ASSERT(offsetof(ObjectMonitor, _metadata) == 0);
+  return &_metadata;
 }
 
 inline markWord ObjectMonitor::header() const {
-  return Atomic::load(&_header);
-}
-
-inline volatile markWord* ObjectMonitor::header_addr() {
-  return &_header;
+  assert(!UseObjectMonitorTable, "Lightweight locking with OM table does not use header");
+  return markWord(metadata());
 }
 
 inline void ObjectMonitor::set_header(markWord hdr) {
-  Atomic::store(&_header, hdr);
+  assert(!UseObjectMonitorTable, "Lightweight locking with OM table does not use header");
+  set_metadata(hdr.value());
+}
+
+inline intptr_t ObjectMonitor::hash() const {
+  assert(UseObjectMonitorTable, "Only used by lightweight locking with OM table");
+  return metadata();
+}
+
+inline void ObjectMonitor::set_hash(intptr_t hash) {
+  assert(UseObjectMonitorTable, "Only used by lightweight locking with OM table");
+  set_metadata(hash);
 }
 
 inline jint ObjectMonitor::waiters() const {
   return _waiters;
+}
+
+inline bool ObjectMonitor::has_owner() const {
+  void* owner = owner_raw();
+  return owner != NULL && owner != DEFLATER_MARKER;
 }
 
 // Returns NULL if DEFLATER_MARKER is observed.
@@ -86,6 +127,12 @@ inline jint ObjectMonitor::contentions() const {
 // Add value to the contentions field.
 inline void ObjectMonitor::add_to_contentions(jint value) {
   Atomic::add(&_contentions, value);
+}
+
+inline void ObjectMonitor::set_recursions(size_t recursions) {
+  assert(_recursions == 0, "must be");
+  assert(has_owner(), "must be owned");
+  _recursions = checked_cast<intx>(recursions);
 }
 
 // Clear _owner field; current value must match old_value.
@@ -175,6 +222,37 @@ inline void ObjectMonitor::release_set_next_om(ObjectMonitor* new_value) {
 // the prior value of the _next_om field.
 inline ObjectMonitor* ObjectMonitor::try_set_next_om(ObjectMonitor* old_value, ObjectMonitor* new_value) {
   return Atomic::cmpxchg(&_next_om, old_value, new_value);
+}
+
+inline ObjectMonitorContentionMark::ObjectMonitorContentionMark(ObjectMonitor* monitor)
+  : _monitor(monitor) {
+  _monitor->add_to_contentions(1);
+}
+
+inline ObjectMonitorContentionMark::~ObjectMonitorContentionMark() {
+  _monitor->add_to_contentions(-1);
+}
+
+inline oop ObjectMonitor::object_peek() const {
+  if (_object.is_null()) {
+    return nullptr;
+  }
+  return _object.peek();
+}
+
+inline bool ObjectMonitor::object_is_dead() const {
+  return object_peek() == nullptr;
+}
+
+inline bool ObjectMonitor::object_is_cleared() const {
+  return _object.is_null();
+}
+
+inline bool ObjectMonitor::object_refers_to(oop obj) const {
+  if (_object.is_null()) {
+    return false;
+  }
+  return _object.peek() == obj;
 }
 
 #endif // SHARE_RUNTIME_OBJECTMONITOR_INLINE_HPP

@@ -50,6 +50,7 @@
 #include "runtime/stackFrameStream.inline.hpp"
 #include "runtime/thread.inline.hpp"
 #include "runtime/threadSMR.hpp"
+#include "runtime/trimNativeHeap.hpp"
 #include "runtime/vmThread.hpp"
 #include "runtime/vmOperations.hpp"
 #include "runtime/vm_version.hpp"
@@ -820,7 +821,15 @@ void VMError::report(outputStream* st, bool _verbose) {
        st->cr();
      }
 
-  STEP("printing code blob if possible")
+  STEP("printing lock stack")
+
+    if (_verbose && _thread != nullptr && _thread->is_Java_thread() && LockingMode == LM_LIGHTWEIGHT) {
+      st->print_cr("Lock stack of current Java thread (top to bottom):");
+      _thread->as_Java_thread()->lock_stack().print_on(st);
+      st->cr();
+    }
+
+  STEP("printing code blobs if possible")
 
      if (_verbose && _context) {
        CodeBlob* cb = CodeCache::find_blob(_pc);
@@ -1052,6 +1061,14 @@ void VMError::report(outputStream* st, bool _verbose) {
   STEP("Native Memory Tracking")
      if (_verbose) {
        MemTracker::error_report(st);
+       st->cr();
+     }
+
+  STEP("printing periodic trim state")
+
+     if (_verbose) {
+       NativeHeapTrimmer::print_state(st);
+       st->cr();
      }
 
   STEP("printing system")
@@ -1237,10 +1254,14 @@ void VMError::print_vm_info(outputStream* st) {
   // STEP("Native Memory Tracking")
 
   MemTracker::error_report(st);
+  st->cr();
+
+  // STEP("printing periodic trim state")
+  NativeHeapTrimmer::print_state(st);
+  st->cr();
+
 
   // STEP("printing system")
-
-  st->cr();
   st->print_cr("---------------  S Y S T E M  ---------------");
   st->cr();
 

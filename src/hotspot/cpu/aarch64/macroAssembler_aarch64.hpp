@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2024, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014, 2021, Red Hat Inc. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -823,7 +823,8 @@ public:
   void load_method_holder(Register holder, Register method);
 
   // oop manipulations
-  void load_klass(Register dst, Register src);
+  void load_nklass(Register dst, Register src);
+  void load_klass(Register dst, Register src, bool null_check = false);
   void store_klass(Register dst, Register src);
   void cmp_klass(Register oop, Register trial_klass, Register tmp);
 
@@ -850,9 +851,9 @@ public:
   // stored using routines that take a jobject.
   void store_heap_oop_null(Address dst);
 
-  void load_prototype_header(Register dst, Register src);
-
   void store_klass_gap(Register dst, Register src);
+
+  void load_prototype_header(Register dst, Register src);
 
   // This dummy is to prevent a call to store_heap_oop from
   // converting a zero (like NULL) into a Register by giving
@@ -1419,6 +1420,9 @@ public:
 
   // Code for java.lang.Thread::onSpinWait() intrinsic.
   void spin_wait();
+
+  void lightweight_lock(Register obj, Register t1, Register t2, Register t3, Label& slow);
+  void lightweight_unlock(Register obj, Register t1, Register t2, Register t3, Label& slow);
 
 private:
   // Check the current thread doesn't need a cross modify fence.

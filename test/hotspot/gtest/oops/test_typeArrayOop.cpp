@@ -36,7 +36,14 @@ TEST_VM(typeArrayOopDesc, bool_at_put) {
   char* addr = align_up(mem, 16);
 
   typeArrayOop o = (typeArrayOop) cast_to_oop(addr);
-  o->set_klass(Universe::boolArrayKlassObj());
+#ifdef _LP64
+  if (UseCompactObjectHeaders) {
+    o->set_mark(Universe::boolArrayKlassObj()->prototype_header());
+  } else
+#endif
+  {
+    o->set_klass(Universe::boolArrayKlassObj());
+  }
   o->set_length(10);
 
 

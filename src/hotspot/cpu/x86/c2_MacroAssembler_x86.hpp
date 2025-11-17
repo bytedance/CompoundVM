@@ -37,13 +37,17 @@ public:
   // Code used by cmpFastLock and cmpFastUnlock mach instructions in .ad file.
   // See full desription in macroAssembler_x86.cpp.
   void fast_lock(Register obj, Register box, Register tmp,
-                 Register scr, Register cx1, Register cx2,
+                 Register scr, Register cx1, Register cx2, Register thread,
                  BiasedLockingCounters* counters,
                  RTMLockingCounters* rtm_counters,
                  RTMLockingCounters* stack_rtm_counters,
                  Metadata* method_data,
                  bool use_rtm, bool profile_rtm);
   void fast_unlock(Register obj, Register box, Register tmp, bool use_rtm);
+
+  void fast_lock_lightweight(Register obj, Register box, Register rax_reg,
+                             Register t, Register thread);
+  void fast_unlock_lightweight(Register obj, Register reg_rax, Register t, Register thread);
 
 #if INCLUDE_RTM_OPT
   void rtm_counters_update(Register abort_status, Register rtm_counters);
@@ -277,5 +281,7 @@ public:
 
   void rearrange_bytes(XMMRegister dst, XMMRegister shuffle, XMMRegister src, XMMRegister xtmp1,
                        XMMRegister xtmp2, XMMRegister xtmp3, Register rtmp, KRegister ktmp, int vlen_enc);
+
+  void load_nklass_compact_c2(Register dst, Register obj, Register index, Address::ScaleFactor scale, int disp);
 
 #endif // CPU_X86_C2_MACROASSEMBLER_X86_HPP
