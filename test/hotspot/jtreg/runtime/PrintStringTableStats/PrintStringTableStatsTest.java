@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -27,13 +27,14 @@ import jdk.test.lib.process.OutputAnalyzer;
 /*
  * @test PrintStringTableStatsTest
  * @bug 8211821
+ * @requires vm.flagless
  * @library /test/lib
  * @run driver PrintStringTableStatsTest
  */
 
 public class PrintStringTableStatsTest {
     public static void main(String... args) throws Exception {
-        ProcessBuilder pb = ProcessTools.createJavaProcessBuilder(
+        ProcessBuilder pb = ProcessTools.createLimitedTestJavaProcessBuilder(
             "-XX:+PrintStringTableStatistics",
             "--version");
         OutputAnalyzer output = new OutputAnalyzer(pb.start());

@@ -566,12 +566,6 @@ void Metaspace::initialize_class_space(ReservedSpace rs) {
          "wrong alignment");
 
   MetaspaceContext::initialize_class_space_context(rs);
-
-  // This does currently not work because rs may be the result of a split
-  // operation and NMT seems not to be able to handle splits.
-  // Will be fixed with JDK-8243535.
-  // MemTracker::record_virtual_memory_type((address)rs.base(), mtClass);
-
 }
 
 // Returns true if class space has been setup (initialize_class_space).
@@ -590,8 +584,8 @@ ReservedSpace Metaspace::reserve_address_space_for_compressed_classes(size_t siz
 #if defined(AARCH64) || defined(PPC64)
   const size_t alignment = Metaspace::reserve_alignment();
 
-  // AArch64: Try to align metaspace so that we can decode a compressed
-  // klass with a single MOVK instruction. We can do this iff the
+  // AArch64: Try to align metaspace class space so that we can decode a
+  // compressed klass with a single MOVK instruction. We can do this iff the
   // compressed class base is a multiple of 4G.
   // Additionally, above 32G, ensure the lower LogKlassAlignmentInBytes bits
   // of the upper 32-bits of the address are zero so we can handle a shift
@@ -614,17 +608,39 @@ ReservedSpace Metaspace::reserve_address_space_for_compressed_classes(size_t siz
     {  NULL, NULL, 0 }
   };
 
+  // Calculate a list of all possible values for the starting address for the
+  // compressed class space.
+  ResourceMark rm;
+  GrowableArray<address> list(36);
   for (int i = 0; search_ranges[i].from != NULL; i ++) {
     address a = search_ranges[i].from;
     assert(CompressedKlassPointers::is_valid_base(a), "Sanity");
     while (a < search_ranges[i].to) {
-      ReservedSpace rs(size, Metaspace::reserve_alignment(),
-                       os::vm_page_size(), (char*)a);
-      if (rs.is_reserved()) {
-        assert(a == (address)rs.base(), "Sanity");
-        return rs;
-      }
+      list.append(a);
       a +=  search_ranges[i].increment;
+    }
+  }
+
+  int len = list.length();
+  int r = 0;
+  if (!DumpSharedSpaces) {
+    // Starting from a random position in the list. If the address cannot be reserved
+    // (the OS already assigned it for something else), go to the next position, wrapping
+    // around if necessary, until we exhaust all the items.
+    os::init_random((int)os::javaTimeNanos());
+    r = ABS(os::random()) % len;
+    assert(r >= 0, "must be");
+    log_info(metaspace)("Randomizing compressed class space: start from %d out of %d locations",
+                        r, len);
+  }
+  for (int i = 0; i < len; i++) {
+    assert((i + r) >= 0, "should never underflow because len is small integer");
+    address a = list.at((i + r) % len);
+    ReservedSpace rs(size, Metaspace::reserve_alignment(),
+                     os::vm_page_size(), (char*)a);
+    if (rs.is_reserved()) {
+      assert(a == (address)rs.base(), "Sanity");
+      return rs;
     }
   }
 #endif // defined(AARCH64) || defined(PPC64)
@@ -817,6 +833,9 @@ void Metaspace::global_initialize() {
           err_msg("Could not allocate compressed class space: " SIZE_FORMAT " bytes",
                    CompressedClassSpaceSize));
     }
+
+    // Mark class space as such
+    MemTracker::record_virtual_memory_type((address)rs.base(), mtClass);
 
     // Initialize space
     Metaspace::initialize_class_space(rs);

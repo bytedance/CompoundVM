@@ -411,6 +411,10 @@
       <setting name="enabled" control="gc-enabled-normal">true</setting>
     </event>
 
+    <event name="jdk.GCCPUTime">
+      <setting name="enabled" control="gc-enabled-normal">true</setting>
+    </event>
+
     <event name="jdk.PromotionFailed">
       <setting name="enabled" control="gc-enabled-normal">true</setting>
     </event>
@@ -773,6 +777,7 @@
 
     <event name="jdk.ZAllocationStall">
       <setting name="enabled">true</setting>
+      <setting name="stackTrace">true</setting>
       <setting name="threshold">0 ms</setting>
     </event>
 
@@ -864,10 +869,10 @@
 
 
 
-  <!--                                                                                                        
-  Contents of the control element is not read by the JVM, it's used                                           
-  by JDK Mission Control and the 'jfr' tool to change settings that                                           
-  carry the control attribute.                                                                                
+  <!--
+  Contents of the control element is not read by the JVM, it's used
+  by JDK Mission Control and the 'jfr' tool to change settings that
+  carry the control attribute.
   -->
     <control>
      <selection name="gc" default="normal" label="Garbage Collector">

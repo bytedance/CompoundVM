@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -28,8 +28,8 @@
  * Test argument is the approximate number of seconds to run.
  * @library /test/lib
  * @modules java.base/jdk.internal.misc
- * @build sun.hotspot.WhiteBox
- * @run driver jdk.test.lib.helpers.ClassFileInstaller sun.hotspot.WhiteBox
+ * @build jdk.test.whitebox.WhiteBox
+ * @run driver jdk.test.lib.helpers.ClassFileInstaller jdk.test.whitebox.WhiteBox
  * @run main/othervm
  *    -Xbootclasspath/a:.
  *    -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI
@@ -50,7 +50,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import jdk.test.lib.process.OutputAnalyzer;
 import jdk.test.lib.process.ProcessTools;
-import sun.hotspot.gc.GC;
+import jdk.test.whitebox.gc.GC;
 
 public class StringTableCleaningTest {
     public static void main(String[] args) throws Exception {
@@ -58,7 +58,7 @@ public class StringTableCleaningTest {
         subargs.addAll(List.of("-Xlog:gc,gc+start,stringtable*=trace", "-Xmx1g"));
         subargs.add(Tester.class.getName());
         subargs.addAll(Arrays.asList(args));
-        OutputAnalyzer output = ProcessTools.executeTestJvm(subargs);
+        OutputAnalyzer output = ProcessTools.executeTestJava(subargs);
         output.shouldHaveExitValue(0);
         checkOutput(output);
     }

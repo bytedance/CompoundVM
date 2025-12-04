@@ -50,42 +50,42 @@ SuperWord::SuperWord(PhaseIdealLoop* phase) :
   _phase(phase),
   _arena(phase->C->comp_arena()),
   _igvn(phase->_igvn),
-  _packset(arena(), 8,  0, NULL),         // packs for the current block
+  _packset(arena(), 8,  0, nullptr),                        // packs for the current block
   _bb_idx(arena(), (int)(1.10 * phase->C->unique()), 0, 0), // node idx to index in bb
-  _block(arena(), 8,  0, NULL),           // nodes in current block
-  _post_block(arena(), 8, 0, NULL),       // nodes common to current block which are marked as post loop vectorizable
-  _data_entry(arena(), 8,  0, NULL),      // nodes with all inputs from outside
-  _mem_slice_head(arena(), 8,  0, NULL),  // memory slice heads
-  _mem_slice_tail(arena(), 8,  0, NULL),  // memory slice tails
-  _node_info(arena(), 8,  0, SWNodeInfo::initial), // info needed per node
-  _clone_map(phase->C->clone_map()),      // map of nodes created in cloning
-  _cmovev_kit(_arena, this),              // map to facilitate CMoveV creation
-  _align_to_ref(NULL),                    // memory reference to align vectors to
-  _disjoint_ptrs(arena(), 8,  0, OrderedPair::initial), // runtime disambiguated pointer pairs
-  _dg(_arena),                            // dependence graph
-  _visited(arena()),                      // visited node set
-  _post_visited(arena()),                 // post visited node set
-  _n_idx_list(arena(), 8),                // scratch list of (node,index) pairs
-  _nlist(arena(), 8, 0, NULL),            // scratch list of nodes
-  _stk(arena(), 8, 0, NULL),              // scratch stack of nodes
-  _lpt(NULL),                             // loop tree node
-  _lp(NULL),                              // CountedLoopNode
-  _pre_loop_end(NULL),                    // Pre loop CountedLoopEndNode
-  _bb(NULL),                              // basic block
-  _iv(NULL),                              // induction var
-  _race_possible(false),                  // cases where SDMU is true
-  _early_return(true),                    // analysis evaluations routine
-  _do_vector_loop(phase->C->do_vector_loop()),  // whether to do vectorization/simd style
+  _block(arena(), 8,  0, nullptr),                          // nodes in current block
+  _post_block(arena(), 8, 0, nullptr),                      // nodes common to current block which are marked as post loop vectorizable
+  _data_entry(arena(), 8,  0, nullptr),                     // nodes with all inputs from outside
+  _mem_slice_head(arena(), 8,  0, nullptr),                 // memory slice heads
+  _mem_slice_tail(arena(), 8,  0, nullptr),                 // memory slice tails
+  _node_info(arena(), 8,  0, SWNodeInfo::initial),          // info needed per node
+  _clone_map(phase->C->clone_map()),                        // map of nodes created in cloning
+  _cmovev_kit(_arena, this),                                // map to facilitate CMoveV creation
+  _align_to_ref(nullptr),                                   // memory reference to align vectors to
+  _disjoint_ptrs(arena(), 8,  0, OrderedPair::initial),     // runtime disambiguated pointer pairs
+  _dg(_arena),                                              // dependence graph
+  _visited(arena()),                                        // visited node set
+  _post_visited(arena()),                                   // post visited node set
+  _n_idx_list(arena(), 8),                                  // scratch list of (node,index) pairs
+  _nlist(arena(), 8, 0, nullptr),                           // scratch list of nodes
+  _stk(arena(), 8, 0, nullptr),                             // scratch stack of nodes
+  _lpt(nullptr),                                            // loop tree node
+  _lp(nullptr),                                             // CountedLoopNode
+  _pre_loop_end(nullptr),                                   // Pre loop CountedLoopEndNode
+  _bb(nullptr),                                             // basic block
+  _iv(nullptr),                                             // induction var
+  _race_possible(false),                                    // cases where SDMU is true
+  _early_return(true),                                      // analysis evaluations routine
+  _do_vector_loop(phase->C->do_vector_loop()),              // whether to do vectorization/simd style
   _do_reserve_copy(DoReserveCopyInSuperWord),
-  _num_work_vecs(0),                      // amount of vector work we have
-  _num_reductions(0),                     // amount of reduction work we have
-  _ii_first(-1),                          // first loop generation index - only if do_vector_loop()
-  _ii_last(-1),                           // last loop generation index - only if do_vector_loop()
+  _num_work_vecs(0),                                        // amount of vector work we have
+  _num_reductions(0),                                       // amount of reduction work we have
+  _ii_first(-1),                                            // first loop generation index - only if do_vector_loop()
+  _ii_last(-1),                                             // last loop generation index - only if do_vector_loop()
   _ii_order(arena(), 8, 0, 0)
 {
 #ifndef PRODUCT
   _vector_loop_debug = 0;
-  if (_phase->C->method() != NULL) {
+  if (_phase->C->method() != nullptr) {
     _vector_loop_debug = phase->C->directive()->VectorizeDebugOption;
   }
 
@@ -171,7 +171,7 @@ bool SuperWord::transform_loop(IdealLoopTree* lpt, bool do_optimization) {
   if (cl->is_main_loop()) {
     // Check for pre-loop ending with CountedLoopEnd(Bool(Cmp(x,Opaque1(limit))))
     CountedLoopEndNode* pre_end = find_pre_loop_end(cl);
-    if (pre_end == NULL) {
+    if (pre_end == nullptr) {
       return false;
     }
     Node* pre_opaq1 = pre_end->limit();
@@ -296,7 +296,7 @@ void SuperWord::unrolling_analysis(int &local_loop_unroll_factor) {
       Node* n_ctrl = _phase->get_ctrl(adr);
 
       // save a queue of post process nodes
-      if (n_ctrl != NULL && lpt()->is_member(_phase->get_loop(n_ctrl))) {
+      if (n_ctrl != nullptr && lpt()->is_member(_phase->get_loop(n_ctrl))) {
         // Process the memory expression
         int stack_idx = 0;
         bool have_side_effects = true;
@@ -526,7 +526,7 @@ bool SuperWord::SLP_extract() {
 
     find_adjacent_refs();
 
-    if (align_to_ref() == NULL) {
+    if (align_to_ref() == nullptr) {
       return false; // Did not find memory reference to align vectors
     }
 
@@ -615,16 +615,16 @@ void SuperWord::find_adjacent_refs() {
   Node_List align_to_refs;
   int max_idx;
   int best_iv_adjustment = 0;
-  MemNode* best_align_to_mem_ref = NULL;
+  MemNode* best_align_to_mem_ref = nullptr;
 
   while (memops.size() != 0) {
     // Find a memory reference to align to.
     MemNode* mem_ref = find_align_to_ref(memops, max_idx);
-    if (mem_ref == NULL) break;
+    if (mem_ref == nullptr) break;
     align_to_refs.push(mem_ref);
     int iv_adjustment = get_iv_adjustment(mem_ref);
 
-    if (best_align_to_mem_ref == NULL) {
+    if (best_align_to_mem_ref == nullptr) {
       // Set memory reference which is the best from all memory operations
       // to be used for alignment. The pre-loop trip count is modified to align
       // this reference to a vector-aligned address.
@@ -633,13 +633,13 @@ void SuperWord::find_adjacent_refs() {
       NOT_PRODUCT(find_adjacent_refs_trace_1(best_align_to_mem_ref, best_iv_adjustment);)
     }
 
-    SWPointer align_to_ref_p(mem_ref, this, NULL, false);
+    SWPointer align_to_ref_p(mem_ref, this, nullptr, false);
     // Set alignment relative to "align_to_ref" for all related memory operations.
     for (int i = memops.size() - 1; i >= 0; i--) {
       MemNode* s = memops.at(i)->as_Mem();
       if (isomorphic(s, mem_ref) &&
            (!_do_vector_loop || same_origin_idx(s, mem_ref))) {
-        SWPointer p2(s, this, NULL, false);
+        SWPointer p2(s, this, nullptr, false);
         if (p2.comparable(align_to_ref_p)) {
           int align = memory_alignment(s, iv_adjustment);
           set_alignment(s, align);
@@ -660,7 +660,7 @@ void SuperWord::find_adjacent_refs() {
           // iterations in pre-loop will be not enough to align it.
           create_pack = false;
         } else {
-          SWPointer p2(best_align_to_mem_ref, this, NULL, false);
+          SWPointer p2(best_align_to_mem_ref, this, nullptr, false);
           if (!align_to_ref_p.invar_equals(p2)) {
             // Do not vectorize memory accesses with different invariants
             // if unaligned memory accesses are not allowed.
@@ -744,9 +744,9 @@ void SuperWord::find_adjacent_refs() {
           memops.push(s);
         }
         best_align_to_mem_ref = find_align_to_ref(memops, max_idx);
-        if (best_align_to_mem_ref == NULL) {
+        if (best_align_to_mem_ref == nullptr) {
           if (TraceSuperWord) {
-            tty->print_cr("SuperWord::find_adjacent_refs(): best_align_to_mem_ref == NULL");
+            tty->print_cr("SuperWord::find_adjacent_refs(): best_align_to_mem_ref == nullptr");
           }
           // best_align_to_mem_ref will be used for adjusting the pre-loop limit in
           // SuperWord::align_initial_loop_index. Find one with the biggest vector size,
@@ -759,10 +759,10 @@ void SuperWord::find_adjacent_refs() {
                 memops.remove(0);
               }
               best_align_to_mem_ref = find_align_to_ref(memops, max_idx);
-              assert(best_align_to_mem_ref == NULL, "sanity");
+              assert(best_align_to_mem_ref == nullptr, "sanity");
               best_align_to_mem_ref = memops.at(max_idx)->as_Mem();
             }
-            assert(best_align_to_mem_ref != NULL, "sanity");
+            assert(best_align_to_mem_ref != nullptr, "sanity");
           }
           break;
         }
@@ -811,7 +811,7 @@ MemNode* SuperWord::find_align_to_ref(Node_List &memops, int &idx) {
   // Count number of comparable memory ops
   for (uint i = 0; i < memops.size(); i++) {
     MemNode* s1 = memops.at(i)->as_Mem();
-    SWPointer p1(s1, this, NULL, false);
+    SWPointer p1(s1, this, nullptr, false);
     // Only discard unalignable memory references if vector memory references
     // should be aligned on this platform.
     if (vectors_should_be_aligned() && !ref_is_alignable(p1)) {
@@ -821,7 +821,7 @@ MemNode* SuperWord::find_align_to_ref(Node_List &memops, int &idx) {
     for (uint j = i+1; j < memops.size(); j++) {
       MemNode* s2 = memops.at(j)->as_Mem();
       if (isomorphic(s1, s2)) {
-        SWPointer p2(s2, this, NULL, false);
+        SWPointer p2(s2, this, nullptr, false);
         if (p1.comparable(p2)) {
           (*cmp_ct.adr_at(i))++;
           (*cmp_ct.adr_at(j))++;
@@ -842,7 +842,7 @@ MemNode* SuperWord::find_align_to_ref(Node_List &memops, int &idx) {
     if (s->is_Store()) {
       int vw = vector_width_in_bytes(s);
       assert(vw > 1, "sanity");
-      SWPointer p(s, this, NULL, false);
+      SWPointer p(s, this, nullptr, false);
       if ( cmp_ct.at(j) >  max_ct ||
           (cmp_ct.at(j) == max_ct &&
             ( vw >  max_vw ||
@@ -865,7 +865,7 @@ MemNode* SuperWord::find_align_to_ref(Node_List &memops, int &idx) {
       if (s->is_Load()) {
         int vw = vector_width_in_bytes(s);
         assert(vw > 1, "sanity");
-        SWPointer p(s, this, NULL, false);
+        SWPointer p(s, this, nullptr, false);
         if ( cmp_ct.at(j) >  max_ct ||
             (cmp_ct.at(j) == max_ct &&
               ( vw >  max_vw ||
@@ -903,7 +903,7 @@ MemNode* SuperWord::find_align_to_ref(Node_List &memops, int &idx) {
 #endif
     return memops.at(max_idx)->as_Mem();
   }
-  return NULL;
+  return nullptr;
 }
 
 //------------------span_works_for_memory_size-----------------------------
@@ -965,7 +965,7 @@ bool SuperWord::ref_is_alignable(SWPointer& p) {
   int vw = vector_width_in_bytes(p.mem());
   assert(vw > 1, "sanity");
   Node* init_nd = pre_end->init_trip();
-  if (init_nd->is_Con() && p.invar() == NULL) {
+  if (init_nd->is_Con() && p.invar() == nullptr) {
     int init = init_nd->bottom_type()->is_int()->get_con();
     int init_offset = init * p.scale_in_bytes() + offset;
     if (init_offset < 0) { // negative offset from object start?
@@ -1021,7 +1021,7 @@ int SuperWord::get_vw_bytes_special(MemNode* s) {
 //---------------------------get_iv_adjustment---------------------------
 // Calculate loop's iv adjustment for this memory ops.
 int SuperWord::get_iv_adjustment(MemNode* mem_ref) {
-  SWPointer align_to_ref_p(mem_ref, this, NULL, false);
+  SWPointer align_to_ref_p(mem_ref, this, nullptr, false);
   int offset = align_to_ref_p.offset_in_bytes();
   int scale  = align_to_ref_p.scale_in_bytes();
   int elt_size = align_to_ref_p.memory_size();
@@ -1091,7 +1091,7 @@ void SuperWord::dependence_graph() {
     _dg.make_edge(_dg.root(), slice);
 
     // Create a sink for the slice
-    DepMem* slice_sink = _dg.make_node(NULL);
+    DepMem* slice_sink = _dg.make_node(nullptr);
     _dg.make_edge(slice_sink, _dg.tail());
 
     // Now visit each pair of memory ops, creating the edges
@@ -1102,13 +1102,13 @@ void SuperWord::dependence_graph() {
       if (_dg.dep(s1)->in_cnt() == 0) {
         _dg.make_edge(slice, s1);
       }
-      SWPointer p1(s1->as_Mem(), this, NULL, false);
+      SWPointer p1(s1->as_Mem(), this, nullptr, false);
       bool sink_dependent = true;
       for (int k = j - 1; k >= 0; k--) {
         Node* s2 = _nlist.at(k);
         if (s1->is_Load() && s2->is_Load())
           continue;
-        SWPointer p2(s2->as_Mem(), this, NULL, false);
+        SWPointer p2(s2->as_Mem(), this, nullptr, false);
 
         int cmp = p1.cmp(p2);
         if (SuperWordRTDepCheck &&
@@ -1154,7 +1154,7 @@ void SuperWord::dependence_graph() {
 void SuperWord::mem_slice_preds(Node* start, Node* stop, GrowableArray<Node*> &preds) {
   assert(preds.length() == 0, "start empty");
   Node* n = start;
-  Node* prev = NULL;
+  Node* prev = nullptr;
   while (true) {
     NOT_PRODUCT( if(is_trace_mem_slice()) tty->print_cr("SuperWord::mem_slice_preds: n %d", n->_idx);)
     assert(in_bb(n), "must be in block");
@@ -1178,7 +1178,7 @@ void SuperWord::mem_slice_preds(Node* start, Node* stop, GrowableArray<Node*> &p
           // StoreCM has an input edge used as a precedence edge.
           // Maybe an issue when oop stores are vectorized.
         } else {
-          assert(out == prev || prev == NULL, "no branches off of store slice");
+          assert(out == prev || prev == nullptr, "no branches off of store slice");
         }
       }//else
     }//for
@@ -1254,8 +1254,8 @@ bool SuperWord::are_adjacent_refs(Node* s1, Node* s2) {
   if (_phase->C->get_alias_index(s1->as_Mem()->adr_type()) !=
       _phase->C->get_alias_index(s2->as_Mem()->adr_type()))
     return false;
-  SWPointer p1(s1->as_Mem(), this, NULL, false);
-  SWPointer p2(s2->as_Mem(), this, NULL, false);
+  SWPointer p1(s1->as_Mem(), this, nullptr, false);
+  SWPointer p2(s2->as_Mem(), this, nullptr, false);
   if (p1.base() != p2.base() || !p1.comparable(p2)) return false;
   int diff = p2.offset_in_bytes() - p1.offset_in_bytes();
   return diff == data_size(s1);
@@ -1273,13 +1273,13 @@ bool SuperWord::isomorphic(Node* s1, Node* s2) {
   if (s1_ctrl == s2_ctrl) {
     return true;
   } else {
-    bool s1_ctrl_inv = ((s1_ctrl == NULL) ? true : lpt()->is_invariant(s1_ctrl));
-    bool s2_ctrl_inv = ((s2_ctrl == NULL) ? true : lpt()->is_invariant(s2_ctrl));
+    bool s1_ctrl_inv = ((s1_ctrl == nullptr) ? true : lpt()->is_invariant(s1_ctrl));
+    bool s2_ctrl_inv = ((s2_ctrl == nullptr) ? true : lpt()->is_invariant(s2_ctrl));
     // If the control nodes are not invariant for the loop, fail isomorphism test.
     if (!s1_ctrl_inv || !s2_ctrl_inv) {
       return false;
     }
-    if(s1_ctrl != NULL && s2_ctrl != NULL) {
+    if(s1_ctrl != nullptr && s2_ctrl != nullptr) {
       if (s1_ctrl->is_Proj()) {
         s1_ctrl = s1_ctrl->in(0);
         assert(lpt()->is_invariant(s1_ctrl), "must be invariant");
@@ -1393,14 +1393,14 @@ void SuperWord::set_alignment(Node* s1, Node* s2, int align) {
 
 //------------------------------data_size---------------------------
 int SuperWord::data_size(Node* s) {
-  Node* use = NULL; //test if the node is a candidate for CMoveV optimization, then return the size of CMov
+  Node* use = nullptr; //test if the node is a candidate for CMoveV optimization, then return the size of CMov
   if (UseVectorCmov) {
     use = _cmovev_kit.is_Bool_candidate(s);
-    if (use != NULL) {
+    if (use != nullptr) {
       return data_size(use);
     }
     use = _cmovev_kit.is_CmpD_candidate(s);
-    if (use != NULL) {
+    if (use != nullptr) {
       return data_size(use);
     }
   }
@@ -1489,8 +1489,8 @@ bool SuperWord::follow_def_uses(Node_List* p) {
   NOT_PRODUCT(if(is_trace_alignment()) tty->print_cr("SuperWord::follow_def_uses: s1 %d, align %d", s1->_idx, align);)
   int savings = -1;
   int num_s1_uses = 0;
-  Node* u1 = NULL;
-  Node* u2 = NULL;
+  Node* u1 = nullptr;
+  Node* u2 = nullptr;
   for (DUIterator_Fast imax, i = s1->fast_outs(imax); i < imax; i++) {
     Node* t1 = s1->fast_out(i);
     num_s1_uses++;
@@ -1545,17 +1545,17 @@ void SuperWord::order_def_uses(Node_List* p) {
     }
 
     // Now find t1's packset
-    Node_List* p2 = NULL;
+    Node_List* p2 = nullptr;
     for (int j = 0; j < _packset.length(); j++) {
       p2 = _packset.at(j);
       Node* first = p2->at(0);
       if (t1 == first) {
         break;
       }
-      p2 = NULL;
+      p2 = nullptr;
     }
     // Arrange all sub components by the major component
-    if (p2 != NULL) {
+    if (p2 != nullptr) {
       for (uint j = 1; j < p->size(); j++) {
         Node* d1 = p->at(j);
         Node* u1 = p2->at(j);
@@ -1678,17 +1678,17 @@ void SuperWord::combine_packs() {
     changed = false;
     for (int i = 0; i < _packset.length(); i++) {
       Node_List* p1 = _packset.at(i);
-      if (p1 == NULL) continue;
+      if (p1 == nullptr) continue;
       // Because of sorting we can start at i + 1
       for (int j = i + 1; j < _packset.length(); j++) {
         Node_List* p2 = _packset.at(j);
-        if (p2 == NULL) continue;
+        if (p2 == nullptr) continue;
         if (i == j) continue;
         if (p1->at(p1->size()-1) == p2->at(0)) {
           for (uint k = 1; k < p2->size(); k++) {
             p1->push(p2->at(k));
           }
-          _packset.at_put(j, NULL);
+          _packset.at_put(j, nullptr);
           changed = true;
         }
       }
@@ -1698,7 +1698,7 @@ void SuperWord::combine_packs() {
   // Split packs which have size greater then max vector size.
   for (int i = 0; i < _packset.length(); i++) {
     Node_List* p1 = _packset.at(i);
-    if (p1 != NULL) {
+    if (p1 != nullptr) {
       BasicType bt = velt_basic_type(p1->at(0));
       uint max_vlen = Matcher::max_vector_size(bt); // Max elements in vector
       assert(is_power_of_2(max_vlen), "sanity");
@@ -1707,7 +1707,7 @@ void SuperWord::combine_packs() {
         // Skip pack which can't be vector.
         // case1: for(...) { a[i] = i; }    elements values are different (i+x)
         // case2: for(...) { a[i] = b[i+1]; }  can't align both, load and store
-        _packset.at_put(i, NULL);
+        _packset.at_put(i, nullptr);
         continue;
       }
       if (psize > max_vlen) {
@@ -1720,7 +1720,7 @@ void SuperWord::combine_packs() {
             pack = new Node_List();
           }
         }
-        _packset.at_put(i, NULL);
+        _packset.at_put(i, nullptr);
       }
     }
   }
@@ -1728,7 +1728,7 @@ void SuperWord::combine_packs() {
   // Compress list.
   for (int i = _packset.length() - 1; i >= 0; i--) {
     Node_List* p1 = _packset.at(i);
-    if (p1 == NULL) {
+    if (p1 == nullptr) {
       _packset.remove_at(i);
     }
   }
@@ -1743,13 +1743,13 @@ void SuperWord::combine_packs() {
 // Construct the map from nodes to packs.  Only valid after the
 // point where a node is only in one pack (after combine_packs).
 void SuperWord::construct_my_pack_map() {
-  Node_List* rslt = NULL;
+  Node_List* rslt = nullptr;
   for (int i = 0; i < _packset.length(); i++) {
     Node_List* p = _packset.at(i);
     for (uint j = 0; j < p->size(); j++) {
       Node* s = p->at(j);
 #ifdef ASSERT
-      if (my_pack(s) != NULL) {
+      if (my_pack(s) != nullptr) {
         s->dump(1);
         tty->print_cr("packs[%d]:", i);
         print_pack(p);
@@ -1852,28 +1852,28 @@ void SuperWord::merge_packs_to_cmovd() {
 }
 
 Node* CMoveKit::is_Bool_candidate(Node* def) const {
-  Node* use = NULL;
-  if (!def->is_Bool() || def->in(0) != NULL || def->outcnt() != 1) {
-    return NULL;
+  Node* use = nullptr;
+  if (!def->is_Bool() || def->in(0) != nullptr || def->outcnt() != 1) {
+    return nullptr;
   }
   for (DUIterator_Fast jmax, j = def->fast_outs(jmax); j < jmax; j++) {
     use = def->fast_out(j);
     if (!_sw->same_generation(def, use) || !use->is_CMove()) {
-      return NULL;
+      return nullptr;
     }
   }
   return use;
 }
 
 Node* CMoveKit::is_CmpD_candidate(Node* def) const {
-  Node* use = NULL;
-  if (!def->is_Cmp() || def->in(0) != NULL || def->outcnt() != 1) {
-    return NULL;
+  Node* use = nullptr;
+  if (!def->is_Cmp() || def->in(0) != nullptr || def->outcnt() != 1) {
+    return nullptr;
   }
   for (DUIterator_Fast jmax, j = def->fast_outs(jmax); j < jmax; j++) {
     use = def->fast_out(j);
-    if (!_sw->same_generation(def, use) || (use = is_Bool_candidate(use)) == NULL || !_sw->same_generation(def, use)) {
-      return NULL;
+    if (!_sw->same_generation(def, use) || (use = is_Bool_candidate(use)) == nullptr || !_sw->same_generation(def, use)) {
+      return nullptr;
     }
   }
   return use;
@@ -1882,50 +1882,50 @@ Node* CMoveKit::is_CmpD_candidate(Node* def) const {
 Node_List* CMoveKit::make_cmovevd_pack(Node_List* cmovd_pk) {
   Node *cmovd = cmovd_pk->at(0);
   if (!cmovd->is_CMove()) {
-    return NULL;
+    return nullptr;
   }
   if (cmovd->Opcode() != Op_CMoveF && cmovd->Opcode() != Op_CMoveD) {
-    return NULL;
+    return nullptr;
   }
-  if (pack(cmovd) != NULL) { // already in the cmov pack
-    return NULL;
+  if (pack(cmovd) != nullptr) { // already in the cmov pack
+    return nullptr;
   }
-  if (cmovd->in(0) != NULL) {
+  if (cmovd->in(0) != nullptr) {
     NOT_PRODUCT(if(_sw->is_trace_cmov()) {tty->print("CMoveKit::make_cmovevd_pack: CMoveD %d has control flow, escaping...", cmovd->_idx); cmovd->dump();})
-    return NULL;
+    return nullptr;
   }
 
   Node* bol = cmovd->as_CMove()->in(CMoveNode::Condition);
   if (!bol->is_Bool()
       || bol->outcnt() != 1
       || !_sw->same_generation(bol, cmovd)
-      || bol->in(0) != NULL  // BoolNode has control flow!!
-      || _sw->my_pack(bol) == NULL) {
+      || bol->in(0) != nullptr  // BoolNode has control flow!!
+      || _sw->my_pack(bol) == nullptr) {
       NOT_PRODUCT(if(_sw->is_trace_cmov()) {tty->print("CMoveKit::make_cmovevd_pack: Bool %d does not fit CMoveD %d for building vector, escaping...", bol->_idx, cmovd->_idx); bol->dump();})
-      return NULL;
+      return nullptr;
   }
   Node_List* bool_pk = _sw->my_pack(bol);
   if (bool_pk->size() != cmovd_pk->size() ) {
-    return NULL;
+    return nullptr;
   }
 
   Node* cmpd = bol->in(1);
   if (!cmpd->is_Cmp()
       || cmpd->outcnt() != 1
       || !_sw->same_generation(cmpd, cmovd)
-      || cmpd->in(0) != NULL  // CmpDNode has control flow!!
-      || _sw->my_pack(cmpd) == NULL) {
+      || cmpd->in(0) != nullptr  // CmpDNode has control flow!!
+      || _sw->my_pack(cmpd) == nullptr) {
       NOT_PRODUCT(if(_sw->is_trace_cmov()) {tty->print("CMoveKit::make_cmovevd_pack: CmpD %d does not fit CMoveD %d for building vector, escaping...", cmpd->_idx, cmovd->_idx); cmpd->dump();})
-      return NULL;
+      return nullptr;
   }
   Node_List* cmpd_pk = _sw->my_pack(cmpd);
   if (cmpd_pk->size() != cmovd_pk->size() ) {
-    return NULL;
+    return nullptr;
   }
 
   if (!test_cmpd_pack(cmpd_pk, cmovd_pk)) {
     NOT_PRODUCT(if(_sw->is_trace_cmov()) {tty->print("CMoveKit::make_cmovevd_pack: cmpd pack for CmpD %d failed vectorization test", cmpd->_idx); cmpd->dump();})
-    return NULL;
+    return nullptr;
   }
 
   Node_List* new_cmpd_pk = new Node_List();
@@ -1961,13 +1961,13 @@ bool CMoveKit::test_cmpd_pack(Node_List* cmpd_pk, Node_List* cmovd_pk) {
   Node_List* in1_pk = _sw->my_pack(in1);
   Node_List* in2_pk = _sw->my_pack(in2);
 
-  if (  (in1_pk != NULL && in1_pk->size() != cmpd_pk->size())
-     || (in2_pk != NULL && in2_pk->size() != cmpd_pk->size()) ) {
+  if (  (in1_pk != nullptr && in1_pk->size() != cmpd_pk->size())
+     || (in2_pk != nullptr && in2_pk->size() != cmpd_pk->size()) ) {
     return false;
   }
 
   // test if "all" in1 are in the same pack or the same node
-  if (in1_pk == NULL) {
+  if (in1_pk == nullptr) {
     for (uint j = 1; j < cmpd_pk->size(); j++) {
       if (cmpd_pk->at(j)->in(1) != in1) {
         return false;
@@ -1975,7 +1975,7 @@ bool CMoveKit::test_cmpd_pack(Node_List* cmpd_pk, Node_List* cmovd_pk) {
     }//for: in1_pk is not pack but all CmpD nodes in the pack have the same in(1)
   }
   // test if "all" in2 are in the same pack or the same node
-  if (in2_pk == NULL) {
+  if (in2_pk == nullptr) {
     for (uint j = 1; j < cmpd_pk->size(); j++) {
       if (cmpd_pk->at(j)->in(2) != in2) {
         return false;
@@ -2012,7 +2012,7 @@ bool CMoveKit::test_cmpd_pack(Node_List* cmpd_pk, Node_List* cmovd_pk) {
 bool SuperWord::implemented(Node_List* p) {
   bool retValue = false;
   Node* p0 = p->at(0);
-  if (p0 != NULL) {
+  if (p0 != nullptr) {
     int opc = p0->Opcode();
     uint size = p->size();
     if (p0->is_reduction()) {
@@ -2037,7 +2037,7 @@ bool SuperWord::implemented(Node_List* p) {
 }
 
 bool SuperWord::is_cmov_pack(Node_List* p) {
-  return _cmovev_kit.pack(p->at(0)) != NULL;
+  return _cmovev_kit.pack(p->at(0)) != nullptr;
 }
 //------------------------------same_inputs--------------------------
 // For pack p, are all idx operands the same?
@@ -2076,7 +2076,7 @@ bool SuperWord::profitable(Node_List* p) {
   if (p0->is_reduction()) {
     Node* second_in = p0->in(2);
     Node_List* second_pk = my_pack(second_in);
-    if ((second_pk == NULL) || (_num_work_vecs == _num_reductions)) {
+    if ((second_pk == nullptr) || (_num_work_vecs == _num_reductions)) {
       // Remove reduction flag if no parent pack or if not enough work
       // to cover reduction expansion overhead
       p0->remove_flag(Node::Flag_is_reduction);
@@ -2090,7 +2090,7 @@ bool SuperWord::profitable(Node_List* p) {
     // case (different shift counts) because it is not supported yet.
     Node* cnt = p0->in(2);
     Node_List* cnt_pk = my_pack(cnt);
-    if (cnt_pk != NULL)
+    if (cnt_pk != nullptr)
       return false;
     if (!same_inputs(p, 2))
       return false;
@@ -2239,7 +2239,7 @@ void SuperWord::co_locate_pack(Node_List* pk) {
             if (in_pack(s2, pk) || schedule_before_pack.member(s2)) {
               schedule_before_pack.push(s1); // s1 must be scheduled before
               Node_List* mem_pk = my_pack(s1);
-              if (mem_pk != NULL) {
+              if (mem_pk != nullptr) {
                 for (uint ii = 0; ii < mem_pk->size(); ii++) {
                   Node* s = mem_pk->at(ii);  // follow partner
                   if (memops.member(s) && !schedule_before_pack.member(s))
@@ -2448,7 +2448,7 @@ bool SuperWord::output() {
     if (p && n == executed_last(p)) {
       uint vlen = p->size();
       uint vlen_in_bytes = 0;
-      Node* vn = NULL;
+      Node* vn = nullptr;
       Node* low_adr = p->at(0);
       Node* first   = executed_first(p);
       if (can_process_post_loop) {
@@ -2460,18 +2460,18 @@ bool SuperWord::output() {
       if (n->is_Load()) {
         Node* ctl = n->in(MemNode::Control);
         Node* mem = first->in(MemNode::Memory);
-        SWPointer p1(n->as_Mem(), this, NULL, false);
-        // Identify the memory dependency for the new loadVector node by
-        // walking up through memory chain.
-        // This is done to give flexibility to the new loadVector node so that
-        // it can move above independent storeVector nodes.
+        // Set the memory dependency of the LoadVector as early as possible.
+        // Walk up the memory chain, and ignore any StoreVector that provably
+        // does not have any memory dependency.
+        SWPointer p1(n->as_Mem(), this, nullptr, false);
         while (mem->is_StoreVector()) {
-          SWPointer p2(mem->as_Mem(), this, NULL, false);
-          int cmp = p1.cmp(p2);
-          if (SWPointer::not_equal(cmp) || !SWPointer::comparable(cmp)) {
+          SWPointer p2(mem->as_Mem(), this, nullptr, false);
+          if (p1.not_equal(p2)) {
+            // Either Less or Greater -> provably no overlap between the two memory regions.
             mem = mem->in(MemNode::Memory);
           } else {
-            break; // dependent memory
+            // No proof that there is no overlap. Stop here.
+            break;
           }
         }
         Node* adr = low_adr->in(MemNode::Address);
@@ -2481,9 +2481,9 @@ bool SuperWord::output() {
       } else if (n->is_Store()) {
         // Promote value to be stored to vector
         Node* val = vector_opd(p, MemNode::ValueIn);
-        if (val == NULL) {
+        if (val == nullptr) {
           if (do_reserve_copy()) {
-            NOT_PRODUCT(if(is_trace_loop_reverse() || TraceLoopOpts) {tty->print_cr("SWPointer::output: val should not be NULL, exiting SuperWord");})
+            NOT_PRODUCT(if(is_trace_loop_reverse() || TraceLoopOpts) {tty->print_cr("SWPointer::output: val should not be null, exiting SuperWord");})
             return false; //and reverse to backup IG
           }
           ShouldNotReachHere();
@@ -2518,25 +2518,25 @@ bool SuperWord::output() {
         vlen_in_bytes = vn->as_Vector()->length_in_bytes();
       } else if (n->req() == 3 && !is_cmov_pack(p)) {
         // Promote operands to vector
-        Node* in1 = NULL;
+        Node* in1 = nullptr;
         bool node_isa_reduction = n->is_reduction();
         if (node_isa_reduction) {
           // the input to the first reduction operation is retained
           in1 = low_adr->in(1);
         } else {
           in1 = vector_opd(p, 1);
-          if (in1 == NULL) {
+          if (in1 == nullptr) {
             if (do_reserve_copy()) {
-              NOT_PRODUCT(if(is_trace_loop_reverse() || TraceLoopOpts) {tty->print_cr("SWPointer::output: in1 should not be NULL, exiting SuperWord");})
+              NOT_PRODUCT(if(is_trace_loop_reverse() || TraceLoopOpts) {tty->print_cr("SWPointer::output: in1 should not be null, exiting SuperWord");})
               return false; //and reverse to backup IG
             }
             ShouldNotReachHere();
           }
         }
         Node* in2 = vector_opd(p, 2);
-        if (in2 == NULL) {
+        if (in2 == nullptr) {
           if (do_reserve_copy()) {
-            NOT_PRODUCT(if(is_trace_loop_reverse() || TraceLoopOpts) {tty->print_cr("SWPointer::output: in2 should not be NULL, exiting SuperWord");})
+            NOT_PRODUCT(if(is_trace_loop_reverse() || TraceLoopOpts) {tty->print_cr("SWPointer::output: in2 should not be null, exiting SuperWord");})
             return false; //and reverse to backup IG
           }
           ShouldNotReachHere();
@@ -2549,7 +2549,7 @@ bool SuperWord::output() {
         }
         if (node_isa_reduction) {
           const Type *arith_type = n->bottom_type();
-          vn = ReductionNode::make(opc, NULL, in1, in2, arith_type->basic_type());
+          vn = ReductionNode::make(opc, nullptr, in1, in2, arith_type->basic_type());
           if (in2->is_Load()) {
             vlen_in_bytes = in2->as_LoadVector()->memory_size();
           } else {
@@ -2566,7 +2566,7 @@ bool SuperWord::output() {
                  opc == Op_PopCountI) {
         assert(n->req() == 2, "only one input expected");
         Node* in = vector_opd(p, 1);
-        vn = VectorNode::make(opc, in, NULL, vlen, velt_basic_type(n));
+        vn = VectorNode::make(opc, in, nullptr, vlen, velt_basic_type(n));
         vlen_in_bytes = vn->as_Vector()->length_in_bytes();
       } else if (is_cmov_pack(p)) {
         if (can_process_post_loop) {
@@ -2601,17 +2601,17 @@ bool SuperWord::output() {
         NOT_PRODUCT(if(is_trace_cmov()) {tty->print("SWPointer::output: created bool cc node %d", cc->_idx); cc->dump();})
 
         Node* src1 = vector_opd(p, 2); //2=CMoveNode::IfFalse
-        if (src1 == NULL) {
+        if (src1 == nullptr) {
           if (do_reserve_copy()) {
-            NOT_PRODUCT(if(is_trace_loop_reverse() || TraceLoopOpts) {tty->print_cr("SWPointer::output: src1 should not be NULL, exiting SuperWord");})
+            NOT_PRODUCT(if(is_trace_loop_reverse() || TraceLoopOpts) {tty->print_cr("SWPointer::output: src1 should not be null, exiting SuperWord");})
             return false; //and reverse to backup IG
           }
           ShouldNotReachHere();
         }
         Node* src2 = vector_opd(p, 3); //3=CMoveNode::IfTrue
-        if (src2 == NULL) {
+        if (src2 == nullptr) {
           if (do_reserve_copy()) {
-            NOT_PRODUCT(if(is_trace_loop_reverse() || TraceLoopOpts) {tty->print_cr("SWPointer::output: src2 should not be NULL, exiting SuperWord");})
+            NOT_PRODUCT(if(is_trace_loop_reverse() || TraceLoopOpts) {tty->print_cr("SWPointer::output: src2 should not be null, exiting SuperWord");})
             return false; //and reverse to backup IG
           }
           ShouldNotReachHere();
@@ -2641,10 +2641,10 @@ bool SuperWord::output() {
         ShouldNotReachHere();
       }
 
-      assert(vn != NULL, "sanity");
-      if (vn == NULL) {
+      assert(vn != nullptr, "sanity");
+      if (vn == nullptr) {
         if (do_reserve_copy()){
-          NOT_PRODUCT(if(is_trace_loop_reverse() || TraceLoopOpts) {tty->print_cr("SWPointer::output: got NULL node, cannot proceed, exiting SuperWord");})
+          NOT_PRODUCT(if(is_trace_loop_reverse() || TraceLoopOpts) {tty->print_cr("SWPointer::output: got null node, cannot proceed, exiting SuperWord");})
           return false; //and reverse to backup IG
         }
         ShouldNotReachHere();
@@ -2757,7 +2757,7 @@ Node* SuperWord::vector_opd(Node_List* p, int opd_idx) {
       assert(((opd_idx != 2) || !VectorNode::is_shift(p0)), "shift's count can't be vector");
       if (opd_idx == 2 && VectorNode::is_shift(p0)) {
         NOT_PRODUCT(if(is_trace_loop_reverse() || TraceLoopOpts) {tty->print_cr("shift's count can't be vector");})
-        return NULL;
+        return nullptr;
       }
       return opd; // input is matching vector
     }
@@ -2767,13 +2767,13 @@ Node* SuperWord::vector_opd(Node_List* p, int opd_idx) {
       // Vector instructions do not mask shift count, do it here.
       juint mask = (p0->bottom_type() == TypeInt::INT) ? (BitsPerInt - 1) : (BitsPerLong - 1);
       const TypeInt* t = opd->find_int_type();
-      if (t != NULL && t->is_con()) {
+      if (t != nullptr && t->is_con()) {
         juint shift = t->get_con();
         if (shift > mask) { // Unsigned cmp
           cnt = ConNode::make(TypeInt::make(shift & mask));
         }
       } else {
-        if (t == NULL || t->_lo < 0 || t->_hi > (int)mask) {
+        if (t == nullptr || t->_lo < 0 || t->_hi > (int)mask) {
           cnt = ConNode::make(TypeInt::make(mask));
           _igvn.register_new_node_with_optimizer(cnt);
           cnt = new AndINode(opd, cnt);
@@ -2783,7 +2783,7 @@ Node* SuperWord::vector_opd(Node_List* p, int opd_idx) {
         assert(opd->bottom_type()->isa_int(), "int type only");
         if (!opd->bottom_type()->isa_int()) {
           NOT_PRODUCT(if(is_trace_loop_reverse() || TraceLoopOpts) {tty->print_cr("Should be int type only");})
-          return NULL;
+          return nullptr;
         }
       }
       // Move shift count into vector register.
@@ -2795,13 +2795,13 @@ Node* SuperWord::vector_opd(Node_List* p, int opd_idx) {
     assert(!opd->is_StoreVector(), "such vector is not expected here");
     if (opd->is_StoreVector()) {
       NOT_PRODUCT(if(is_trace_loop_reverse() || TraceLoopOpts) {tty->print_cr("StoreVector is not expected here");})
-      return NULL;
+      return nullptr;
     }
     // Convert scalar input to vector with the same number of elements as
     // p0's vector. Use p0's type because size of operand's container in
     // vector should match p0's size regardless operand's size.
-    const Type* p0_t = NULL;
-    VectorNode* vn = NULL;
+    const Type* p0_t = nullptr;
+    VectorNode* vn = nullptr;
     if (opd_idx == 2 && VectorNode::is_scalar_rotate(p0)) {
        Node* conv = opd;
        p0_t =  TypeInt::INT;
@@ -2836,19 +2836,19 @@ Node* SuperWord::vector_opd(Node_List* p, int opd_idx) {
   for (uint i = 1; i < vlen; i++) {
     Node* pi = p->at(i);
     Node* in = pi->in(opd_idx);
-    assert(my_pack(in) == NULL, "Should already have been unpacked");
-    if (my_pack(in) != NULL) {
+    assert(my_pack(in) == nullptr, "Should already have been unpacked");
+    if (my_pack(in) != nullptr) {
       NOT_PRODUCT(if(is_trace_loop_reverse() || TraceLoopOpts) {tty->print_cr("Should already have been unpacked");})
-      return NULL;
+      return nullptr;
     }
     assert(opd_bt == in->bottom_type()->basic_type(), "all same type");
     pk->add_opd(in);
     if (VectorNode::is_muladds2i(pi)) {
       Node* in2 = pi->in(opd_idx + 2);
-      assert(my_pack(in2) == NULL, "Should already have been unpacked");
-      if (my_pack(in2) != NULL) {
+      assert(my_pack(in2) == nullptr, "Should already have been unpacked");
+      if (my_pack(in2) != nullptr) {
         NOT_PRODUCT(if (is_trace_loop_reverse() || TraceLoopOpts) { tty->print_cr("Should already have been unpacked"); })
-          return NULL;
+          return nullptr;
       }
       assert(opd_bt == in2->bottom_type()->basic_type(), "all same type");
       pk->add_opd(in2);
@@ -2883,7 +2883,7 @@ void SuperWord::insert_extracts(Node_List* p) {
         Node* n = use->in(k);
         if (def == n) {
           Node_List* u_pk = my_pack(use);
-          if ((u_pk == NULL || !is_cmov_pack(u_pk) || use->is_CMove()) && !is_vector_use(use, k)) {
+          if ((u_pk == nullptr || !is_cmov_pack(u_pk) || use->is_CMove()) && !is_vector_use(use, k)) {
               _n_idx_list.push(use, k);
           }
         }
@@ -2918,11 +2918,11 @@ void SuperWord::insert_extracts(Node_List* p) {
 // Is use->in(u_idx) a vector use?
 bool SuperWord::is_vector_use(Node* use, int u_idx) {
   Node_List* u_pk = my_pack(use);
-  if (u_pk == NULL) return false;
+  if (u_pk == nullptr) return false;
   if (use->is_reduction()) return true;
   Node* def = use->in(u_idx);
   Node_List* d_pk = my_pack(def);
-  if (d_pk == NULL) {
+  if (d_pk == nullptr) {
     // check for scalar promotion
     Node* n = u_pk->at(0)->in(u_idx);
     for (uint i = 1; i < u_pk->size(); i++) {
@@ -3268,7 +3268,7 @@ int SuperWord::memory_alignment(MemNode* s, int iv_adjust) {
   }
 #endif
   NOT_PRODUCT(SWPointer::Tracer::Depth ddd(0);)
-  SWPointer p(s, this, NULL, false);
+  SWPointer p(s, this, nullptr, false);
   if (!p.valid()) {
     NOT_PRODUCT(if(is_trace_alignment()) tty->print_cr("SWPointer::memory_alignment: SWPointer p invalid, return bottom_align");)
     return bottom_align;
@@ -3349,7 +3349,7 @@ Node_List* SuperWord::in_pack(Node* s, Node_List* p) {
       return p;
     }
   }
-  return NULL;
+  return nullptr;
 }
 
 //------------------------------remove_pack_at---------------------------
@@ -3358,7 +3358,7 @@ void SuperWord::remove_pack_at(int pos) {
   Node_List* p = _packset.at(pos);
   for (uint i = 0; i < p->size(); i++) {
     Node* s = p->at(i);
-    set_my_pack(s, NULL);
+    set_my_pack(s, nullptr);
   }
   _packset.remove_at(pos);
 }
@@ -3455,9 +3455,9 @@ void SuperWord::align_initial_loop_index(MemNode* align_to_ref) {
   // Ensure the original loop limit is available from the
   // pre-loop Opaque1 node.
   Node* orig_limit = pre_opaq->original_loop_limit();
-  assert(orig_limit != NULL && _igvn.type(orig_limit) != Type::TOP, "");
+  assert(orig_limit != nullptr && _igvn.type(orig_limit) != Type::TOP, "");
 
-  SWPointer align_to_ref_p(align_to_ref, this, NULL, false);
+  SWPointer align_to_ref_p(align_to_ref, this, nullptr, false);
   assert(align_to_ref_p.valid(), "sanity");
 
   // Given:
@@ -3521,7 +3521,7 @@ void SuperWord::align_initial_loop_index(MemNode* align_to_ref) {
   Node *offsn  = _igvn.intcon(offset);
 
   Node *e = offsn;
-  if (align_to_ref_p.invar() != NULL) {
+  if (align_to_ref_p.invar() != nullptr) {
     // incorporate any extra invariant piece producing (offset +/- invar) >>> log2(elt)
     Node* log2_elt = _igvn.intcon(exact_log2(elt_size));
     Node* invar = align_to_ref_p.invar();
@@ -3533,7 +3533,7 @@ void SuperWord::align_initial_loop_index(MemNode* align_to_ref) {
       _igvn.register_new_node_with_optimizer(invar);
     }
     Node* invar_scale = align_to_ref_p.invar_scale();
-    if (invar_scale != NULL) {
+    if (invar_scale != nullptr) {
       invar = new LShiftINode(invar, invar_scale);
       _igvn.register_new_node_with_optimizer(invar);
     }
@@ -3550,7 +3550,7 @@ void SuperWord::align_initial_loop_index(MemNode* align_to_ref) {
   }
   if (vw > ObjectAlignmentInBytes || align_to_ref_p.base()->is_top()) {
     // incorporate base e +/- base && Mask >>> log2(elt)
-    Node* xbase = new CastP2XNode(NULL, align_to_ref_p.adr());
+    Node* xbase = new CastP2XNode(nullptr, align_to_ref_p.adr());
     _igvn.register_new_node_with_optimizer(xbase);
 #ifdef _LP64
     xbase  = new ConvL2INode(xbase);
@@ -3590,20 +3590,39 @@ void SuperWord::align_initial_loop_index(MemNode* align_to_ref) {
   _igvn.register_new_node_with_optimizer(N);
   _phase->set_ctrl(N, pre_ctrl);
 
+  // The computation of the new pre-loop limit could overflow or underflow the int range. This is problematic in
+  // combination with Range Check Elimination (RCE), which determines a "safe" range where a RangeCheck will always
+  // succeed. RCE adjusts the pre-loop limit such that we only enter the main-loop once we have reached the "safe"
+  // range, and adjusts the main-loop limit so that we exit the main-loop before we leave the "safe" range. After RCE,
+  // the range of the main-loop can only be safely narrowed, and should never be widened. Hence, the pre-loop limit
+  // can only be increased (for stride > 0), but an add overflow might decrease it, or decreased (for stride < 0), but
+  // a sub underflow might increase it. To prevent that, we perform the Sub / Add and Max / Min with long operations.
+  lim0       = new ConvI2LNode(lim0);
+  N          = new ConvI2LNode(N);
+  orig_limit = new ConvI2LNode(orig_limit);
+  _igvn.register_new_node_with_optimizer(lim0);
+  _igvn.register_new_node_with_optimizer(N);
+  _igvn.register_new_node_with_optimizer(orig_limit);
+
   //   substitute back into (1), so that new limit
   //     lim = lim0 + N
   Node* lim;
   if (stride < 0) {
-    lim = new SubINode(lim0, N);
+    lim = new SubLNode(lim0, N);
   } else {
-    lim = new AddINode(lim0, N);
+    lim = new AddLNode(lim0, N);
   }
   _igvn.register_new_node_with_optimizer(lim);
   _phase->set_ctrl(lim, pre_ctrl);
   Node* constrained =
-    (stride > 0) ? (Node*) new MinINode(lim, orig_limit)
-                 : (Node*) new MaxINode(lim, orig_limit);
+    (stride > 0) ? (Node*) new MinLNode(_phase->C, lim, orig_limit)
+                 : (Node*) new MaxLNode(_phase->C, lim, orig_limit);
   _igvn.register_new_node_with_optimizer(constrained);
+
+  // We know that the result is in the int range, there is never truncation
+  constrained = new ConvL2INode(constrained);
+  _igvn.register_new_node_with_optimizer(constrained);
+
   _phase->set_ctrl(constrained, pre_ctrl);
   _igvn.replace_input_of(pre_opaq, 1, constrained);
 }
@@ -3613,16 +3632,16 @@ void SuperWord::align_initial_loop_index(MemNode* align_to_ref) {
 CountedLoopEndNode* SuperWord::find_pre_loop_end(CountedLoopNode* cl) const {
   // The loop cannot be optimized if the graph shape at
   // the loop entry is inappropriate.
-  if (cl->is_canonical_loop_entry() == NULL) {
-    return NULL;
+  if (cl->is_canonical_loop_entry() == nullptr) {
+    return nullptr;
   }
 
   Node* p_f = cl->skip_predicates()->in(0)->in(0);
-  if (!p_f->is_IfFalse()) return NULL;
-  if (!p_f->in(0)->is_CountedLoopEnd()) return NULL;
+  if (!p_f->is_IfFalse()) return nullptr;
+  if (!p_f->in(0)->is_CountedLoopEnd()) return nullptr;
   CountedLoopEndNode* pre_end = p_f->in(0)->as_CountedLoopEnd();
   CountedLoopNode* loop_node = pre_end->loopnode();
-  if (loop_node == NULL || !loop_node->is_pre_loop()) return NULL;
+  if (loop_node == nullptr || !loop_node->is_pre_loop()) return nullptr;
   return pre_end;
 }
 
@@ -3639,11 +3658,11 @@ void SuperWord::init() {
   _iteration_first.clear();
   _iteration_last.clear();
   _node_info.clear();
-  _align_to_ref = NULL;
-  _lpt = NULL;
-  _lp = NULL;
-  _bb = NULL;
-  _iv = NULL;
+  _align_to_ref = nullptr;
+  _lpt = nullptr;
+  _lp = nullptr;
+  _bb = nullptr;
+  _iv = nullptr;
   _race_possible = 0;
   _early_return = false;
   _num_work_vecs = 0;
@@ -3720,9 +3739,13 @@ int SWPointer::Tracer::_depth = 0;
 #endif
 //----------------------------SWPointer------------------------
 SWPointer::SWPointer(MemNode* mem, SuperWord* slp, Node_Stack *nstack, bool analyze_only) :
-  _mem(mem), _slp(slp),  _base(NULL),  _adr(NULL),
-  _scale(0), _offset(0), _invar(NULL), _negate_invar(false),
-  _invar_scale(NULL),
+  _mem(mem), _slp(slp),  _base(nullptr),  _adr(nullptr),
+  _scale(0), _offset(0), _invar(nullptr), _negate_invar(false),
+  _invar_scale(nullptr),
+  _has_int_index_after_convI2L(false),
+  _int_index_after_convI2L_offset(0),
+  _int_index_after_convI2L_invar(nullptr),
+  _int_index_after_convI2L_scale(0),
   _nstack(nstack), _analyze_only(analyze_only),
   _stack_idx(0)
 #ifndef PRODUCT
@@ -3781,6 +3804,11 @@ SWPointer::SWPointer(MemNode* mem, SuperWord* slp, Node_Stack *nstack, bool anal
   NOT_PRODUCT(if(_slp->is_trace_alignment()) _tracer.restore_depth();)
   NOT_PRODUCT(_tracer.ctor_6(mem);)
 
+  if (!is_safe_to_use_as_simple_form(base, adr)) {
+    assert(!valid(), "does not have simple form");
+    return;
+  }
+
   _base = base;
   _adr  = adr;
   assert(valid(), "Usable");
@@ -3789,15 +3817,367 @@ SWPointer::SWPointer(MemNode* mem, SuperWord* slp, Node_Stack *nstack, bool anal
 // Following is used to create a temporary object during
 // the pattern match of an address expression.
 SWPointer::SWPointer(SWPointer* p) :
-  _mem(p->_mem), _slp(p->_slp),  _base(NULL),  _adr(NULL),
-  _scale(0), _offset(0), _invar(NULL), _negate_invar(false),
-  _invar_scale(NULL),
+  _mem(p->_mem), _slp(p->_slp),  _base(nullptr),  _adr(nullptr),
+  _scale(0), _offset(0), _invar(nullptr), _negate_invar(false),
+  _invar_scale(nullptr),
+  _has_int_index_after_convI2L(false),
+  _int_index_after_convI2L_offset(0),
+  _int_index_after_convI2L_invar(nullptr),
+  _int_index_after_convI2L_scale(0),
   _nstack(p->_nstack), _analyze_only(p->_analyze_only),
   _stack_idx(p->_stack_idx)
   #ifndef PRODUCT
   , _tracer(p->_slp)
   #endif
 {}
+
+// We would like to make decisions about aliasing (i.e. removing memory edges) and adjacency
+// (i.e. which loads/stores can be packed) based on the simple form:
+//
+//   s_pointer = adr + offset + invar + scale * ConvI2L(iv)
+//
+// However, we parse the compound-long-int form:
+//
+//   c_pointer = adr + long_offset + long_invar + long_scale * ConvI2L(int_index)
+//   int_index =       int_offset  + int_invar  + int_scale  * iv
+//
+// In general, the simple and the compound-long-int form do not always compute the same pointer
+// at runtime. For example, the simple form would give a different result due to an overflow
+// in the int_index.
+//
+// Example:
+//   For both forms, we have:
+//     iv = 0
+//     scale = 1
+//
+//   We now account the offset and invar once to the long part and once to the int part:
+//     Pointer 1 (long offset and long invar):
+//       long_offset = min_int
+//       long_invar  = min_int
+//       int_offset  = 0
+//       int_invar   = 0
+//
+//     Pointer 2 (int offset and int invar):
+//       long_offset = 0
+//       long_invar  = 0
+//       int_offset  = min_int
+//       int_invar   = min_int
+//
+//   This gives us the following pointers:
+//     Compound-long-int form pointers:
+//       Form:
+//         c_pointer   = adr + long_offset + long_invar + long_scale * ConvI2L(int_offset + int_invar + int_scale * iv)
+//
+//       Pointers:
+//         c_pointer1  = adr + min_int     + min_int    + 1          * ConvI2L(0          + 0         + 1         * 0)
+//                     = adr + min_int + min_int
+//                     = adr - 2^32
+//
+//         c_pointer2  = adr + 0           + 0          + 1          * ConvI2L(min_int    + min_int   + 1         * 0)
+//                     = adr + ConvI2L(min_int + min_int)
+//                     = adr + 0
+//                     = adr
+//
+//     Simple form pointers:
+//       Form:
+//         s_pointer  = adr + offset                     + invar                     + scale                    * ConvI2L(iv)
+//         s_pointer  = adr + (long_offset + int_offset) + (long_invar  + int_invar) + (long_scale * int_scale) * ConvI2L(iv)
+//
+//       Pointers:
+//         s_pointer1 = adr + (min_int     + 0         ) + (min_int     + 0        ) + 1                        * 0
+//                    = adr + min_int + min_int
+//                    = adr - 2^32
+//         s_pointer2 = adr + (0           + min_int   ) + (0           + min_int  ) + 1                        * 0
+//                    = adr + min_int + min_int
+//                    = adr - 2^32
+//
+//   We see that the two addresses are actually 2^32 bytes apart (derived from the c_pointers), but their simple form look identical.
+//
+// Hence, we need to determine in which cases it is safe to make decisions based on the simple
+// form, rather than the compound-long-int form. If we cannot prove that using the simple form
+// is safe (i.e. equivalent to the compound-long-int form), then we do not get a valid SWPointer,
+// and the associated memop cannot be vectorized.
+bool SWPointer::is_safe_to_use_as_simple_form(Node* base, Node* adr) const {
+#ifndef _LP64
+  // On 32-bit platforms, there is never an explicit int_index with ConvI2L for the iv. Thus, the
+  // parsed pointer form is always the simple form, with int operations:
+  //
+  //   pointer = adr + offset + invar + scale * iv
+  //
+  assert(!_has_int_index_after_convI2L, "32-bit never has an int_index with ConvI2L for the iv");
+  return true;
+#else
+
+  // Array accesses that are not Unsafe always have a RangeCheck which ensures that there is no
+  // int_index overflow. This implies that the conversion to long can be done separately:
+  //
+  //   ConvI2L(int_index) = ConvI2L(int_offset) + ConvI2L(int_invar) + ConvI2L(scale) * ConvI2L(iv)
+  //
+  // And hence, the simple form is guaranteed to be identical to the compound-long-int form at
+  // runtime and the SWPointer is safe/valid to be used.
+  const TypeAryPtr* ary_ptr_t = _mem->adr_type()->isa_aryptr();
+  if (ary_ptr_t != nullptr) {
+    if (!_mem->is_unsafe_access()) {
+      return true;
+    }
+  }
+
+  // We did not find the int_index. Just to be safe, reject this SWPointer.
+  if (!_has_int_index_after_convI2L) {
+    return false;
+  }
+
+  int int_offset  = _int_index_after_convI2L_offset;
+  Node* int_invar = _int_index_after_convI2L_invar;
+  int int_scale   = _int_index_after_convI2L_scale;
+  int long_scale  = _scale / int_scale;
+
+  // If "int_index = iv", then the simple form is identical to the compound-long-int form.
+  //
+  //   int_index = int_offset + int_invar + int_scale * iv
+  //             = 0            0           1         * iv
+  //             =                                      iv
+  if (int_offset == 0 && int_invar == nullptr && int_scale == 1) {
+    return true;
+  }
+
+  // Intuition: What happens if the int_index overflows? Let us look at two pointers on the "overflow edge":
+  //
+  //              pointer1 = adr + ConvI2L(int_index1)
+  //              pointer2 = adr + ConvI2L(int_index2)
+  //
+  //              int_index1 = max_int + 0 = max_int  -> very close to but before the overflow
+  //              int_index2 = max_int + 1 = min_int  -> just enough to get the overflow
+  //
+  //            When looking at the difference of pointer1 and pointer2, we notice that it is very large
+  //            (almost 2^32). Since arrays have at most 2^31 elements, chances are high that pointer2 is
+  //            an actual out-of-bounds access at runtime. These would normally be prevented by range checks
+  //            at runtime. However, if the access was done by using Unsafe, where range checks are omitted,
+  //            then an out-of-bounds access constitutes undefined behavior. This means that we are allowed to
+  //            do anything, including changing the behavior.
+  //
+  //            If we can set the right conditions, we have a guarantee that an overflow is either impossible
+  //            (no overflow or range checks preventing that) or undefined behavior. In both cases, we are
+  //            safe to do a vectorization.
+  //
+  // Approach:  We want to prove a lower bound for the distance between these two pointers, and an
+  //            upper bound for the size of a memory object. We can derive such an upper bound for
+  //            arrays. We know they have at most 2^31 elements. If we know the size of the elements
+  //            in bytes, we have:
+  //
+  //              array_element_size_in_bytes * 2^31 >= max_possible_array_size_in_bytes
+  //                                                 >= array_size_in_bytes                      (ARR)
+  //
+  //            If some small difference "delta" leads to an int_index overflow, we know that the
+  //            int_index1 before overflow must have been close to max_int, and the int_index2 after
+  //            the overflow must be close to min_int:
+  //
+  //              pointer1 =        adr + long_offset + long_invar + long_scale * ConvI2L(int_index1)
+  //                       =approx  adr + long_offset + long_invar + long_scale * max_int
+  //
+  //              pointer2 =        adr + long_offset + long_invar + long_scale * ConvI2L(int_index2)
+  //                       =approx  adr + long_offset + long_invar + long_scale * min_int
+  //
+  //            We realize that the pointer difference is very large:
+  //
+  //              difference =approx  long_scale * 2^32
+  //
+  //            Hence, if we set the right condition for long_scale and array_element_size_in_bytes,
+  //            we can prove that an overflow is impossible (or would imply undefined behaviour).
+  //
+  // We must now take this intuition, and develop a rigorous proof. We start by stating the problem
+  // more precisely, with the help of some definitions and the Statement we are going to prove.
+  //
+  // Definition:
+  //   Two SWPointers are "comparable" (i.e. SWPointer::comparable is true, set with SWPointer::cmp()),
+  //   iff all of these conditions apply for the simple form:
+  //     1) Both SWPointers are valid.
+  //     2) The adr are identical, or both are array bases of different arrays.
+  //     3) They have identical scale.
+  //     4) They have identical invar.
+  //     5) The difference in offsets is limited: abs(offset1 - offset2) < 2^31.                 (DIFF)
+  //
+  // For the Vectorization Optimization, we pair-wise compare SWPointers and determine if they are:
+  //   1) "not comparable":
+  //        We do not optimize them (assume they alias, not assume adjacency).
+  //
+  //        Whenever we chose this option based on the simple form, it is also correct based on the
+  //        compound-long-int form, since we make no optimizations based on it.
+  //
+  //   2) "comparable" with different array bases at runtime:
+  //        We assume they do not alias (remove memory edges), but not assume adjacency.
+  //
+  //        Whenever we have two different array bases for the simple form, we also have different
+  //        array bases for the compound-long-form. Since SWPointers provably point to different
+  //        memory objects, they can never alias.
+  //
+  //   3) "comparable" with the same base address:
+  //        We compute the relative pointer difference, and based on the load/store size we can
+  //        compute aliasing and adjacency.
+  //
+  //        We must find a condition under which the pointer difference of the simple form is
+  //        identical to the pointer difference of the compound-long-form. We do this with the
+  //        Statement below, which we then proceed to prove.
+  //
+  // Statement:
+  //   If two SWPointers satisfy these 3 conditions:
+  //     1) They are "comparable".
+  //     2) They have the same base address.
+  //     3) Their long_scale is a multiple of the array element size in bytes:
+  //
+  //          abs(long_scale) % array_element_size_in_bytes = 0                                     (A)
+  //
+  //   Then their pointer difference of the simple form is identical to the pointer difference
+  //   of the compound-long-int form.
+  //
+  //   More precisely:
+  //     Such two SWPointers by definition have identical adr, invar, and scale.
+  //     Their simple form is:
+  //
+  //       s_pointer1 = adr + offset1 + invar + scale * ConvI2L(iv)                                 (B1)
+  //       s_pointer2 = adr + offset2 + invar + scale * ConvI2L(iv)                                 (B2)
+  //
+  //     Thus, the pointer difference of the simple forms collapses to the difference in offsets:
+  //
+  //       s_difference = s_pointer1 - s_pointer2 = offset1 - offset2                               (C)
+  //
+  //     Their compound-long-int form for these SWPointer is:
+  //
+  //       c_pointer1 = adr + long_offset1 + long_invar1 + long_scale1 * ConvI2L(int_index1)        (D1)
+  //       int_index1 = int_offset1 + int_invar1 + int_scale1 * iv                                  (D2)
+  //
+  //       c_pointer2 = adr + long_offset2 + long_invar2 + long_scale2 * ConvI2L(int_index2)        (D3)
+  //       int_index2 = int_offset2 + int_invar2 + int_scale2 * iv                                  (D4)
+  //
+  //     And these are the offset1, offset2, invar and scale from the simple form (B1) and (B2):
+  //
+  //       offset1 = long_offset1 + long_scale1 * ConvI2L(int_offset1)                              (D5)
+  //       offset2 = long_offset2 + long_scale2 * ConvI2L(int_offset2)                              (D6)
+  //
+  //       invar   = long_invar1 + long_scale1 * ConvI2L(int_invar1)
+  //               = long_invar2 + long_scale2 * ConvI2L(int_invar2)                                (D7)
+  //
+  //       scale   = long_scale1 * ConvI2L(int_scale1)
+  //               = long_scale2 * ConvI2L(int_scale2)                                              (D8)
+  //
+  //     The pointer difference of the compound-long-int form is defined as:
+  //
+  //       c_difference = c_pointer1 - c_pointer2
+  //
+  //   Thus, the statement claims that for the two SWPointer we have:
+  //
+  //     s_difference = c_difference                                                                (Statement)
+  //
+  // We prove the Statement with the help of a Lemma:
+  //
+  // Lemma:
+  //   There is some integer x, such that:
+  //
+  //     c_difference = s_difference + array_element_size_in_bytes * x * 2^32                       (Lemma)
+  //
+  // From condition (DIFF), we can derive:
+  //
+  //   abs(s_difference) < 2^31                                                                     (E)
+  //
+  // Assuming the Lemma, we prove the Statement:
+  //   If "x = 0" (intuitively: the int_index does not overflow), then:
+  //     c_difference = s_difference
+  //     and hence the simple form computes the same pointer difference as the compound-long-int form.
+  //   If "x != 0" (intuitively: the int_index overflows), then:
+  //     abs(c_difference) >= abs(s_difference + array_element_size_in_bytes * x * 2^32)
+  //                       >= array_element_size_in_bytes * 2^32 - abs(s_difference)
+  //                                                               --  apply (E)  --
+  //                       >  array_element_size_in_bytes * 2^32 - 2^31
+  //                       >= array_element_size_in_bytes * 2^31
+  //                              --  apply (ARR)  --
+  //                       >= max_possible_array_size_in_bytes
+  //                       >= array_size_in_bytes
+  //
+  //     This shows that c_pointer1 and c_pointer2 have a distance that exceeds the maximum array size.
+  //     Thus, at least one of the two pointers must be outside of the array bounds. But we can assume
+  //     that out-of-bounds accesses do not happen. If they still do, it is undefined behavior. Hence,
+  //     we are allowed to do anything. We can also "safely" use the simple form in this case even though
+  //     it might not match the compound-long-int form at runtime.
+  // QED Statement.
+  //
+  // We must now prove the Lemma.
+  //
+  // ConvI2L always truncates by some power of 2^32, i.e. there is some integer y such that:
+  //
+  //   ConvI2L(y1 + y2) = ConvI2L(y1) + ConvI2L(y2) + 2^32 * y                                  (F)
+  //
+  // It follows, that there is an integer y1 such that:
+  //
+  //   ConvI2L(int_index1) =  ConvI2L(int_offset1 + int_invar1 + int_scale1 * iv)
+  //                          -- apply (F) --
+  //                       =  ConvI2L(int_offset1)
+  //                        + ConvI2L(int_invar1)
+  //                        + ConvI2L(int_scale1) * ConvI2L(iv)
+  //                        + y1 * 2^32                                                         (G)
+  //
+  // Thus, we can write the compound-long-int form (D1) as:
+  //
+  //   c_pointer1 =   adr + long_offset1 + long_invar1 + long_scale1 * ConvI2L(int_index1)
+  //                  -- apply (G) --
+  //              =   adr
+  //                + long_offset1
+  //                + long_invar1
+  //                + long_scale1 * ConvI2L(int_offset1)
+  //                + long_scale1 * ConvI2L(int_invar1)
+  //                + long_scale1 * ConvI2L(int_scale1) * ConvI2L(iv)
+  //                + long_scale1 * y1 * 2^32                                                    (H)
+  //
+  // And we can write the simple form as:
+  //
+  //   s_pointer1 =   adr + offset1 + invar + scale * ConvI2L(iv)
+  //                  -- apply (D5, D7, D8) --
+  //              =   adr
+  //                + long_offset1
+  //                + long_scale1 * ConvI2L(int_offset1)
+  //                + long_invar1
+  //                + long_scale1 * ConvI2L(int_invar1)
+  //                + long_scale1 * ConvI2L(int_scale1) * ConvI2L(iv)                            (K)
+  //
+  // We now compute the pointer difference between the simple (K) and compound-long-int form (H).
+  // Most terms cancel out immediately:
+  //
+  //   sc_difference1 = c_pointer1 - s_pointer1 = long_scale1 * y1 * 2^32                        (L)
+  //
+  // Rearranging the equation (L), we get:
+  //
+  //   c_pointer1 = s_pointer1 + long_scale1 * y1 * 2^32                                         (M)
+  //
+  // And since long_scale1 is a multiple of array_element_size_in_bytes, there is some integer
+  // x1, such that (M) implies:
+  //
+  //   c_pointer1 = s_pointer1 + array_element_size_in_bytes * x1 * 2^32                         (N)
+  //
+  // With an analogue equation for c_pointer2, we can now compute the pointer difference for
+  // the compound-long-int form:
+  //
+  //   c_difference =  c_pointer1 - c_pointer2
+  //                   -- apply (N) --
+  //                =  s_pointer1 + array_element_size_in_bytes * x1 * 2^32
+  //                 -(s_pointer2 + array_element_size_in_bytes * x2 * 2^32)
+  //                   -- where "x = x1 - x2" --
+  //                =  s_pointer1 - s_pointer2 + array_element_size_in_bytes * x * 2^32
+  //                   -- apply (C) --
+  //                =  s_difference            + array_element_size_in_bytes * x * 2^32
+  // QED Lemma.
+  if (ary_ptr_t != nullptr) {
+    BasicType array_element_bt = ary_ptr_t->elem()->array_element_basic_type();
+    if (is_java_primitive(array_element_bt)) {
+      int array_element_size_in_bytes = type2aelembytes(array_element_bt);
+      if (abs(long_scale) % array_element_size_in_bytes == 0) {
+        return true;
+      }
+    }
+  }
+
+  // General case: we do not know if it is safe to use the simple form.
+  return false;
+#endif
+}
 
 bool SWPointer::is_main_loop_member(Node* n) const {
   Node* n_c = phase()->get_ctrl(n);
@@ -3848,11 +4228,42 @@ bool SWPointer::scaled_iv_plus_offset(Node* n) {
     }
   } else if (opc == Op_SubI) {
     if (offset_plus_k(n->in(2), true) && scaled_iv_plus_offset(n->in(1))) {
+      // (offset1 + invar1 + scale * iv) - (offset2) or
+      // (offset1 + scale * iv) - (offset2 + invar1)
+      // Subtraction handled via "negate" flag of "offset_plus_k".
       NOT_PRODUCT(_tracer.scaled_iv_plus_offset_6(n);)
       return true;
     }
-    if (offset_plus_k(n->in(1)) && scaled_iv_plus_offset(n->in(2))) {
-      _scale *= -1;
+    SWPointer tmp(this);
+    if (offset_plus_k(n->in(1)) && tmp.scaled_iv_plus_offset(n->in(2))) {
+      // (offset1 + invar1) - (offset2 + scale * iv) or
+      // (offset1) - (offset2 + invar1 + scale * iv)
+      // Subtraction handled explicitly below.
+      assert(_scale == 0, "shouldn't be set yet");
+      // _scale = -tmp._scale
+      if (!try_MulI_no_overflow(-1, tmp._scale, _scale)) {
+        return false; // mul overflow.
+      }
+      // _offset -= tmp._offset
+      if (!try_SubI_no_overflow(_offset, tmp._offset, _offset)) {
+        return false; // sub overflow.
+      }
+      // _invar -= tmp._invar
+      if (tmp._invar != nullptr) {
+        if (_invar != nullptr) {
+          return false;
+        }
+        _invar = tmp._invar;
+        _invar_scale = tmp._invar_scale;
+        _negate_invar = !tmp._negate_invar;
+      }
+
+      // SWPointer tmp does not have an integer part to be forwarded
+      // (tmp._has_int_index_after_convI2L is false) because n is a SubI, all
+      // nodes above must also be of integer type (ConvL2I is not handled
+      // to allow a long) and ConvI2L (the only node that can add an integer
+      // part) won't be present.
+
       NOT_PRODUCT(_tracer.scaled_iv_plus_offset_7(n);)
       return true;
     }
@@ -3895,8 +4306,55 @@ bool SWPointer::scaled_iv(Node* n) {
     }
   } else if (opc == Op_LShiftI) {
     if (n->in(1) == iv() && n->in(2)->is_Con()) {
-      _scale = 1 << n->in(2)->get_int();
+      if (!try_LShiftI_no_overflow(1, n->in(2)->get_int(), _scale)) {
+        return false; // shift overflow.
+      }
       NOT_PRODUCT(_tracer.scaled_iv_6(n, _scale);)
+      return true;
+    }
+  } else if (opc == Op_ConvI2L && !has_iv()) {
+    // So far we have not found the iv yet, and are about to enter a ConvI2L subgraph,
+    // which may be the int index (that might overflow) for the memory access, of the form:
+    //
+    //   int_index = int_offset + int_invar + int_scale * iv
+    //
+    // If we simply continue parsing with the current SWPointer, then the int_offset and
+    // int_invar simply get added to the long offset and invar. But for the checks in
+    // SWPointer::is_safe_to_use_as_simple_form() we need to have explicit access to the
+    // int_index. Thus, we must parse it explicitly here. For this, we use a temporary
+    // SWPointer, to pattern match the int_index sub-expression of the address.
+
+    NOT_PRODUCT(Tracer::Depth dddd;)
+    SWPointer tmp(this);
+    NOT_PRODUCT(_tracer.scaled_iv_8(n, &tmp);)
+
+    if (tmp.scaled_iv_plus_offset(n->in(1)) && tmp.has_iv()) {
+      // We successfully matched an integer index, of the form:
+      //   int_index = int_offset + int_invar + int_scale * iv
+      // Forward scale.
+      assert(_scale == 0 && tmp._scale != 0, "iv only found just now");
+      _scale = tmp._scale;
+      // Accumulate offset.
+      if (!try_AddI_no_overflow(_offset, tmp._offset, _offset)) {
+        return false; // add overflow.
+      }
+      // Forward invariant if not already found.
+      if (tmp._invar != nullptr) {
+        if (_invar != nullptr) {
+          return false;
+        }
+        _invar = tmp._invar;
+        _invar_scale = tmp._invar_scale;
+        _negate_invar = tmp._negate_invar;
+      }
+      // Set info about the int_index:
+      assert(!_has_int_index_after_convI2L, "no previous int_index discovered");
+      _has_int_index_after_convI2L = true;
+      _int_index_after_convI2L_offset = tmp._offset;
+      _int_index_after_convI2L_invar  = tmp._invar;
+      _int_index_after_convI2L_scale  = tmp._scale;
+
+      NOT_PRODUCT(_tracer.scaled_iv_7(n);)
       return true;
     }
   } else if (opc == Op_ConvI2L || opc == Op_CastII) {
@@ -3905,7 +4363,7 @@ bool SWPointer::scaled_iv(Node* n) {
       return true;
     }
   } else if (opc == Op_LShiftL && n->in(2)->is_Con()) {
-    if (!has_iv() && _invar == NULL) {
+    if (!has_iv() && _invar == nullptr) {
       // Need to preserve the current _offset value, so
       // create a temporary object for this expression subtree.
       // Hacky, so should re-engineer the address pattern match.
@@ -3914,14 +4372,33 @@ bool SWPointer::scaled_iv(Node* n) {
       NOT_PRODUCT(_tracer.scaled_iv_8(n, &tmp);)
 
       if (tmp.scaled_iv_plus_offset(n->in(1))) {
-        int scale = n->in(2)->get_int();
-        _scale   = tmp._scale  << scale;
-        _offset += tmp._offset << scale;
+        int shift = n->in(2)->get_int();
+        // Accumulate scale.
+        if (!try_LShiftI_no_overflow(tmp._scale, shift, _scale)) {
+          return false; // shift overflow.
+        }
+        // Accumulate offset.
+        int shifted_offset = 0;
+        if (!try_LShiftI_no_overflow(tmp._offset, shift, shifted_offset)) {
+          return false; // shift overflow.
+        }
+        if (!try_AddI_no_overflow(_offset, shifted_offset, _offset)) {
+          return false; // add overflow.
+        }
+        // Accumulate invar.
         _invar = tmp._invar;
-        if (_invar != NULL) {
+        if (_invar != nullptr) {
           _negate_invar = tmp._negate_invar;
           _invar_scale = n->in(2);
         }
+
+        // Forward info about the int_index:
+        assert(!_has_int_index_after_convI2L, "no previous int_index discovered");
+        _has_int_index_after_convI2L = tmp._has_int_index_after_convI2L;
+        _int_index_after_convI2L_offset = tmp._int_index_after_convI2L_offset;
+        _int_index_after_convI2L_invar  = tmp._int_index_after_convI2L_invar;
+        _int_index_after_convI2L_scale  = tmp._int_index_after_convI2L_scale;
+
         NOT_PRODUCT(_tracer.scaled_iv_9(n, _scale, _offset, _invar, _negate_invar);)
         return true;
       }
@@ -3940,7 +4417,9 @@ bool SWPointer::offset_plus_k(Node* n, bool negate) {
 
   int opc = n->Opcode();
   if (opc == Op_ConI) {
-    _offset += negate ? -(n->get_int()) : n->get_int();
+    if (!try_AddSubI_no_overflow(_offset, n->get_int(), negate, _offset)) {
+      return false; // add/sub overflow.
+    }
     NOT_PRODUCT(_tracer.offset_plus_k_2(n, _offset);)
     return true;
   } else if (opc == Op_ConL) {
@@ -3949,14 +4428,16 @@ bool SWPointer::offset_plus_k(Node* n, bool negate) {
     if (t->higher_equal(TypeLong::INT)) {
       jlong loff = n->get_long();
       jint  off  = (jint)loff;
-      _offset += negate ? -off : loff;
+      if (!try_AddSubI_no_overflow(_offset, off, negate, _offset)) {
+        return false; // add/sub overflow.
+      }
       NOT_PRODUCT(_tracer.offset_plus_k_3(n, _offset);)
       return true;
     }
     NOT_PRODUCT(_tracer.offset_plus_k_4(n);)
     return false;
   }
-  if (_invar != NULL) { // already has an invariant
+  if (_invar != nullptr) { // already has an invariant
     NOT_PRODUCT(_tracer.offset_plus_k_5(n, _invar);)
     return false;
   }
@@ -3968,11 +4449,15 @@ bool SWPointer::offset_plus_k(Node* n, bool negate) {
     if (n->in(2)->is_Con() && invariant(n->in(1))) {
       _negate_invar = negate;
       _invar = n->in(1);
-      _offset += negate ? -(n->in(2)->get_int()) : n->in(2)->get_int();
+      if (!try_AddSubI_no_overflow(_offset, n->in(2)->get_int(), negate, _offset)) {
+        return false; // add/sub overflow.
+      }
       NOT_PRODUCT(_tracer.offset_plus_k_6(n, _invar, _negate_invar, _offset);)
       return true;
     } else if (n->in(1)->is_Con() && invariant(n->in(2))) {
-      _offset += negate ? -(n->in(1)->get_int()) : n->in(1)->get_int();
+      if (!try_AddSubI_no_overflow(_offset, n->in(1)->get_int(), negate, _offset)) {
+        return false; // add/sub overflow.
+      }
       _negate_invar = negate;
       _invar = n->in(2);
       NOT_PRODUCT(_tracer.offset_plus_k_7(n, _invar, _negate_invar, _offset);)
@@ -3983,11 +4468,15 @@ bool SWPointer::offset_plus_k(Node* n, bool negate) {
     if (n->in(2)->is_Con() && invariant(n->in(1))) {
       _negate_invar = negate;
       _invar = n->in(1);
-      _offset += !negate ? -(n->in(2)->get_int()) : n->in(2)->get_int();
+      if (!try_AddSubI_no_overflow(_offset, n->in(2)->get_int(), !negate, _offset)) {
+        return false; // add/sub overflow.
+      }
       NOT_PRODUCT(_tracer.offset_plus_k_8(n, _invar, _negate_invar, _offset);)
       return true;
     } else if (n->in(1)->is_Con() && invariant(n->in(2))) {
-      _offset += negate ? -(n->in(1)->get_int()) : n->in(1)->get_int();
+      if (!try_AddSubI_no_overflow(_offset, n->in(1)->get_int(), negate, _offset)) {
+        return false; // add/sub overflow.
+      }
       _negate_invar = !negate;
       _invar = n->in(2);
       NOT_PRODUCT(_tracer.offset_plus_k_9(n, _invar, _negate_invar, _offset);)
@@ -4018,14 +4507,65 @@ bool SWPointer::offset_plus_k(Node* n, bool negate) {
   return false;
 }
 
+bool SWPointer::try_AddI_no_overflow(int offset1, int offset2, int& result) {
+  jlong long_offset = java_add((jlong)(offset1), (jlong)(offset2));
+  jint  int_offset  = java_add((jint)(offset1), (jint)(offset2));
+  if (long_offset != int_offset) {
+    return false;
+  }
+  result = int_offset;
+  return true;
+}
+
+bool SWPointer::try_SubI_no_overflow(int offset1, int offset2, int& result) {
+  jlong long_offset = java_subtract((jlong)(offset1), (jlong)(offset2));
+  jint  int_offset  = java_subtract((jint)(offset1), (jint)(offset2));
+  if (long_offset != int_offset) {
+    return false;
+  }
+  result = int_offset;
+  return true;
+}
+
+bool SWPointer::try_AddSubI_no_overflow(int offset1, int offset2, bool is_sub, int& result) {
+  if (is_sub) {
+    return try_SubI_no_overflow(offset1, offset2, result);
+  } else {
+    return try_AddI_no_overflow(offset1, offset2, result);
+  }
+}
+
+bool SWPointer::try_LShiftI_no_overflow(int offset, int shift, int& result) {
+  if (shift < 0 || shift > 31) {
+    return false;
+  }
+  jlong long_offset = java_shift_left((jlong)(offset), (julong)((jlong)(shift)));
+  jint  int_offset  = java_shift_left((jint)(offset), (juint)((jint)(shift)));
+  if (long_offset != int_offset) {
+    return false;
+  }
+  result = int_offset;
+  return true;
+}
+
+bool SWPointer::try_MulI_no_overflow(int offset1, int offset2, int& result) {
+  jlong long_offset = java_multiply((jlong)(offset1), (jlong)(offset2));
+  jint  int_offset  = java_multiply((jint)(offset1), (jint)(offset2));
+  if (long_offset != int_offset) {
+    return false;
+  }
+  result = int_offset;
+  return true;
+}
+
 //----------------------------print------------------------
 void SWPointer::print() {
 #ifndef PRODUCT
   tty->print("base: [%d]  adr: [%d]  scale: %d  offset: %d",
-             _base != NULL ? _base->_idx : 0,
-             _adr  != NULL ? _adr->_idx  : 0,
+             _base != nullptr ? _base->_idx : 0,
+             _adr  != nullptr ? _adr->_idx  : 0,
              _scale, _offset);
-  if (_invar != NULL) {
+  if (_invar != nullptr) {
     tty->print("  invar: %c[%d] << [%d]", _negate_invar?'-':'+', _invar->_idx, _invar_scale->_idx);
   }
   tty->cr();
@@ -4221,13 +4761,13 @@ void SWPointer::Tracer::scaled_iv_9(Node* n, int scale, int offset, Node* invar,
     print_depth(); tty->print_cr(" %d SWPointer::scaled_iv: Op_LShiftL PASSED, setting _scale = %d, _offset = %d", n->_idx, scale, offset);
     print_depth(); tty->print_cr("  \\ SWPointer::scaled_iv: in(1) [%d] is scaled_iv_plus_offset, in(2) [%d] used to scale: _scale = %d, _offset = %d",
     n->in(1)->_idx, n->in(2)->_idx, scale, offset);
-    if (invar != NULL) {
+    if (invar != nullptr) {
       print_depth(); tty->print_cr("  \\ SWPointer::scaled_iv: scaled invariant: %c[%d]", (negate_invar?'-':'+'), invar->_idx);
     }
     inc_depth(); inc_depth();
     print_depth(); n->in(1)->dump();
     print_depth(); n->in(2)->dump();
-    if (invar != NULL) {
+    if (invar != nullptr) {
       print_depth(); invar->dump();
     }
     dec_depth(); dec_depth();
@@ -4268,7 +4808,7 @@ void SWPointer::Tracer::offset_plus_k_4(Node* n) {
 void SWPointer::Tracer::offset_plus_k_5(Node* n, Node* _invar) {
   if(_slp->is_trace_alignment()) {
     print_depth(); tty->print_cr(" %d SWPointer::offset_plus_k: FAILED since another invariant has been detected before", n->_idx);
-    print_depth(); tty->print("  \\ %d SWPointer::offset_plus_k: _invar != NULL: ", _invar->_idx); _invar->dump();
+    print_depth(); tty->print("  \\ %d SWPointer::offset_plus_k: _invar is not null: ", _invar->_idx); _invar->dump();
   }
 }
 
@@ -4336,8 +4876,8 @@ const SWNodeInfo SWNodeInfo::initial;
 // Make a new dependence graph node for an ideal node.
 DepMem* DepGraph::make_node(Node* node) {
   DepMem* m = new (_arena) DepMem(node);
-  if (node != NULL) {
-    assert(_map.at_grow(node->_idx) == NULL, "one init only");
+  if (node != nullptr) {
+    assert(_map.at_grow(node->_idx) == nullptr, "one init only");
     _map.at_put_grow(node->_idx, m);
   }
   return m;
@@ -4357,14 +4897,14 @@ DepEdge* DepGraph::make_edge(DepMem* dpred, DepMem* dsucc) {
 //------------------------------in_cnt---------------------------
 int DepMem::in_cnt() {
   int ct = 0;
-  for (DepEdge* e = _in_head; e != NULL; e = e->next_in()) ct++;
+  for (DepEdge* e = _in_head; e != nullptr; e = e->next_in()) ct++;
   return ct;
 }
 
 //------------------------------out_cnt---------------------------
 int DepMem::out_cnt() {
   int ct = 0;
-  for (DepEdge* e = _out_head; e != NULL; e = e->next_out()) ct++;
+  for (DepEdge* e = _out_head; e != nullptr; e = e->next_out()) ct++;
   return ct;
 }
 
@@ -4372,14 +4912,14 @@ int DepMem::out_cnt() {
 void DepMem::print() {
 #ifndef PRODUCT
   tty->print("  DepNode %d (", _node->_idx);
-  for (DepEdge* p = _in_head; p != NULL; p = p->next_in()) {
+  for (DepEdge* p = _in_head; p != nullptr; p = p->next_in()) {
     Node* pred = p->pred()->node();
-    tty->print(" %d", pred != NULL ? pred->_idx : 0);
+    tty->print(" %d", pred != nullptr ? pred->_idx : 0);
   }
   tty->print(") [");
-  for (DepEdge* s = _out_head; s != NULL; s = s->next_out()) {
+  for (DepEdge* s = _out_head; s != nullptr; s = s->next_out()) {
     Node* succ = s->succ()->node();
-    tty->print(" %d", succ != NULL ? succ->_idx : 0);
+    tty->print(" %d", succ != nullptr ? succ->_idx : 0);
   }
   tty->print_cr(" ]");
 #endif
@@ -4412,14 +4952,14 @@ DepPreds::DepPreds(Node* n, DepGraph& dg) {
   } else {
     _next_idx = 1;
     _end_idx  = _n->req();
-    _dep_next = NULL;
+    _dep_next = nullptr;
   }
   next();
 }
 
 //------------------------------next---------------------------
 void DepPreds::next() {
-  if (_dep_next != NULL) {
+  if (_dep_next != nullptr) {
     _current  = _dep_next->pred()->node();
     _dep_next = _dep_next->next_in();
   } else if (_next_idx < _end_idx) {
@@ -4447,14 +4987,14 @@ DepSuccs::DepSuccs(Node* n, DepGraph& dg) {
   } else {
     _next_idx = 0;
     _end_idx  = _n->outcnt();
-    _dep_next = NULL;
+    _dep_next = nullptr;
   }
   next();
 }
 
 //-------------------------------next---------------------------
 void DepSuccs::next() {
-  if (_dep_next != NULL) {
+  if (_dep_next != nullptr) {
     _current  = _dep_next->succ()->node();
     _dep_next = _dep_next->next_out();
   } else if (_next_idx < _end_idx) {
@@ -4468,10 +5008,10 @@ void DepSuccs::next() {
 // --------------------------------- vectorization/simd -----------------------------------
 //
 bool SuperWord::same_origin_idx(Node* a, Node* b) const {
-  return a != NULL && b != NULL && _clone_map.same_idx(a->_idx, b->_idx);
+  return a != nullptr && b != nullptr && _clone_map.same_idx(a->_idx, b->_idx);
 }
 bool SuperWord::same_generation(Node* a, Node* b) const {
-  return a != NULL && b != NULL && _clone_map.same_gen(a->_idx, b->_idx);
+  return a != nullptr && b != nullptr && _clone_map.same_gen(a->_idx, b->_idx);
 }
 
 Node*  SuperWord::find_phi_for_mem_dep(LoadNode* ld) {
@@ -4483,7 +5023,7 @@ Node*  SuperWord::find_phi_for_mem_dep(LoadNode* ld) {
         _clone_map.gen(ld->_idx));
     }
 #endif
-    return NULL; //we think that any ld in the first gen being vectorizable
+    return nullptr; //we think that any ld in the first gen being vectorizable
   }
 
   Node* mem = ld->in(MemNode::Memory);
@@ -4497,7 +5037,7 @@ Node*  SuperWord::find_phi_for_mem_dep(LoadNode* ld) {
       mem->dump();
     }
 #endif
-    return NULL;
+    return nullptr;
   }
   if (!in_bb(mem) || same_generation(mem, ld)) {
 #ifndef PRODUCT
@@ -4506,7 +5046,7 @@ Node*  SuperWord::find_phi_for_mem_dep(LoadNode* ld) {
         _clone_map.gen(mem->_idx));
     }
 #endif
-    return NULL; // does not depend on loop volatile node or depends on the same generation
+    return nullptr; // does not depend on loop volatile node or depends on the same generation
   }
 
   //otherwise first node should depend on mem-phi
@@ -4521,7 +5061,7 @@ Node*  SuperWord::find_phi_for_mem_dep(LoadNode* ld) {
       first->dump();
     }
 #endif
-    return NULL;
+    return nullptr;
   }
 
   Node* tail = 0;
@@ -4539,7 +5079,7 @@ Node*  SuperWord::find_phi_for_mem_dep(LoadNode* ld) {
       phi->dump();
     }
 #endif
-    return NULL;
+    return nullptr;
   }
 
   // now all conditions are met
@@ -4586,7 +5126,7 @@ Node* SuperWord::last_node(Node* nd) {
 }
 
 int SuperWord::mark_generations() {
-  Node *ii_err = NULL, *tail_err = NULL;
+  Node *ii_err = nullptr, *tail_err = nullptr;
   for (int i = 0; i < _mem_slice_head.length(); i++) {
     Node* phi  = _mem_slice_head.at(i);
     assert(phi->is_Phi(), "must be phi");
@@ -4849,7 +5389,7 @@ bool SuperWord::hoist_loads_in_graph() {
   for (int i = 0; i < loads.length(); i++) {
     LoadNode* ld = loads.at(i)->as_Load();
     Node* phi = find_phi_for_mem_dep(ld);
-    if (phi != NULL) {
+    if (phi != nullptr) {
 #ifndef PRODUCT
       if (_vector_loop_debug) {
         tty->print_cr("SuperWord::hoist_loads_in_graph replacing MemNode::Memory(%d) edge in %d with one from %d",

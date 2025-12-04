@@ -318,7 +318,7 @@ class ObjectMonitor : public CHeapObj<mtObjectMonitor> {
   };
  public:
 #if HOTSPOT_TARGET_CLASSLIB == 8
-  bool      try_enter(Thread* current);
+  bool      try_enter(JavaThread* current);
 #endif
   bool      enter(JavaThread* current);
   void      exit(JavaThread* current, bool not_suspended = true);

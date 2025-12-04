@@ -1,7 +1,7 @@
 // This project is a modified version of OpenJDK, licensed under GPL v2.
 // Modifications Copyright (C) 2025 ByteDance Inc.
 /*
- * Copyright (c) 1997, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -132,6 +132,7 @@ class Symbol : public MetaspaceObj {
     return (int)heap_word_size(byte_size(length));
   }
 
+  // Constructor is private for use only by SymbolTable.
   Symbol(const u1* name, int length, int refcount);
   void* operator new(size_t size, int len) throw();
   void* operator new(size_t size, int len, Arena* arena) throw();

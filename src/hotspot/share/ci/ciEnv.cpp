@@ -1191,6 +1191,27 @@ ciInstance* ciEnv::unloaded_ciinstance() {
 // Don't change thread state and acquire any locks.
 // Safe to call from VM error reporter.
 
+
+// Look up the location descriptor for the given class and return it as a string.
+// Returns the class name as a fallback if no location is found.
+const char *ciEnv::replay_name(ciKlass* k) const {
+  if (k->is_instance_klass()) {
+    return replay_name(k->as_instance_klass()->get_instanceKlass());
+  }
+  return k->name()->as_quoted_ascii();
+}
+
+// Look up the location descriptor for the given class and return it as a string.
+// Returns the class name as a fallback if no location is found.
+const char *ciEnv::replay_name(const InstanceKlass* ik) const {
+  // JDK-8271911 is not in JDK 17, so we fall back to using the class name below.
+  const char* name = nullptr; // dyno_name(ik);
+  if (name != nullptr) {
+      return name;
+  }
+  return ik->name()->as_quoted_ascii();
+}
+
 void ciEnv::dump_compile_data(outputStream* out) {
   CompileTask* task = this->task();
   if (task) {
@@ -1229,6 +1250,9 @@ void ciEnv::dump_replay_data_unsafe(outputStream* out) {
 
   GrowableArray<ciMetadata*>* objects = _factory->get_ci_metadata();
   out->print_cr("# %d ciObject found", objects->length());
+  // The very first entry is the InstanceKlass of the root method of the current compilation in order to get the right
+  // protection domain to load subsequent classes during replay compilation.
+  out->print_cr("instanceKlass %s", CURRENT_ENV->replay_name(task()->method()->method_holder()));
   for (int i = 0; i < objects->length(); i++) {
     objects->at(i)->dump_replay_data(out);
   }
@@ -1256,6 +1280,7 @@ void ciEnv::dump_replay_data(int compile_id) {
         tty->print_cr("# Compiler replay data is saved as: %s", buffer);
       } else {
         tty->print_cr("# Can't open file to dump replay data.");
+        close(fd);
       }
     }
   }
@@ -1279,6 +1304,7 @@ void ciEnv::dump_inline_data(int compile_id) {
         tty->print_cr("%s", buffer);
       } else {
         tty->print_cr("# Can't open file to dump inline data.");
+        close(fd);
       }
     }
   }

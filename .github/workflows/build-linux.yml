@@ -79,6 +79,7 @@ jobs:
       - name: 'Get GTest'
         id: gtest
         uses: ./.github/actions/get-gtest
+        if: false
 
       - name: 'Set architecture'
         id: arch

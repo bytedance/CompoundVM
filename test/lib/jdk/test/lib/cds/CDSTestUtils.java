@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -257,7 +257,7 @@ public class CDSTestUtils {
         for (String s : opts.suffix) cmd.add(s);
 
         String[] cmdLine = cmd.toArray(new String[cmd.size()]);
-        ProcessBuilder pb = ProcessTools.createTestJvm(cmdLine);
+        ProcessBuilder pb = ProcessTools.createTestJavaProcessBuilder(cmdLine);
         return executeAndLog(pb, "dump");
     }
 
@@ -399,6 +399,12 @@ public class CDSTestUtils {
                                .addPrefix(cliPrefix) );
     }
 
+    // Enable basic verification (VerifyArchivedFields=1, no side effects) for all CDS
+    // tests to make sure the archived heap objects are mapped/loaded properly.
+    public static void addVerifyArchivedFields(ArrayList<String> cmd) {
+        cmd.add("-XX:+UnlockDiagnosticVMOptions");
+        cmd.add("-XX:VerifyArchivedFields=1");
+    }
 
     // Execute JVM with CDS archive, specify CDSOptions
     public static OutputAnalyzer runWithArchive(CDSOptions opts)
@@ -416,6 +422,7 @@ public class CDSTestUtils {
                 opts.archiveName = getDefaultArchiveName();
             cmd.add("-XX:SharedArchiveFile=" + opts.archiveName);
         }
+        addVerifyArchivedFields(cmd);
 
         if (opts.useVersion)
             cmd.add("-version");
@@ -423,7 +430,7 @@ public class CDSTestUtils {
         for (String s : opts.suffix) cmd.add(s);
 
         String[] cmdLine = cmd.toArray(new String[cmd.size()]);
-        ProcessBuilder pb = ProcessTools.createTestJvm(cmdLine);
+        ProcessBuilder pb = ProcessTools.createTestJavaProcessBuilder(cmdLine);
         return executeAndLog(pb, "exec");
     }
 
@@ -587,8 +594,12 @@ public class CDSTestUtils {
 
     // ============================= Logging
     public static OutputAnalyzer executeAndLog(ProcessBuilder pb, String logName) throws Exception {
+        return executeAndLog(pb.start(), logName);
+    }
+
+    public static OutputAnalyzer executeAndLog(Process process, String logName) throws Exception {
         long started = System.currentTimeMillis();
-        OutputAnalyzer output = new OutputAnalyzer(pb.start());
+        OutputAnalyzer output = new OutputAnalyzer(process);
         String logFileNameStem =
             String.format("%04d", getNextLogCounter()) + "-" + logName;
 
@@ -605,6 +616,9 @@ public class CDSTestUtils {
         if (copyChildStdoutToMainStdout)
             System.out.println("[STDOUT]\n" + output.getStdout());
 
+        if (output.getExitValue() != 0 && output.getStdout().contains("A fatal error has been detected")) {
+          throw new RuntimeException("Hotspot crashed");
+        }
         return output;
     }
 

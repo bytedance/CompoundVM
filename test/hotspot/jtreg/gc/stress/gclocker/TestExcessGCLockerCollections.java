@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -44,7 +44,6 @@ import java.util.zip.Deflater;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import jdk.test.lib.Asserts;
 import jdk.test.lib.process.ProcessTools;
 import jdk.test.lib.process.OutputAnalyzer;
 
@@ -174,7 +173,7 @@ public class TestExcessGCLockerCollections {
         finalArgs.addAll(Arrays.asList(args));
 
         // GC and other options obtained from test framework.
-        OutputAnalyzer output = ProcessTools.executeTestJvm(finalArgs);
+        OutputAnalyzer output = ProcessTools.executeTestJava(finalArgs);
         output.shouldHaveExitValue(0);
         //System.out.println("------------- begin stdout ----------------");
         //System.out.println(output.getStdout());

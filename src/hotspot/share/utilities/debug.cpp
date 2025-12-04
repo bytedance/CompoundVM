@@ -440,7 +440,7 @@ extern "C" JNIEXPORT void disnm(intptr_t p) {
 
 extern "C" JNIEXPORT void printnm(intptr_t p) {
   char buffer[256];
-  sprintf(buffer, "printnm: " INTPTR_FORMAT, p);
+  os::snprintf_checked(buffer, sizeof(buffer), "printnm: " INTPTR_FORMAT, p);
   Command c(buffer);
   CodeBlob* cb = CodeCache::find_blob((address) p);
   if (cb->is_nmethod()) {
@@ -476,6 +476,10 @@ extern "C" JNIEXPORT void verify() {
 extern "C" JNIEXPORT void pp(void* p) {
   Command c("pp");
   FlagSetting fl(DisplayVMOutput, true);
+  if (p == NULL) {
+    tty->print_cr("NULL");
+    return;
+  }
   if (Universe::heap()->is_in(p)) {
     oop obj = cast_to_oop(p);
     obj->print();
@@ -676,7 +680,8 @@ extern "C" JNIEXPORT void pns(void* sp, void* fp, void* pc) { // print native st
 extern "C" JNIEXPORT void pns2() { // print native stack
   Command c("pns2");
   static char buf[O_BUFLEN];
-  if (os::platform_print_native_stack(tty, NULL, buf, sizeof(buf))) {
+  address lastpc = nullptr;
+  if (os::platform_print_native_stack(tty, NULL, buf, sizeof(buf), lastpc)) {
     // We have printed the native stack in platform-specific code,
     // so nothing else to do in this case.
   } else {
@@ -738,10 +743,22 @@ void disarm_assert_poison() {
 
 static void store_context(const void* context) {
   memcpy(&g_stored_assertion_context, context, sizeof(ucontext_t));
-#if defined(LINUX) && defined(PPC64)
+#if defined(LINUX)
   // on Linux ppc64, ucontext_t contains pointers into itself which have to be patched up
   //  after copying the context (see comment in sys/ucontext.h):
+#if defined(PPC64)
   *((void**) &g_stored_assertion_context.uc_mcontext.regs) = &(g_stored_assertion_context.uc_mcontext.gp_regs);
+#elif defined(AMD64)
+  // In the copied version, fpregs should point to the copied contents.
+  // Sanity check: fpregs should point into the context.
+  if ((address)((const ucontext_t*)context)->uc_mcontext.fpregs > (address)context) {
+    size_t fpregs_offset = pointer_delta(((const ucontext_t*)context)->uc_mcontext.fpregs, context, 1);
+    if (fpregs_offset < sizeof(ucontext_t)) {
+      // Preserve the offset.
+      *((void**) &g_stored_assertion_context.uc_mcontext.fpregs) = (void*)((address)(void*)&g_stored_assertion_context + fpregs_offset);
+    }
+  }
+#endif
 #endif
 }
 

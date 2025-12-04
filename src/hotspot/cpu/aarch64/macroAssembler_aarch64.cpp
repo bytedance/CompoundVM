@@ -1050,6 +1050,110 @@ void MacroAssembler::lookup_interface_method(Register recv_klass,
   }
 }
 
+// Look up the method for a megamorphic invokeinterface call in a single pass over itable:
+// - check recv_klass (actual object class) is a subtype of resolved_klass from CompiledICHolder
+// - find a holder_klass (class that implements the method) vtable offset and get the method from vtable by index
+// The target method is determined by <holder_klass, itable_index>.
+// The receiver klass is in recv_klass.
+// On success, the result will be in method_result, and execution falls through.
+// On failure, execution transfers to the given label.
+void MacroAssembler::lookup_interface_method_stub(Register recv_klass,
+                                                  Register holder_klass,
+                                                  Register resolved_klass,
+                                                  Register method_result,
+                                                  Register temp_itbl_klass,
+                                                  Register scan_temp,
+                                                  int itable_index,
+                                                  Label& L_no_such_interface) {
+  // 'method_result' is only used as output register at the very end of this method.
+  // Until then we can reuse it as 'holder_offset'.
+  Register holder_offset = method_result;
+  assert_different_registers(resolved_klass, recv_klass, holder_klass, temp_itbl_klass, scan_temp, holder_offset);
+
+  int vtable_start_offset = in_bytes(Klass::vtable_start_offset());
+  int itable_offset_entry_size = itableOffsetEntry::size() * wordSize;
+  int ioffset = itableOffsetEntry::interface_offset_in_bytes();
+  int ooffset = itableOffsetEntry::offset_offset_in_bytes();
+
+  Label L_loop_search_resolved_entry, L_resolved_found, L_holder_found;
+
+  ldrw(scan_temp, Address(recv_klass, Klass::vtable_length_offset()));
+  add(recv_klass, recv_klass, vtable_start_offset + ioffset);
+  // itableOffsetEntry[] itable = recv_klass + Klass::vtable_start_offset() + sizeof(vtableEntry) * recv_klass->_vtable_len;
+  // temp_itbl_klass = itable[0]._interface;
+  int vtblEntrySize = vtableEntry::size_in_bytes();
+  assert(vtblEntrySize == wordSize, "ldr lsl shift amount must be 3");
+  ldr(temp_itbl_klass, Address(recv_klass, scan_temp, Address::lsl(exact_log2(vtblEntrySize))));
+  mov(holder_offset, zr);
+  // scan_temp = &(itable[0]._interface)
+  lea(scan_temp, Address(recv_klass, scan_temp, Address::lsl(exact_log2(vtblEntrySize))));
+
+  // Initial checks:
+  //   - if (holder_klass != resolved_klass), go to "scan for resolved"
+  //   - if (itable[0] == holder_klass), shortcut to "holder found"
+  //   - if (itable[0] == 0), no such interface
+  cmp(resolved_klass, holder_klass);
+  br(Assembler::NE, L_loop_search_resolved_entry);
+  cmp(holder_klass, temp_itbl_klass);
+  br(Assembler::EQ, L_holder_found);
+  cbz(temp_itbl_klass, L_no_such_interface);
+
+  // Loop: Look for holder_klass record in itable
+  //   do {
+  //     temp_itbl_klass = *(scan_temp += itable_offset_entry_size);
+  //     if (temp_itbl_klass == holder_klass) {
+  //       goto L_holder_found; // Found!
+  //     }
+  //   } while (temp_itbl_klass != 0);
+  //   goto L_no_such_interface // Not found.
+  Label L_search_holder;
+  bind(L_search_holder);
+    ldr(temp_itbl_klass, Address(pre(scan_temp, itable_offset_entry_size)));
+    cmp(holder_klass, temp_itbl_klass);
+    br(Assembler::EQ, L_holder_found);
+    cbnz(temp_itbl_klass, L_search_holder);
+
+  b(L_no_such_interface);
+
+  // Loop: Look for resolved_class record in itable
+  //   while (true) {
+  //     temp_itbl_klass = *(scan_temp += itable_offset_entry_size);
+  //     if (temp_itbl_klass == 0) {
+  //       goto L_no_such_interface;
+  //     }
+  //     if (temp_itbl_klass == resolved_klass) {
+  //        goto L_resolved_found;  // Found!
+  //     }
+  //     if (temp_itbl_klass == holder_klass) {
+  //        holder_offset = scan_temp;
+  //     }
+  //   }
+  //
+  Label L_loop_search_resolved;
+  bind(L_loop_search_resolved);
+    ldr(temp_itbl_klass, Address(pre(scan_temp, itable_offset_entry_size)));
+  bind(L_loop_search_resolved_entry);
+    cbz(temp_itbl_klass, L_no_such_interface);
+    cmp(resolved_klass, temp_itbl_klass);
+    br(Assembler::EQ, L_resolved_found);
+    cmp(holder_klass, temp_itbl_klass);
+    br(Assembler::NE, L_loop_search_resolved);
+    mov(holder_offset, scan_temp);
+    b(L_loop_search_resolved);
+
+  // See if we already have a holder klass. If not, go and scan for it.
+  bind(L_resolved_found);
+  cbz(holder_offset, L_search_holder);
+  mov(scan_temp, holder_offset);
+
+  // Finally, scan_temp contains holder_klass vtable offset
+  bind(L_holder_found);
+  ldrw(method_result, Address(scan_temp, ooffset - ioffset));
+  add(recv_klass, recv_klass, itable_index * wordSize + itableMethodEntry::method_offset_in_bytes()
+    - vtable_start_offset - ioffset); // substract offsets to restore the original value of recv_klass
+  ldr(method_result, Address(recv_klass, method_result, Address::uxtw(0)));
+}
+
 // virtual method calling
 void MacroAssembler::lookup_virtual_method(Register recv_klass,
                                            RegisterOrConstant vtable_index,
@@ -4514,6 +4618,8 @@ address MacroAssembler::has_negatives(Register ary1, Register len, Register resu
   return pc();
 }
 
+// Clobbers: rscratch1, rscratch2, rflags
+// May also clobber v0-v7 when (!UseSimpleArrayEquals && UseSIMDForArrayEquals)
 address MacroAssembler::arrays_equals(Register a1, Register a2, Register tmp3,
                                       Register tmp4, Register tmp5, Register result,
                                       Register cnt1, int elem_size) {
@@ -5031,113 +5137,123 @@ void MacroAssembler::fill_words(Register base, Register cnt, Register value)
   bind(fini);
 }
 
-// Intrinsic for sun/nio/cs/ISO_8859_1$Encoder.implEncodeISOArray and
-// java/lang/StringUTF16.compress.
+// Intrinsic for
+//
+// - sun/nio/cs/ISO_8859_1$Encoder.implEncodeISOArray
+//     return the number of characters copied.
+// - java/lang/StringUTF16.compress
+//     return zero (0) if copy fails, otherwise 'len'.
+//
+// This version always returns the number of characters copied, and does not
+// clobber the 'len' register. A successful copy will complete with the post-
+// condition: 'res' == 'len', while an unsuccessful copy will exit with the
+// post-condition: 0 <= 'res' < 'len'.
+//
+// NOTE: Attempts to use 'ld2' (and 'umaxv' in the ISO part) has proven to
+//       degrade performance (on Ampere Altra - Neoverse N1), to an extent
+//       beyond the acceptable, even though the footprint would be smaller.
+//       Using 'umaxv' in the ASCII-case comes with a small penalty but does
+//       avoid additional bloat.
+//
+// Clobbers: src, dst, res, rscratch1, rscratch2, rflags
 void MacroAssembler::encode_iso_array(Register src, Register dst,
-                      Register len, Register result,
-                      FloatRegister Vtmp1, FloatRegister Vtmp2,
-                      FloatRegister Vtmp3, FloatRegister Vtmp4)
+                                      Register len, Register res, bool ascii,
+                                      FloatRegister vtmp0, FloatRegister vtmp1,
+                                      FloatRegister vtmp2, FloatRegister vtmp3,
+                                      FloatRegister vtmp4, FloatRegister vtmp5)
 {
-    Label DONE, SET_RESULT, NEXT_32, NEXT_32_PRFM, LOOP_8, NEXT_8, LOOP_1, NEXT_1,
-        NEXT_32_START, NEXT_32_PRFM_START;
-    Register tmp1 = rscratch1, tmp2 = rscratch2;
+  Register cnt = res;
+  Register max = rscratch1;
+  Register chk = rscratch2;
 
-      mov(result, len); // Save initial len
+  prfm(Address(src), PLDL1STRM);
+  movw(cnt, len);
 
-      cmp(len, (u1)8); // handle shortest strings first
-      br(LT, LOOP_1);
-      cmp(len, (u1)32);
-      br(LT, NEXT_8);
-      // The following code uses the SIMD 'uzp1' and 'uzp2' instructions
-      // to convert chars to bytes
-      if (SoftwarePrefetchHintDistance >= 0) {
-        ld1(Vtmp1, Vtmp2, Vtmp3, Vtmp4, T8H, src);
-        subs(tmp2, len, SoftwarePrefetchHintDistance/2 + 16);
-        br(LE, NEXT_32_START);
-        b(NEXT_32_PRFM_START);
-        BIND(NEXT_32_PRFM);
-          ld1(Vtmp1, Vtmp2, Vtmp3, Vtmp4, T8H, src);
-        BIND(NEXT_32_PRFM_START);
-          prfm(Address(src, SoftwarePrefetchHintDistance));
-          orr(v4, T16B, Vtmp1, Vtmp2);
-          orr(v5, T16B, Vtmp3, Vtmp4);
-          uzp1(Vtmp1, T16B, Vtmp1, Vtmp2);
-          uzp1(Vtmp3, T16B, Vtmp3, Vtmp4);
-          uzp2(v5, T16B, v4, v5); // high bytes
-          umov(tmp2, v5, D, 1);
-          fmovd(tmp1, v5);
-          orr(tmp1, tmp1, tmp2);
-          cbnz(tmp1, LOOP_8);
-          stpq(Vtmp1, Vtmp3, dst);
-          sub(len, len, 32);
-          add(dst, dst, 32);
-          add(src, src, 64);
-          subs(tmp2, len, SoftwarePrefetchHintDistance/2 + 16);
-          br(GE, NEXT_32_PRFM);
-          cmp(len, (u1)32);
-          br(LT, LOOP_8);
-        BIND(NEXT_32);
-          ld1(Vtmp1, Vtmp2, Vtmp3, Vtmp4, T8H, src);
-        BIND(NEXT_32_START);
-      } else {
-        BIND(NEXT_32);
-          ld1(Vtmp1, Vtmp2, Vtmp3, Vtmp4, T8H, src);
-      }
-      prfm(Address(src, SoftwarePrefetchHintDistance));
-      uzp1(v4, T16B, Vtmp1, Vtmp2);
-      uzp1(v5, T16B, Vtmp3, Vtmp4);
-      orr(Vtmp1, T16B, Vtmp1, Vtmp2);
-      orr(Vtmp3, T16B, Vtmp3, Vtmp4);
-      uzp2(Vtmp1, T16B, Vtmp1, Vtmp3); // high bytes
-      umov(tmp2, Vtmp1, D, 1);
-      fmovd(tmp1, Vtmp1);
-      orr(tmp1, tmp1, tmp2);
-      cbnz(tmp1, LOOP_8);
-      stpq(v4, v5, dst);
-      sub(len, len, 32);
-      add(dst, dst, 32);
-      add(src, src, 64);
-      cmp(len, (u1)32);
-      br(GE, NEXT_32);
-      cbz(len, DONE);
+#define ASCII(insn) do { if (ascii) { insn; } } while (0)
 
-    BIND(LOOP_8);
-      cmp(len, (u1)8);
-      br(LT, LOOP_1);
-    BIND(NEXT_8);
-      ld1(Vtmp1, T8H, src);
-      uzp1(Vtmp2, T16B, Vtmp1, Vtmp1); // low bytes
-      uzp2(Vtmp3, T16B, Vtmp1, Vtmp1); // high bytes
-      fmovd(tmp1, Vtmp3);
-      cbnz(tmp1, NEXT_1);
-      strd(Vtmp2, dst);
+  Label LOOP_32, DONE_32, FAIL_32;
 
-      sub(len, len, 8);
-      add(dst, dst, 8);
-      add(src, src, 16);
-      cmp(len, (u1)8);
-      br(GE, NEXT_8);
+  BIND(LOOP_32);
+  {
+    cmpw(cnt, 32);
+    br(LT, DONE_32);
+    ld1(vtmp0, vtmp1, vtmp2, vtmp3, T8H, Address(post(src, 64)));
+    // Extract lower bytes.
+    FloatRegister vlo0 = vtmp4;
+    FloatRegister vlo1 = vtmp5;
+    uzp1(vlo0, T16B, vtmp0, vtmp1);
+    uzp1(vlo1, T16B, vtmp2, vtmp3);
+    // Merge bits...
+    orr(vtmp0, T16B, vtmp0, vtmp1);
+    orr(vtmp2, T16B, vtmp2, vtmp3);
+    // Extract merged upper bytes.
+    FloatRegister vhix = vtmp0;
+    uzp2(vhix, T16B, vtmp0, vtmp2);
+    // ISO-check on hi-parts (all zero).
+    //                          ASCII-check on lo-parts (no sign).
+    FloatRegister vlox = vtmp1; // Merge lower bytes.
+                                ASCII(orr(vlox, T16B, vlo0, vlo1));
+    umov(chk, vhix, D, 1);      ASCII(cmlt(vlox, T16B, vlox));
+    fmovd(max, vhix);           ASCII(umaxv(vlox, T16B, vlox));
+    orr(chk, chk, max);         ASCII(umov(max, vlox, B, 0));
+                                ASCII(orr(chk, chk, max));
+    cbnz(chk, FAIL_32);
+    subw(cnt, cnt, 32);
+    st1(vlo0, vlo1, T16B, Address(post(dst, 32)));
+    b(LOOP_32);
+  }
+  BIND(FAIL_32);
+  sub(src, src, 64);
+  BIND(DONE_32);
 
-    BIND(LOOP_1);
+  Label LOOP_8, SKIP_8;
 
-    cbz(len, DONE);
-    BIND(NEXT_1);
-      ldrh(tmp1, Address(post(src, 2)));
-      tst(tmp1, 0xff00);
-      br(NE, SET_RESULT);
-      strb(tmp1, Address(post(dst, 1)));
-      subs(len, len, 1);
-      br(GT, NEXT_1);
+  BIND(LOOP_8);
+  {
+    cmpw(cnt, 8);
+    br(LT, SKIP_8);
+    FloatRegister vhi = vtmp0;
+    FloatRegister vlo = vtmp1;
+    ld1(vtmp3, T8H, src);
+    uzp1(vlo, T16B, vtmp3, vtmp3);
+    uzp2(vhi, T16B, vtmp3, vtmp3);
+    // ISO-check on hi-parts (all zero).
+    //                          ASCII-check on lo-parts (no sign).
+                                ASCII(cmlt(vtmp2, T16B, vlo));
+    fmovd(chk, vhi);            ASCII(umaxv(vtmp2, T16B, vtmp2));
+                                ASCII(umov(max, vtmp2, B, 0));
+                                ASCII(orr(chk, chk, max));
+    cbnz(chk, SKIP_8);
 
-    BIND(SET_RESULT);
-      sub(result, result, len); // Return index where we stopped
-                                // Return len == 0 if we processed all
-                                // characters
-    BIND(DONE);
+    strd(vlo, Address(post(dst, 8)));
+    subw(cnt, cnt, 8);
+    add(src, src, 16);
+    b(LOOP_8);
+  }
+  BIND(SKIP_8);
+
+#undef ASCII
+
+  Label LOOP, DONE;
+
+  cbz(cnt, DONE);
+  BIND(LOOP);
+  {
+    Register chr = rscratch1;
+    ldrh(chr, Address(post(src, 2)));
+    tst(chr, ascii ? 0xff80 : 0xff00);
+    br(NE, DONE);
+    strb(chr, Address(post(dst, 1)));
+    subs(cnt, cnt, 1);
+    br(GT, LOOP);
+  }
+  BIND(DONE);
+  // Return index where we stopped.
+  subw(res, len, cnt);
 }
 
-
 // Inflate byte[] array to char[].
+// Clobbers: src, dst, len, rflags, rscratch1, v0-v6
 address MacroAssembler::byte_array_inflate(Register src, Register dst, Register len,
                                            FloatRegister vtmp1, FloatRegister vtmp2,
                                            FloatRegister vtmp3, Register tmp4) {
@@ -5244,13 +5360,14 @@ address MacroAssembler::byte_array_inflate(Register src, Register dst, Register 
 
 // Compress char[] array to byte[].
 void MacroAssembler::char_array_compress(Register src, Register dst, Register len,
-                                         FloatRegister tmp1Reg, FloatRegister tmp2Reg,
-                                         FloatRegister tmp3Reg, FloatRegister tmp4Reg,
-                                         Register result) {
-  encode_iso_array(src, dst, len, result,
-                   tmp1Reg, tmp2Reg, tmp3Reg, tmp4Reg);
-  cmp(len, zr);
-  csel(result, result, zr, EQ);
+                                         Register res,
+                                         FloatRegister tmp0, FloatRegister tmp1,
+                                         FloatRegister tmp2, FloatRegister tmp3,
+                                         FloatRegister tmp4, FloatRegister tmp5) {
+  encode_iso_array(src, dst, len, res, false, tmp0, tmp1, tmp2, tmp3, tmp4, tmp5);
+  // Adjust result: res == len ? len : 0
+  cmp(len, res);
+  csel(res, res, zr, EQ);
 }
 
 // get_thread() can be called anywhere inside generated code so we

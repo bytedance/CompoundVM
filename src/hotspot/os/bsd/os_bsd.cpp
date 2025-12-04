@@ -212,11 +212,13 @@ static char cpu_arch[] = "ppc";
   #error Add appropriate cpu_arch setting
 #endif
 
-// Compiler variant
-#ifdef COMPILER2
-  #define COMPILER_VARIANT "server"
+// JVM variant
+#if   defined(ZERO)
+  #define JVM_VARIANT "zero"
+#elif defined(COMPILER2)
+  #define JVM_VARIANT "server"
 #else
-  #define COMPILER_VARIANT "client"
+  #define JVM_VARIANT "client"
 #endif
 
 
@@ -338,7 +340,7 @@ void os::init_system_properties_values() {
 
 #ifndef __APPLE__
 
-  // Buffer that fits several sprintfs.
+  // Buffer that fits several snprintfs.
   // Note that the space for the colon and the trailing null are provided
   // by the nulls included by the sizeof operator.
   const size_t bufsize =
@@ -394,17 +396,16 @@ void os::init_system_properties_values() {
     const char *v_colon = ":";
     if (v == NULL) { v = ""; v_colon = ""; }
     // That's +1 for the colon and +1 for the trailing '\0'.
-    char *ld_library_path = NEW_C_HEAP_ARRAY(char,
-                                             strlen(v) + 1 +
-                                             sizeof(SYS_EXT_DIR) + sizeof("/lib/") + strlen(cpu_arch) + sizeof(DEFAULT_LIBPATH) + 1,
-                                             mtInternal);
-    sprintf(ld_library_path, "%s%s" SYS_EXT_DIR "/lib/%s:" DEFAULT_LIBPATH, v, v_colon, cpu_arch);
+    const size_t ld_library_path_size = strlen(v) + 1 + sizeof(SYS_EXT_DIR) +
+            sizeof("/lib/") + strlen(cpu_arch) + sizeof(DEFAULT_LIBPATH) + 1;
+    char *ld_library_path = NEW_C_HEAP_ARRAY(char, ld_library_path_size, mtInternal);
+    os::snprintf_checked(ld_library_path, ld_library_path_size, "%s%s" SYS_EXT_DIR "/lib/%s:" DEFAULT_LIBPATH, v, v_colon, cpu_arch);
     Arguments::set_library_path(ld_library_path);
     FREE_C_HEAP_ARRAY(char, ld_library_path);
   }
 
   // Extensions directories.
-  sprintf(buf, "%s" EXTENSIONS_DIR ":" SYS_EXT_DIR EXTENSIONS_DIR, Arguments::get_java_home());
+  os::snprintf_checked(buf, bufsize, "%s" EXTENSIONS_DIR ":" SYS_EXT_DIR EXTENSIONS_DIR, Arguments::get_java_home());
   Arguments::set_ext_dirs(buf);
 
   FREE_C_HEAP_ARRAY(char, buf);
@@ -419,7 +420,7 @@ void os::init_system_properties_values() {
   size_t system_ext_size = strlen(user_home_dir) + sizeof(SYS_EXTENSIONS_DIR) +
     sizeof(SYS_EXTENSIONS_DIRS);
 
-  // Buffer that fits several sprintfs.
+  // Buffer that fits several snprintfs.
   // Note that the space for the colon and the trailing null are provided
   // by the nulls included by the sizeof operator.
   const size_t bufsize =
@@ -489,11 +490,9 @@ void os::init_system_properties_values() {
     // could cause a change in behavior, but Apple's Java6 behavior
     // can be achieved by putting "." at the beginning of the
     // JAVA_LIBRARY_PATH environment variable.
-    char *ld_library_path = NEW_C_HEAP_ARRAY(char,
-                                             strlen(v) + 1 + strlen(l) + 1 +
-                                             system_ext_size + 3,
-                                             mtInternal);
-    sprintf(ld_library_path, "%s%s%s%s%s" SYS_EXTENSIONS_DIR ":" SYS_EXTENSIONS_DIRS ":.",
+    const size_t ld_library_path_size = strlen(v) + 1 + strlen(l) + 1 + system_ext_size + 3;
+    char *ld_library_path = NEW_C_HEAP_ARRAY(char, ld_library_path_size, mtInternal);
+    os::snprintf_checked(ld_library_path, ld_library_path_size, "%s%s%s%s%s" SYS_EXTENSIONS_DIR ":" SYS_EXTENSIONS_DIRS ":.",
             v, v_colon, l, l_colon, user_home_dir);
     Arguments::set_library_path(ld_library_path);
     FREE_C_HEAP_ARRAY(char, ld_library_path);
@@ -504,7 +503,7 @@ void os::init_system_properties_values() {
   // Note that the space for the colon and the trailing null are provided
   // by the nulls included by the sizeof operator (so actually one byte more
   // than necessary is allocated).
-  sprintf(buf, "%s" SYS_EXTENSIONS_DIR ":%s" EXTENSIONS_DIR ":" SYS_EXTENSIONS_DIRS,
+  os::snprintf_checked(buf, bufsize, "%s" SYS_EXTENSIONS_DIR ":%s" EXTENSIONS_DIR ":" SYS_EXTENSIONS_DIRS,
           user_home_dir, Arguments::get_java_home());
   Arguments::set_ext_dirs(buf);
 
@@ -1377,8 +1376,34 @@ void os::print_os_info(outputStream* st) {
   VM_Version::print_platform_virtualization_info(st);
 }
 
+#ifdef __APPLE__
+static void print_sysctl_info_string(const char* sysctlkey, outputStream* st, char* buf, size_t size) {
+  if (sysctlbyname(sysctlkey, buf, &size, nullptr, 0) >= 0) {
+    st->print_cr("%s:%s", sysctlkey, buf);
+  }
+}
+
+static void print_sysctl_info_uint64(const char* sysctlkey, outputStream* st) {
+  uint64_t val;
+  size_t size=sizeof(uint64_t);
+  if (sysctlbyname(sysctlkey, &val, &size, nullptr, 0) >= 0) {
+    st->print_cr("%s:%llu", sysctlkey, val);
+  }
+}
+#endif
+
 void os::pd_print_cpu_info(outputStream* st, char* buf, size_t buflen) {
-  // Nothing to do for now.
+#ifdef __APPLE__
+  print_sysctl_info_string("machdep.cpu.brand_string", st, buf, buflen);
+  print_sysctl_info_uint64("hw.cpufrequency", st);
+  print_sysctl_info_uint64("hw.cpufrequency_min", st);
+  print_sysctl_info_uint64("hw.cpufrequency_max", st);
+  print_sysctl_info_uint64("hw.cachelinesize", st);
+  print_sysctl_info_uint64("hw.l1icachesize", st);
+  print_sysctl_info_uint64("hw.l1dcachesize", st);
+  print_sysctl_info_uint64("hw.l2cachesize", st);
+  print_sysctl_info_uint64("hw.l3cachesize", st);
+#endif
 }
 
 void os::get_summary_cpu_info(char* buf, size_t buflen) {
@@ -1515,10 +1540,10 @@ void os::jvm_path(char *buf, jint buflen) {
           snprintf(jrelib_p, buflen-len, "/lib");
         }
 
-        // Add the appropriate client or server subdir
+        // Add the appropriate JVM variant subdir
         len = strlen(buf);
         jrelib_p = buf + len;
-        snprintf(jrelib_p, buflen-len, "/%s", COMPILER_VARIANT);
+        snprintf(jrelib_p, buflen-len, "/%s", JVM_VARIANT);
         if (0 != access(buf, F_OK)) {
           snprintf(jrelib_p, buflen-len, "%s", "");
         }
@@ -1583,7 +1608,7 @@ bool os::pd_commit_memory(char* addr, size_t size, bool exec) {
   int prot = exec ? PROT_READ|PROT_WRITE|PROT_EXEC : PROT_READ|PROT_WRITE;
 #if defined(__OpenBSD__)
   // XXX: Work-around mmap/MAP_FIXED bug temporarily on OpenBSD
-  Events::log(NULL, "Protecting memory [" INTPTR_FORMAT "," INTPTR_FORMAT "] with protection modes %x", p2i(addr), p2i(addr+size), prot);
+  Events::log_memprotect(NULL, "Protecting memory [" INTPTR_FORMAT "," INTPTR_FORMAT "] with protection modes %x", p2i(addr), p2i(addr+size), prot);
   if (::mprotect(addr, size, prot) == 0) {
     return true;
   }
@@ -1685,7 +1710,7 @@ char *os::scan_pages(char *start, char* end, page_info* page_expected, page_info
 bool os::pd_uncommit_memory(char* addr, size_t size, bool exec) {
 #if defined(__OpenBSD__)
   // XXX: Work-around mmap/MAP_FIXED bug temporarily on OpenBSD
-  Events::log(NULL, "Protecting memory [" INTPTR_FORMAT "," INTPTR_FORMAT "] with PROT_NONE", p2i(addr), p2i(addr+size));
+  Events::log_memprotect(NULL, "Protecting memory [" INTPTR_FORMAT "," INTPTR_FORMAT "] with PROT_NONE", p2i(addr), p2i(addr+size));
   return ::mprotect(addr, size, PROT_NONE) == 0;
 #elif defined(__APPLE__)
   if (exec) {
@@ -1755,7 +1780,7 @@ static bool bsd_mprotect(char* addr, size_t size, int prot) {
   assert(addr == bottom, "sanity check");
 
   size = align_up(pointer_delta(addr, bottom, 1) + size, os::Bsd::page_size());
-  Events::log(NULL, "Protecting memory [" INTPTR_FORMAT "," INTPTR_FORMAT "] with protection modes %x", p2i(bottom), p2i(bottom+size), prot);
+  Events::log_memprotect(NULL, "Protecting memory [" INTPTR_FORMAT "," INTPTR_FORMAT "] with protection modes %x", p2i(bottom), p2i(bottom+size), prot);
   return ::mprotect(bottom, size, prot) == 0;
 }
 
@@ -2064,16 +2089,24 @@ jint os::init_2(void) {
     if (status != 0) {
       log_info(os)("os::init_2 getrlimit failed: %s", os::strerror(errno));
     } else {
-      nbr_files.rlim_cur = nbr_files.rlim_max;
+      rlim_t rlim_original = nbr_files.rlim_cur;
 
-#ifdef __APPLE__
-      // Darwin returns RLIM_INFINITY for rlim_max, but fails with EINVAL if
-      // you attempt to use RLIM_INFINITY. As per setrlimit(2), OPEN_MAX must
-      // be used instead
-      nbr_files.rlim_cur = MIN(OPEN_MAX, nbr_files.rlim_cur);
-#endif
+      // On macOS according to setrlimit(2), OPEN_MAX must be used instead
+      // of RLIM_INFINITY, but testing on macOS >= 10.6, reveals that
+      // we can, in fact, use even RLIM_INFINITY.
+      // However, we need to limit the value to 0x100000 (which is the max value
+      // allowed on Linux) so that any existing code that iterates over all allowed
+      // file descriptors, finishes in a reasonable time, without appearing
+      // to hang.
+      nbr_files.rlim_cur = MIN(0x100000, nbr_files.rlim_max);
 
       status = setrlimit(RLIMIT_NOFILE, &nbr_files);
+      if (status != 0) {
+        // If that fails then try lowering the limit to either OPEN_MAX
+        // (which is safe) or the original limit, whichever was greater.
+        nbr_files.rlim_cur = MAX(OPEN_MAX, rlim_original);
+        status = setrlimit(RLIMIT_NOFILE, &nbr_files);
+      }
       if (status != 0) {
         log_info(os)("os::init_2 setrlimit failed: %s", os::strerror(errno));
       }

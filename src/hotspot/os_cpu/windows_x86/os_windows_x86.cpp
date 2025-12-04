@@ -223,7 +223,7 @@ bool os::register_code_area(char *low, char *high) {
  * loop in vmError.cpp. We need to roll our own loop.
  */
 bool os::platform_print_native_stack(outputStream* st, const void* context,
-                                     char *buf, int buf_size)
+                                     char *buf, int buf_size, address& lastpc)
 {
   CONTEXT ctx;
   if (context != NULL) {
@@ -244,14 +244,14 @@ bool os::platform_print_native_stack(outputStream* st, const void* context,
   stk.AddrPC.Mode         = AddrModeFlat;
 
   int count = 0;
-  address lastpc = 0;
+  address lastpc_internal = 0;
   while (count++ < StackPrintLimit) {
     intptr_t* sp = (intptr_t*)stk.AddrStack.Offset;
     intptr_t* fp = (intptr_t*)stk.AddrFrame.Offset; // NOT necessarily the same as ctx.Rbp!
     address pc = (address)stk.AddrPC.Offset;
 
     if (pc != NULL) {
-      if (count == 2 && lastpc == pc) {
+      if (count == 2 && lastpc_internal == pc) {
         // Skip it -- StackWalk64() may return the same PC
         // (but different SP) on the first try.
       } else {
@@ -267,12 +267,13 @@ bool os::platform_print_native_stack(outputStream* st, const void* context,
         }
         st->cr();
       }
-      lastpc = pc;
+      lastpc_internal = pc;
     }
 
     PVOID p = WindowsDbgHelp::symFunctionTableAccess64(GetCurrentProcess(), stk.AddrPC.Offset);
     if (!p) {
       // StackWalk64() can't handle this PC. Calling StackWalk64 again may cause crash.
+      lastpc = lastpc_internal;
       break;
     }
 
@@ -431,6 +432,15 @@ void os::print_context(outputStream *st, const void *context) {
   st->cr();
   st->print(  "RIP=" INTPTR_FORMAT, uc->Rip);
   st->print(", EFLAGS=" INTPTR_FORMAT, uc->EFlags);
+  // Add XMM registers + MXCSR. Note that C2 uses XMM to spill GPR values including pointers.
+  st->cr();
+  st->cr();
+  for (int i = 0; i < 16; ++i) {
+    const uint64_t *xmm = ((const uint64_t*)&(uc->Xmm0)) + 2 * i;
+    st->print_cr("XMM[%d]=" INTPTR_FORMAT " " INTPTR_FORMAT,
+                 i, xmm[1], xmm[0]);
+  }
+  st->print("  MXCSR=" UINT32_FORMAT_X_0, uc->MxCsr);
 #else
   st->print(  "EAX=" INTPTR_FORMAT, uc->Eax);
   st->print(", EBX=" INTPTR_FORMAT, uc->Ebx);
@@ -447,20 +457,24 @@ void os::print_context(outputStream *st, const void *context) {
 #endif // AMD64
   st->cr();
   st->cr();
+}
 
-  intptr_t *sp = (intptr_t *)uc->REG_SP;
-  st->print_cr("Top of Stack: (sp=" PTR_FORMAT ")", sp);
-  print_hex_dump(st, (address)sp, (address)(sp + 32), sizeof(intptr_t));
+void os::print_tos_pc(outputStream *st, const void *context) {
+  if (context == NULL) return;
+
+  const CONTEXT* uc = (const CONTEXT*)context;
+
+  address sp = (address)uc->REG_SP;
+  print_tos(st, sp);
   st->cr();
 
   // Note: it may be unsafe to inspect memory near pc. For example, pc may
   // point to garbage if entry point in an nmethod is corrupted. Leave
   // this at the end, and hope for the best.
   address pc = os::fetch_frame_from_context(uc).pc();
-  print_instructions(st, pc, sizeof(char));
+  print_instructions(st, pc);
   st->cr();
 }
-
 
 void os::print_register_info(outputStream *st, const void *context) {
   if (context == NULL) return;

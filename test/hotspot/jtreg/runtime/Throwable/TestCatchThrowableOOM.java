@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,6 +25,7 @@
  * @test
  * @bug 8267118
  * @summary Test catching Throwable doesn't trigger OOME
+ * @requires vm.flagless
  * @library /test/lib
  * @run driver TestCatchThrowableOOM
  */
@@ -42,10 +43,10 @@ public class TestCatchThrowableOOM {
     };
 
     public static void main(String[] args) throws Throwable {
-        ProcessBuilder pb = ProcessTools.createJavaProcessBuilder("-Xmx64m",
-                                                                  "-Xlog:exceptions=trace",
+        ProcessBuilder pb = ProcessTools.createLimitedTestJavaProcessBuilder("-Xmx64m",
+                                                                             "-Xlog:exceptions=trace",
 
-                                                                  "TestCatchThrowableOOM$OOM");
+                                                                             "TestCatchThrowableOOM$OOM");
         OutputAnalyzer output = new OutputAnalyzer(pb.start());
         output.shouldHaveExitValue(0);
         for (String msg : expected) {

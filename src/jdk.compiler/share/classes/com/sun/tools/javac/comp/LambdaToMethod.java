@@ -165,9 +165,14 @@ public class LambdaToMethod extends TreeTranslator {
         dumpLambdaToMethodStats = options.isSet("debug.dumpLambdaToMethodStats");
         attr = Attr.instance(context);
         forceSerializable = options.isSet("forceSerializable");
-        debugLinesOrVars = options.isSet(Option.G)
-                || options.isSet(Option.G_CUSTOM, "lines")
-                || options.isSet(Option.G_CUSTOM, "vars");
+        boolean lineDebugInfo =
+            options.isUnset(Option.G_CUSTOM) ||
+            options.isSet(Option.G_CUSTOM, "lines");
+        boolean varDebugInfo =
+            options.isUnset(Option.G_CUSTOM)
+            ? options.isSet(Option.G)
+            : options.isSet(Option.G_CUSTOM, "vars");
+        debugLinesOrVars = lineDebugInfo || varDebugInfo;
         verboseDeduplication = options.isSet("debug.dumpLambdaToMethodDeduplication");
         deduplicateLambdas = options.getBoolean("deduplicateLambdas", true);
         nestmateLambdas = Target.instance(context).runtimeUseNestAccess();
@@ -1556,8 +1561,15 @@ public class LambdaToMethod extends TreeTranslator {
         public void visitVarDef(JCVariableDecl tree) {
             TranslationContext<?> context = context();
             if (context != null && context instanceof LambdaTranslationContext lambdaContext) {
-                if (frameStack.head.tree.hasTag(LAMBDA)) {
-                    lambdaContext.addSymbol(tree.sym, LOCAL_VAR);
+                for (Frame frame : frameStack) {
+                    if (frame.tree.hasTag(VARDEF)) {
+                        //skip variable frames inside a lambda:
+                        continue;
+                    } else if (frame.tree.hasTag(LAMBDA)) {
+                        lambdaContext.addSymbol(tree.sym, LOCAL_VAR);
+                    } else {
+                        break;
+                    }
                 }
                 // Check for type variables (including as type arguments).
                 // If they occur within class nested in a lambda, mark for erasure

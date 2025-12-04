@@ -41,6 +41,7 @@
 #include "runtime/handles.inline.hpp"
 #include "runtime/fieldDescriptor.inline.hpp"
 #include "runtime/java.hpp"
+#include "runtime/javaCalls.hpp"
 #include "runtime/jniHandles.inline.hpp"
 #include "runtime/semaphore.inline.hpp"
 #include "runtime/synchronizer.hpp"
@@ -607,6 +608,23 @@ JfrJavaSupport::CAUSE JfrJavaSupport::cause() {
 const char* const JDK_JFR_MODULE_NAME = "jdk.jfr";
 const char* const JDK_JFR_PACKAGE_NAME = "jdk/jfr";
 
+
+
+void JfrJavaSupport::load_jdk_jfr_module(TRAPS) {
+  DEBUG_ONLY(JfrJavaSupport::check_java_thread_in_vm(THREAD));
+  ResourceMark rm(THREAD);
+  HandleMark hm(THREAD);
+  Handle h_module_name = java_lang_String::create_from_str(JDK_JFR_MODULE_NAME, CHECK);
+  JavaValue result(T_OBJECT);
+  JavaCalls::call_static(&result,
+    vmClasses::module_Modules_klass(),
+    vmSymbols::loadModule_name(),
+    vmSymbols::loadModule_signature(),
+    h_module_name,
+    CHECK
+  );
+}
+
 static bool is_jdk_jfr_module_in_readability_graph() {
   // take one of the packages in the module to be located and query for its definition.
   TempNewSymbol pkg_sym = SymbolTable::new_symbol(JDK_JFR_PACKAGE_NAME);
@@ -726,20 +744,21 @@ static bool check_exclusion_state_on_thread_start(JavaThread* jt) {
   return true;
 }
 
-static JavaThread* get_native(jobject thread) {
-  ThreadsListHandle tlh;
+static JavaThread* get_native(ThreadsListHandle& tlh, jobject thread) {
   JavaThread* native_thread = NULL;
   (void)tlh.cv_internal_thread_to_JavaThread(thread, &native_thread, NULL);
   return native_thread;
 }
 
 jlong JfrJavaSupport::jfr_thread_id(jobject thread) {
-  JavaThread* native_thread = get_native(thread);
+  ThreadsListHandle tlh;
+  JavaThread* native_thread = get_native(tlh, thread);
   return native_thread != NULL ? JFR_THREAD_ID(native_thread) : 0;
 }
 
 void JfrJavaSupport::exclude(jobject thread) {
-  JavaThread* native_thread = get_native(thread);
+  ThreadsListHandle tlh;
+  JavaThread* native_thread = get_native(tlh, thread);
   if (native_thread != NULL) {
     JfrThreadLocal::exclude(native_thread);
   } else {
@@ -749,7 +768,8 @@ void JfrJavaSupport::exclude(jobject thread) {
 }
 
 void JfrJavaSupport::include(jobject thread) {
-  JavaThread* native_thread = get_native(thread);
+  ThreadsListHandle tlh;
+  JavaThread* native_thread = get_native(tlh, thread);
   if (native_thread != NULL) {
     JfrThreadLocal::include(native_thread);
   } else {
@@ -759,7 +779,8 @@ void JfrJavaSupport::include(jobject thread) {
 }
 
 bool JfrJavaSupport::is_excluded(jobject thread) {
-  JavaThread* native_thread = get_native(thread);
+  ThreadsListHandle tlh;
+  JavaThread* native_thread = get_native(tlh, thread);
   return native_thread != NULL ? native_thread->jfr_thread_local()->is_excluded() : is_thread_excluded(thread);
 }
 

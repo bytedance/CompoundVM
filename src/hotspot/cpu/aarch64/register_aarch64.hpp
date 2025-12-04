@@ -36,7 +36,7 @@ typedef VMRegImpl* VMReg;
 class RegisterImpl;
 typedef RegisterImpl* Register;
 
-inline Register as_Register(int encoding) {
+inline const Register as_Register(int encoding) {
   return (Register)(intptr_t) encoding;
 }
 
@@ -53,7 +53,7 @@ class RegisterImpl: public AbstractRegisterImpl {
   Register successor() const                          { return as_Register(encoding() + 1); }
 
   // construction
-  inline friend Register as_Register(int encoding);
+  inline friend const Register as_Register(int encoding);
 
   VMReg as_VMReg();
 
@@ -140,7 +140,13 @@ class FloatRegisterImpl: public AbstractRegisterImpl {
     max_slots_per_register = 8,
     save_slots_per_register = 2,
     slots_per_neon_register = 4,
-    extra_save_slots_per_neon_register = slots_per_neon_register - save_slots_per_register
+    extra_save_slots_per_neon_register = slots_per_neon_register - save_slots_per_register,
+    neon_vl = 16,
+    // VLmax: The maximum sve vector length is determined by the hardware
+    // sve_vl_min <= VLmax <= sve_vl_max.
+    sve_vl_min = 16,
+    // Maximum supported vector length across all CPUs
+    sve_vl_max = 256
   };
 
   // construction
@@ -418,6 +424,10 @@ template <>
 inline FloatRegister AbstractRegSet<FloatRegister>::first() {
   uint32_t first = _bitset & -_bitset;
   return first ? as_FloatRegister(exact_log2(first)) : fnoreg;
+}
+
+inline Register as_Register(FloatRegister reg) {
+  return as_Register(reg->encoding());
 }
 
 #endif // CPU_AARCH64_REGISTER_AARCH64_HPP

@@ -49,6 +49,7 @@
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/javaCalls.hpp"
 #include "runtime/jniHandles.inline.hpp"
+#include "runtime/mutexLocker.hpp"
 #include "runtime/notificationThread.hpp"
 #include "runtime/os.hpp"
 #include "runtime/thread.inline.hpp"
@@ -470,8 +471,6 @@ static MemoryPool* get_memory_pool_from_jobject(jobject obj, TRAPS) {
   return MemoryService::get_memory_pool(ph);
 }
 
-#endif // INCLUDE_MANAGEMENT
-
 static void validate_thread_id_array(typeArrayHandle ids_ah, TRAPS) {
   int num_threads = ids_ah->length();
 
@@ -486,8 +485,6 @@ static void validate_thread_id_array(typeArrayHandle ids_ah, TRAPS) {
     }
   }
 }
-
-#if INCLUDE_MANAGEMENT
 
 static void validate_thread_info_array(objArrayHandle infoArray_h, TRAPS) {
   // check if the element of infoArray is of type ThreadInfo class
@@ -2286,9 +2283,7 @@ jlong Management::ticks_to_ms(jlong ticks) {
   return (jlong)(((double)ticks / (double)os::elapsed_frequency())
                  * (double)1000.0);
 }
-#endif // INCLUDE_MANAGEMENT
 
-#if HOTSPOT_TARGET_CLASSLIB == 8
 // Gets the amount of memory allocated on the Java heap since JVM launch.
 JVM_ENTRY(jlong, jmm_GetTotalThreadAllocatedMemory(JNIEnv *env))
     // A thread increments exited_allocated_bytes in ThreadService::remove_thread
@@ -2324,7 +2319,6 @@ JVM_ENTRY(jlong, jmm_GetTotalThreadAllocatedMemory(JNIEnv *env))
     }
     return result;
 JVM_END
-#endif
 
 // Gets the amount of memory allocated on the Java heap for a single thread.
 // Returns -1 if the thread does not exist or has terminated.
@@ -2462,9 +2456,6 @@ JVM_ENTRY(void, jmm_GetThreadCpuTimesWithKind(JNIEnv *env, jlongArray ids,
   }
 JVM_END
 
-
-
-#if INCLUDE_MANAGEMENT
 const struct jmmInterface_1_ jmm_interface = {
   NULL,
   NULL,
@@ -2498,7 +2489,7 @@ const struct jmmInterface_1_ jmm_interface = {
   jmm_DumpHeap0,
   jmm_FindDeadlockedThreads,
   jmm_SetVMGlobal,
-  NULL,
+  jmm_GetTotalThreadAllocatedMemory,
   jmm_DumpThreads,
   jmm_SetGCNotificationEnabled,
   jmm_GetDiagnosticCommands,

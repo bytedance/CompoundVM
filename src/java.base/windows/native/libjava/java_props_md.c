@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1998, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -134,18 +134,19 @@ getEncodingInternal(LCID lcid)
 
 static char* getConsoleEncoding()
 {
-    char* buf = malloc(16);
+    size_t buflen = 16;
+    char* buf = malloc(buflen);
     int cp;
     if (buf == NULL) {
         return NULL;
     }
     cp = GetConsoleCP();
     if (cp >= 874 && cp <= 950)
-        sprintf(buf, "ms%d", cp);
+        snprintf(buf, buflen, "ms%d", cp);
     else if (cp == 65001)
-        sprintf(buf, "UTF-8");
+        snprintf(buf, buflen, "UTF-8");
     else
-        sprintf(buf, "cp%d", cp);
+        snprintf(buf, buflen, "cp%d", cp);
     return buf;
 }
 
@@ -473,6 +474,8 @@ GetJavaProperties(JNIEnv* env)
          *       where (buildNumber > 17762)
          * Windows Server 2022          10              0  (!VER_NT_WORKSTATION)
          *       where (buildNumber > 20347)
+         * Windows Server 2025          10              0  (!VER_NT_WORKSTATION)
+         *       where (buildNumber > 26039)
          *
          * This mapping will presumably be augmented as new Windows
          * versions are released.
@@ -556,7 +559,10 @@ GetJavaProperties(JNIEnv* env)
                     case  0:
                         /* Windows server 2019 GA 10/2018 build number is 17763 */
                         /* Windows server 2022 build number is 20348 */
-                        if (buildNumber > 20347) {
+                        /* Windows server 2025 Preview build is 26040 */
+                        if (buildNumber > 26039) {
+                            sprops.os_name = "Windows Server 2025";
+                        } else if (buildNumber > 20347) {
                             sprops.os_name = "Windows Server 2022";
                         } else if (buildNumber > 17762) {
                             sprops.os_name = "Windows Server 2019";
@@ -575,7 +581,7 @@ GetJavaProperties(JNIEnv* env)
             sprops.os_name = "Windows (unknown)";
             break;
         }
-        sprintf(buf, "%d.%d", majorVersion, minorVersion);
+        snprintf(buf, sizeof(buf), "%d.%d", majorVersion, minorVersion);
         sprops.os_version = _strdup(buf);
 #if defined(_M_AMD64)
         sprops.os_arch = "amd64";

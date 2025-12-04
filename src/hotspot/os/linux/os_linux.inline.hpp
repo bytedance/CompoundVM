@@ -45,6 +45,15 @@ inline bool os::must_commit_stack_guard_pages() {
 inline void os::map_stack_shadow_pages(address sp) {
 }
 
+// Trim-native support
+inline bool os::can_trim_native_heap() {
+#ifdef __GLIBC__
+  return true;
+#else
+  return false; // musl
+#endif
+}
+
 #if defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
 #include <unistd.h>
 #include <sys/socket.h>

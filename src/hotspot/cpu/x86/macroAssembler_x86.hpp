@@ -196,8 +196,8 @@ class MacroAssembler: public Assembler {
   // Alignment
   void align32();
   void align64();
-  void align(int modulus);
-  void align(int modulus, int target);
+  void align(uint modulus);
+  void align(uint modulus, uint target);
 
   // A 5 byte nop that is safe for patching (see patch_verified_entry)
   void fat_nop();
@@ -556,6 +556,16 @@ class MacroAssembler: public Assembler {
                                Label& no_such_interface,
                                bool return_method = true);
 
+  void lookup_interface_method_stub(Register recv_klass,
+                                    Register holder_klass,
+                                    Register resolved_klass,
+                                    Register method_result,
+                                    Register scan_temp,
+                                    Register temp_reg2,
+                                    Register receiver,
+                                    int itable_index,
+                                    Label& L_no_such_interface);
+
   // virtual method calling
   void lookup_virtual_method(Register recv_klass,
                              RegisterOrConstant vtable_index,
@@ -825,6 +835,7 @@ class MacroAssembler: public Assembler {
 
   void testptr(Register src, int32_t imm32) {  LP64_ONLY(testq(src, imm32)) NOT_LP64(testl(src, imm32)); }
   void testptr(Register src1, Address src2) { LP64_ONLY(testq(src1, src2)) NOT_LP64(testl(src1, src2)); }
+  void testptr(Address src, int32_t imm32) {  LP64_ONLY(testq(src, imm32)) NOT_LP64(testl(src, imm32)); }
   void testptr(Register src1, Register src2);
 
   void xorptr(Register dst, Register src) { LP64_ONLY(xorq(dst, src)) NOT_LP64(xorl(dst, src)); }
@@ -964,6 +975,8 @@ private:
   void roundDec(XMMRegister key, int rnum);
   void lastroundDec(XMMRegister key, int rnum);
   void ev_load_key(XMMRegister xmmdst, Register key, int offset, XMMRegister xmm_shuf_mask);
+  void ev_add128(XMMRegister xmmdst, XMMRegister xmmsrc1, XMMRegister xmmsrc2,
+                 int vector_len, KRegister ktmp, Register rscratch = noreg);
 
 public:
   void aesecb_encrypt(Register source_addr, Register dest_addr, Register key, Register len);

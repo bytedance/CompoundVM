@@ -438,8 +438,10 @@ class java_lang_Thread : AllStatic {
 
   // Returns the JavaThread associated with the thread obj
   static JavaThread* thread(oop java_thread);
+  static JavaThread* thread_acquire(oop java_thread);
   // Set JavaThread for instance
   static void set_thread(oop java_thread, JavaThread* thread);
+  static void release_set_thread(oop java_thread, JavaThread* thread);
   // Interrupted status
   static bool interrupted(oop java_thread);
   static void set_interrupted(oop java_thread, bool val);
@@ -565,12 +567,14 @@ class java_lang_Throwable: AllStatic {
   static void set_backtrace(oop throwable, oop value);
   static int depth(oop throwable);
   static void set_depth(oop throwable, int value);
-  static int get_detailMessage_offset() { CHECK_INIT(_detailMessage_offset); }
   // Message
+  static int get_detailMessage_offset() { CHECK_INIT(_detailMessage_offset); }
   static oop message(oop throwable);
-  static oop cause(oop throwable);
+  static const char* message_as_utf8(oop throwable);
   static void set_message(oop throwable, oop value);
-  static Symbol* detail_message(oop throwable);
+
+  static oop cause(oop throwable);
+
   static void print_stack_element(outputStream *st, Method* method, int bci);
 
   static void compute_offsets();
@@ -946,6 +950,8 @@ class java_lang_ref_Reference: AllStatic {
   static bool is_referent_field(oop obj, ptrdiff_t offset);
   static inline bool is_final(oop ref);
   static inline bool is_phantom(oop ref);
+  static inline bool is_weak(oop ref);
+  static inline bool is_soft(oop ref);
 
   static int referent_offset()    { CHECK_INIT(_referent_offset); }
   static int queue_offset()       { CHECK_INIT(_queue_offset); }

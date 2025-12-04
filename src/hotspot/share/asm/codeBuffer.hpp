@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -195,7 +195,7 @@ class CodeSection {
   }
   void    set_locs_point(address pc) {
     assert(pc >= locs_point(), "relocation addr may not decrease");
-    assert(allocates2(pc),     "relocation addr must be in this section");
+    assert(allocates2(pc),     "relocation addr " INTPTR_FORMAT " must be in this section from " INTPTR_FORMAT " to " INTPTR_FORMAT, p2i(pc), p2i(_start), p2i(_limit));
     _locs_point = pc;
   }
 
@@ -222,7 +222,11 @@ class CodeSection {
     set_end(curr);
   }
 
-  void emit_int32(int32_t x) { *((int32_t*) end()) = x; set_end(end() + sizeof(int32_t)); }
+  void emit_int32(int32_t x) {
+    address curr = end();
+    *((int32_t*) curr) = x;
+    set_end(curr + sizeof(int32_t));
+  }
   void emit_int32(int8_t x1, int8_t x2, int8_t x3, int8_t x4)  {
     address curr = end();
     *((int8_t*)  curr++) = x1;

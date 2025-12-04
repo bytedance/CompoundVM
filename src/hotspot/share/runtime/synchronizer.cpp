@@ -53,6 +53,7 @@
 #include "runtime/synchronizer.hpp"
 #include "runtime/thread.inline.hpp"
 #include "runtime/timer.hpp"
+#include "runtime/trimNativeHeap.hpp"
 #include "runtime/vframe.hpp"
 #include "runtime/vmThread.hpp"
 #include "utilities/align.hpp"
@@ -81,44 +82,68 @@ size_t MonitorList::max() const {
   return Atomic::load(&_max);
 }
 
-// Walk the in-use list and unlink (at most MonitorDeflationMax) deflated
-// ObjectMonitors. Returns the number of unlinked ObjectMonitors.
+// Walk the in-use list and unlink deflated ObjectMonitors.
+// Returns the number of unlinked ObjectMonitors.
 size_t MonitorList::unlink_deflated(Thread* current, LogStream* ls,
                                     elapsedTimer* timer_p,
+                                    size_t deflated_count,
                                     GrowableArray<ObjectMonitor*>* unlinked_list) {
   size_t unlinked_count = 0;
-  ObjectMonitor* prev = NULL;
-  ObjectMonitor* head = Atomic::load_acquire(&_head);
-  ObjectMonitor* m = head;
-  // The in-use list head can be NULL during the final audit.
-  while (m != NULL) {
+  ObjectMonitor* prev = nullptr;
+  ObjectMonitor* m = Atomic::load_acquire(&_head);
+
+  // The in-use list head can be null during the final audit.
+  while (m != nullptr) {
     if (m->is_being_async_deflated()) {
-      // Find next live ObjectMonitor.
+      // Find next live ObjectMonitor. Batch up the unlinkable monitors, so we can
+      // modify the list once per batch. The batch starts at "m".
+      size_t unlinked_batch = 0;
       ObjectMonitor* next = m;
+      // Look for at most MonitorUnlinkBatch monitors, or the number of
+      // deflated and not unlinked monitors, whatever comes first.
+      assert(deflated_count >= unlinked_count, "Sanity: underflow");
+      size_t unlinked_batch_limit = MIN2<size_t>(deflated_count - unlinked_count, MonitorUnlinkBatch);
       do {
         ObjectMonitor* next_next = next->next_om();
-        unlinked_count++;
+        unlinked_batch++;
         unlinked_list->append(next);
         next = next_next;
-        if (unlinked_count >= (size_t)MonitorDeflationMax) {
-          // Reached the max so bail out on the gathering loop.
+        if (unlinked_batch >= unlinked_batch_limit) {
+          // Reached the max batch, so bail out of the gathering loop.
           break;
         }
-      } while (next != NULL && next->is_being_async_deflated());
-      if (prev == NULL) {
-        ObjectMonitor* prev_head = Atomic::cmpxchg(&_head, head, next);
-        if (prev_head != head) {
-          // Find new prev ObjectMonitor that just got inserted.
+        if (prev == nullptr && Atomic::load(&_head) != m) {
+          // Current batch used to be at head, but it is not at head anymore.
+          // Bail out and figure out where we currently are. This avoids long
+          // walks searching for new prev during unlink under heavy list inserts.
+          break;
+        }
+      } while (next != nullptr && next->is_being_async_deflated());
+
+      // Unlink the found batch.
+      if (prev == nullptr) {
+        // The current batch is the first batch, so there is a chance that it starts at head.
+        // Optimistically assume no inserts happened, and try to unlink the entire batch from the head.
+        ObjectMonitor* prev_head = Atomic::cmpxchg(&_head, m, next);
+        if (prev_head != m) {
+          // Something must have updated the head. Figure out the actual prev for this batch.
           for (ObjectMonitor* n = prev_head; n != m; n = n->next_om()) {
             prev = n;
           }
+          assert(prev != nullptr, "Should have found the prev for the current batch");
           prev->set_next_om(next);
         }
       } else {
+        // The current batch is preceded by another batch. This guarantees the current batch
+        // does not start at head. Unlink the entire current batch without updating the head.
+        assert(Atomic::load(&_head) != m, "Sanity");
         prev->set_next_om(next);
       }
-      if (unlinked_count >= (size_t)MonitorDeflationMax) {
-        // Reached the max so bail out on the searching loop.
+
+      unlinked_count += unlinked_batch;
+      if (unlinked_count >= deflated_count) {
+        // Reached the max so bail out of the searching loop.
+        // There should be no more deflated monitors left.
         break;
       }
       m = next;
@@ -134,6 +159,20 @@ size_t MonitorList::unlink_deflated(Thread* current, LogStream* ls,
                                             ls, timer_p);
     }
   }
+
+#ifdef ASSERT
+  // Invariant: the code above should unlink all deflated monitors.
+  // The code that runs after this unlinking does not expect deflated monitors.
+  // Notably, attempting to deflate the already deflated monitor would break.
+  {
+    ObjectMonitor* m = Atomic::load_acquire(&_head);
+    while (m != nullptr) {
+      assert(!m->is_being_async_deflated(), "All deflated monitors should be unlinked");
+      m = m->next_om();
+    }
+  }
+#endif
+
   Atomic::sub(&_count, unlinked_count);
   return unlinked_count;
 }
@@ -748,14 +787,14 @@ struct SharedGlobals {
 static SharedGlobals GVars;
 
 static markWord read_stable_mark(oop obj) {
-  markWord mark = obj->mark();
+  markWord mark = obj->mark_acquire();
   if (!mark.is_being_inflated()) {
     return mark;       // normal fast-path return
   }
 
   int its = 0;
   for (;;) {
-    markWord mark = obj->mark();
+    markWord mark = obj->mark_acquire();
     if (!mark.is_being_inflated()) {
       return mark;    // normal fast-path return
     }
@@ -789,7 +828,7 @@ static markWord read_stable_mark(oop obj) {
         int YieldThenBlock = 0;
         assert(ix >= 0 && ix < NINFLATIONLOCKS, "invariant");
         gInflationLocks[ix]->lock();
-        while (obj->mark() == markWord::INFLATING()) {
+        while (obj->mark_acquire() == markWord::INFLATING()) {
           // Beware: naked_yield() is advisory and has almost no effect on some platforms
           // so we periodically call current->_ParkEvent->park(1).
           // We use a mixed spin/yield/block mechanism.
@@ -937,7 +976,8 @@ intptr_t ObjectSynchronizer::FastHashCode(Thread* current, oop obj) {
       }
       // Fall thru so we only have one place that installs the hash in
       // the ObjectMonitor.
-    } else if (current->is_lock_owned((address)mark.locker())) {
+    } else if (current->is_Java_thread()
+               && current->as_Java_thread()->is_lock_owned((address)mark.locker())) {
       // This is a stack lock owned by the calling thread so fetch the
       // displaced markWord from the BasicLock on the stack.
       temp = mark.displaced_mark_helper();
@@ -1238,7 +1278,6 @@ static void post_monitor_inflate_event(EventJavaMonitorInflate* event,
                                        const oop obj,
                                        ObjectSynchronizer::InflateCause cause) {
   assert(event != NULL, "invariant");
-  assert(event->should_commit(), "invariant");
   event->set_monitorClass(obj->klass());
   event->set_address((uintptr_t)(void*)obj);
   event->set_cause((u1)cause);
@@ -1247,7 +1286,7 @@ static void post_monitor_inflate_event(EventJavaMonitorInflate* event,
 
 // Fast path code shared by multiple functions
 void ObjectSynchronizer::inflate_helper(oop obj) {
-  markWord mark = obj->mark();
+  markWord mark = obj->mark_acquire();
   if (mark.has_monitor()) {
     ObjectMonitor* monitor = mark.monitor();
     markWord dmw = monitor->header();
@@ -1262,7 +1301,7 @@ ObjectMonitor* ObjectSynchronizer::inflate(Thread* current, oop object,
   EventJavaMonitorInflate event;
 
   for (;;) {
-    const markWord mark = object->mark();
+    const markWord mark = object->mark_acquire();
     assert(!mark.has_bias_pattern(), "invariant");
 
     // The mark can be in one of the following states:
@@ -1535,6 +1574,7 @@ size_t ObjectSynchronizer::deflate_idle_monitors() {
     ResourceMark rm;
     GrowableArray<ObjectMonitor*> delete_list((int)deflated_count);
     size_t unlinked_count = _in_use_list.unlink_deflated(current, ls, &timer,
+                                                         deflated_count,
                                                          &delete_list);
     if (current->is_Java_thread()) {
       if (ls != NULL) {
@@ -1558,6 +1598,8 @@ size_t ObjectSynchronizer::deflate_idle_monitors() {
         timer.start();
       }
     }
+
+    NativeHeapTrimmer::SuspendMark sm("monitor deletion");
 
     // After the handshake, safely free the ObjectMonitors that were
     // deflated in this cycle.
@@ -1691,7 +1733,7 @@ void ObjectSynchronizer::do_final_audit_and_print_stats() {
       ; // empty
     }
     // The other audit_and_print_stats() call is done at the Debug
-    // level at a safepoint in ObjectSynchronizer::do_safepoint_work().
+    // level at a safepoint in SafepointSynchronize::do_cleanup_tasks.
     ObjectSynchronizer::audit_and_print_stats(true /* on_exit */);
   }
 }

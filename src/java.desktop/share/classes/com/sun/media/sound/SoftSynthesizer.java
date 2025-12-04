@@ -289,12 +289,11 @@ public final class SoftSynthesizer implements AudioSynthesizer,
                     c.current_instrument = null;
                     c.current_director = null;
                 }
-            for (Instrument instrument : instruments) {
+            for (ModelInstrument instrument : instruments) {
                 String pat = patchToString(instrument.getPatch());
-                SoftInstrument softins
-                        = new SoftInstrument((ModelInstrument) instrument);
+                SoftInstrument softins = new SoftInstrument(instrument);
                 inslist.put(pat, softins);
-                loadedlist.put(pat, (ModelInstrument) instrument);
+                loadedlist.put(pat, instrument);
             }
         }
 
@@ -756,10 +755,8 @@ public final class SoftSynthesizer implements AudioSynthesizer,
                     InputStream is = AccessController.doPrivileged(action);
                     if(is == null) continue;
                     Soundbank sbk;
-                    try {
+                    try (is) {
                         sbk = MidiSystem.getSoundbank(new BufferedInputStream(is));
-                    } finally {
-                        is.close();
                     }
                     if (sbk != null) {
                         defaultSoundBank = sbk;
@@ -803,9 +800,8 @@ public final class SoftSynthesizer implements AudioSynthesizer,
                             return null;
                         });
                 if (out != null) {
-                    try {
+                    try (out) {
                         ((SF2Soundbank) defaultSoundBank).save(out);
-                        out.close();
                     } catch (final IOException ignored) {
                     }
                 }

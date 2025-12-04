@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -33,7 +33,9 @@ import java.nio.file.Paths;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import static java.util.Locale.ROOT;
 
 public class Platform {
     public  static final String vmName      = privilegedGetProperty("java.vm.name");
@@ -133,7 +135,7 @@ public class Platform {
     }
 
     private static boolean isOs(String osname) {
-        return osName.toLowerCase().startsWith(osname.toLowerCase());
+        return osName.toLowerCase(ROOT).startsWith(osname.toLowerCase(ROOT));
     }
 
     public static String getOsName() {
@@ -174,15 +176,15 @@ public class Platform {
     }
 
     public static boolean isDebugBuild() {
-        return (jdkDebug.toLowerCase().contains("debug"));
+        return (jdkDebug.toLowerCase(ROOT).contains("debug"));
     }
 
     public static boolean isSlowDebugBuild() {
-        return (jdkDebug.toLowerCase().equals("slowdebug"));
+        return (jdkDebug.toLowerCase(ROOT).equals("slowdebug"));
     }
 
     public static boolean isFastDebugBuild() {
-        return (jdkDebug.toLowerCase().equals("fastdebug"));
+        return (jdkDebug.toLowerCase(ROOT).equals("fastdebug"));
     }
 
     public static String getVMVersion() {
@@ -208,6 +210,10 @@ public class Platform {
 
     public static boolean isARM() {
         return isArch("arm.*");
+    }
+
+    public static boolean isRISCV64() {
+        return isArch("riscv64");
     }
 
     public static boolean isPPC() {
@@ -256,63 +262,102 @@ public class Platform {
         return true;
     }
 
-    /**
-     * Return true if the test JDK is signed, otherwise false. Only valid on OSX.
-     */
-    public static boolean isSignedOSX() throws IOException {
-        // We only care about signed binaries for 10.14 and later (actually 10.14.5, but
-        // for simplicity we'll also include earlier 10.14 versions).
-        if (getOsVersionMajor() == 10 && getOsVersionMinor() < 14) {
-            return false; // assume not signed
-        }
-
-        // Find the path to the java binary.
+    private static Process launchCodesignOnJavaBinary() throws IOException {
         String jdkPath = System.getProperty("java.home");
         Path javaPath = Paths.get(jdkPath + "/bin/java");
         String javaFileName = javaPath.toAbsolutePath().toString();
         if (Files.notExists(javaPath)) {
             throw new FileNotFoundException("Could not find file " + javaFileName);
         }
-
-        // Run codesign on the java binary.
-        ProcessBuilder pb = new ProcessBuilder("codesign", "-d", "-v", javaFileName);
-        pb.redirectError(ProcessBuilder.Redirect.DISCARD);
-        pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+        ProcessBuilder pb = new ProcessBuilder("codesign", "--display", "--verbose", javaFileName);
+        pb.redirectErrorStream(true); // redirect stderr to stdout
         Process codesignProcess = pb.start();
+        return codesignProcess;
+    }
+
+    public static boolean hasOSXPlistEntries() throws IOException {
+        Process codesignProcess = launchCodesignOnJavaBinary();
+        BufferedReader is = new BufferedReader(new InputStreamReader(codesignProcess.getInputStream()));
+        String line;
+        while ((line = is.readLine()) != null) {
+            System.out.println("STDOUT: " + line);
+            if (line.indexOf("Info.plist=not bound") != -1) {
+                return false;
+            }
+            if (line.indexOf("Info.plist entries=") != -1) {
+                return true;
+            }
+        }
+        System.out.println("No matching Info.plist entry was found");
+        return false;
+    }
+
+    /**
+     * Return true if the test JDK is hardened, otherwise false. Only valid on OSX.
+     */
+    public static boolean isHardenedOSX() throws IOException {
+        // We only care about hardened binaries for 10.14 and later (actually 10.14.5, but
+        // for simplicity we'll also include earlier 10.14 versions).
+        if (getOsVersionMajor() == 10 && getOsVersionMinor() < 14) {
+            return false; // assume not hardened
+        }
+        Process codesignProcess = launchCodesignOnJavaBinary();
+        BufferedReader is = new BufferedReader(new InputStreamReader(codesignProcess.getInputStream()));
+        String line;
+        boolean isHardened = false;
+        boolean hardenedStatusConfirmed = false; // set true when we confirm whether or not hardened
+        while ((line = is.readLine()) != null) {
+            System.out.println("STDOUT: " + line);
+            if (line.indexOf("flags=0x10000(runtime)") != -1 ) {
+                hardenedStatusConfirmed = true;
+                isHardened = true;
+                System.out.println("Target JDK is hardened. Some tests may be skipped.");
+            } else if (line.indexOf("flags=0x20002(adhoc,linker-signed)") != -1 ) {
+                hardenedStatusConfirmed = true;
+                isHardened = false;
+                System.out.println("Target JDK is adhoc signed, but not hardened.");
+            } else if (line.indexOf("code object is not signed at all") != -1) {
+                hardenedStatusConfirmed = true;
+                isHardened = false;
+                System.out.println("Target JDK is not signed, therefore not hardened.");
+            }
+        }
+        if (!hardenedStatusConfirmed) {
+            System.out.println("Could not confirm if TargetJDK is hardened. Assuming not hardened.");
+            isHardened = false;
+        }
+
         try {
             if (codesignProcess.waitFor(10, TimeUnit.SECONDS) == false) {
-                System.err.println("Timed out waiting for the codesign process to complete. Assuming not signed.");
+                System.err.println("Timed out waiting for the codesign process to complete. Assuming not hardened.");
                 codesignProcess.destroyForcibly();
-                return false; // assume not signed
+                return false; // assume not hardened
             }
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
 
-        // Check codesign result to see if java binary is signed. Here are the
-        // exit code meanings:
-        //    0: signed
-        //    1: not signed
-        //    2: invalid arguments
-        //    3: only has meaning with the -R argument.
-        // So we should always get 0 or 1 as an exit value.
-        if (codesignProcess.exitValue() == 0) {
-            System.out.println("Target JDK is signed. Some tests may be skipped.");
-            return true; // signed
-        } else if (codesignProcess.exitValue() == 1) {
-            System.out.println("Target JDK is not signed.");
-            return false; // not signed
-        } else {
-            System.err.println("Executing codesign failed. Assuming unsigned: " +
-                               codesignProcess.exitValue());
-            return false; // not signed
-        }
+        return isHardened;
     }
 
     private static boolean isArch(String archnameRE) {
         return Pattern.compile(archnameRE, Pattern.CASE_INSENSITIVE)
                       .matcher(osArch)
                       .matches();
+    }
+
+    public static boolean isOracleLinux7() {
+        if (System.getProperty("os.name").toLowerCase(ROOT).contains("linux") &&
+                System.getProperty("os.version").toLowerCase(ROOT).contains("el")) {
+            Pattern p = Pattern.compile("el(\\d+)");
+            Matcher m = p.matcher(System.getProperty("os.version"));
+            if (m.find()) {
+                try {
+                    return Integer.parseInt(m.group(1)) <= 7;
+                } catch (NumberFormatException nfe) {}
+            }
+        }
+        return false;
     }
 
     /**
@@ -406,5 +451,14 @@ public class Platform {
      */
     public static boolean areCustomLoadersSupportedForCDS() {
         return (is64bit() && (isLinux() || isOSX()));
+    }
+
+    /**
+     * Checks if the current system is running on Wayland display server on Linux.
+     *
+     * @return {@code true} if the system is running on Wayland display server
+     */
+    public static boolean isOnWayland() {
+        return System.getenv("WAYLAND_DISPLAY") != null;
     }
 }

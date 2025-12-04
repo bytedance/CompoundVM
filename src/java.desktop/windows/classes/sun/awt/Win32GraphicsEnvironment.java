@@ -82,7 +82,7 @@ public final class Win32GraphicsEnvironment extends SunGraphicsEnvironment {
     }
 
     /**
-     * Initializes native components of the graphics environment.  This
+     * Initializes native components of the graphics environment. This
      * includes everything from the native GraphicsDevice elements to
      * the DirectX rendering layer.
      */

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2011, 2021, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2011, 2022, Oracle and/or its affiliates. All rights reserved.
 # DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 #
 # This code is free software; you can redistribute it and/or modify it
@@ -358,9 +358,9 @@ AC_DEFUN_ONCE([BASIC_SETUP_OUTPUT_DIR],
     # WARNING: This might be a bad thing to do. You need to be sure you want to
     # have a configuration in this directory. Do some sanity checks!
 
-    if test ! -e "$OUTPUTDIR/spec.gmk"; then
-      # If we have a spec.gmk, we have run here before and we are OK. Otherwise, check for
-      # other files
+    if test ! -e "$OUTPUTDIR/spec.gmk" && test ! -e "$OUTPUTDIR/configure-support/generated-configure.sh"; then
+      # If we have a spec.gmk or configure-support/generated-configure.sh,
+      # we have run here before and we are OK. Otherwise, check for other files
       files_present=`$LS $OUTPUTDIR`
       # Configure has already touched config.log and confdefs.h in the current dir when this check
       # is performed.
@@ -375,8 +375,9 @@ AC_DEFUN_ONCE([BASIC_SETUP_OUTPUT_DIR],
         AC_MSG_NOTICE([Current directory is $CONFIGURE_START_DIR.])
         AC_MSG_NOTICE([Since this is not the source root, configure will output the configuration here])
         AC_MSG_NOTICE([(as opposed to creating a configuration in <src_root>/build/<conf-name>).])
-        AC_MSG_NOTICE([However, this directory is not empty. This is not allowed, since it could])
-        AC_MSG_NOTICE([seriously mess up just about everything.])
+        AC_MSG_NOTICE([However, this directory is not empty, additionally to some allowed files])
+        AC_MSG_NOTICE([it contains $filtered_files.])
+        AC_MSG_NOTICE([This is not allowed, since it could seriously mess up just about everything.])
         AC_MSG_NOTICE([Try 'cd $TOPDIR' and restart configure])
         AC_MSG_NOTICE([(or create a new empty directory and cd to it).])
         AC_MSG_ERROR([Will not continue creating configuration in $CONFIGURE_START_DIR])
@@ -451,7 +452,9 @@ AC_DEFUN([BASIC_CHECK_DIR_ON_LOCAL_DISK],
 AC_DEFUN_ONCE([BASIC_CHECK_SRC_PERMS],
 [
   if test "x$OPENJDK_BUILD_OS_ENV" = "xwindows.cygwin"; then
-    file_to_test="$TOPDIR/LICENSE"
+    # The choice of file here is somewhat arbitrary, it just needs to be there
+    # in the source tree when configure runs
+    file_to_test="$TOPDIR/Makefile"
     if test `$STAT -c '%a' "$file_to_test"` -lt 400; then
       AC_MSG_ERROR([Bad file permissions on src files. This is usually caused by cloning the repositories with a non cygwin hg in a directory not created in cygwin.])
     fi

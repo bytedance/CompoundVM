@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2016, 2024, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -30,7 +30,7 @@
  * @requires vm.jvmti
  * @library /test/lib /test/hotspot/jtreg/serviceability/jvmti/RedefineClasses /test/hotspot/jtreg/runtime/cds/appcds
  * @run driver RedefineClassHelper
- * @build sun.hotspot.WhiteBox RedefineRunningMethods_SharedHelper
+ * @build jdk.test.whitebox.WhiteBox RedefineRunningMethods_SharedHelper
  * @run driver RedefineRunningMethods_Shared
  */
 
@@ -50,11 +50,12 @@ public class RedefineRunningMethods_Shared {
         "jdk/test/lib/compiler/InMemoryJavaCompiler",
         "jdk/test/lib/compiler/InMemoryJavaCompiler$FileManagerWrapper",
         "jdk/test/lib/compiler/InMemoryJavaCompiler$FileManagerWrapper$1",
-        "jdk/test/lib/compiler/InMemoryJavaCompiler$MemoryJavaFileObject"
+        "jdk/test/lib/compiler/InMemoryJavaCompiler$SourceFile",
+        "jdk/test/lib/compiler/InMemoryJavaCompiler$ClassFile"
     };
 
     public static void main(String[] args) throws Exception {
-        String wbJar = ClassFileInstaller.writeJar("WhiteBox.jar", "sun.hotspot.WhiteBox");
+        String wbJar = ClassFileInstaller.writeJar("WhiteBox.jar", "jdk.test.whitebox.WhiteBox");
         String appJar = ClassFileInstaller.writeJar("RedefineRunningMethods_Shared.jar", shared_classes);
         String use_whitebox_jar = "-Xbootclasspath/a:" + wbJar;
 

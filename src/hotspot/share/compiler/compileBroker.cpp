@@ -185,7 +185,7 @@ int CompileBroker::_sum_standard_bytes_compiled    = 0;
 int CompileBroker::_sum_nmethod_size               = 0;
 int CompileBroker::_sum_nmethod_code_size          = 0;
 
-long CompileBroker::_peak_compilation_time         = 0;
+jlong CompileBroker::_peak_compilation_time        = 0;
 
 CompilerStatistics CompileBroker::_stats_per_level[CompLevel_full_optimization];
 
@@ -878,90 +878,75 @@ void DeoptimizeObjectsALotThread::deoptimize_objects_alot_loop_all() {
 
 JavaThread* CompileBroker::make_thread(ThreadType type, jobject thread_handle, CompileQueue* queue, AbstractCompiler* comp, JavaThread* THREAD) {
   JavaThread* new_thread = NULL;
-  {
-    MutexLocker mu(THREAD, Threads_lock);
-    switch (type) {
-      case compiler_t:
-        assert(comp != NULL, "Compiler instance missing.");
-        if (!InjectCompilerCreationFailure || comp->num_compiler_threads() == 0) {
-          CompilerCounters* counters = new CompilerCounters();
-          new_thread = new CompilerThread(queue, counters);
-        }
-        break;
-      case sweeper_t:
-        new_thread = new CodeCacheSweeperThread();
-        break;
+
+  switch (type) {
+    case compiler_t:
+      assert(comp != NULL, "Compiler instance missing.");
+      if (!InjectCompilerCreationFailure || comp->num_compiler_threads() == 0) {
+        CompilerCounters* counters = new CompilerCounters();
+        new_thread = new CompilerThread(queue, counters);
+      }
+      break;
+    case sweeper_t:
+      new_thread = new CodeCacheSweeperThread();
+      break;
 #if defined(ASSERT) && COMPILER2_OR_JVMCI
-      case deoptimizer_t:
-        new_thread = new DeoptimizeObjectsALotThread();
-        break;
+    case deoptimizer_t:
+      new_thread = new DeoptimizeObjectsALotThread();
+      break;
 #endif // ASSERT
-      default:
-        ShouldNotReachHere();
-    }
-
-    // At this point the new CompilerThread data-races with this startup
-    // thread (which I believe is the primoridal thread and NOT the VM
-    // thread).  This means Java bytecodes being executed at startup can
-    // queue compile jobs which will run at whatever default priority the
-    // newly created CompilerThread runs at.
-
-
-    // At this point it may be possible that no osthread was created for the
-    // JavaThread due to lack of memory. We would have to throw an exception
-    // in that case. However, since this must work and we do not allow
-    // exceptions anyway, check and abort if this fails. But first release the
-    // lock.
-
-    if (new_thread != NULL && new_thread->osthread() != NULL) {
-
-      java_lang_Thread::set_thread(JNIHandles::resolve_non_null(thread_handle), new_thread);
-
-      // Note that this only sets the JavaThread _priority field, which by
-      // definition is limited to Java priorities and not OS priorities.
-      // The os-priority is set in the CompilerThread startup code itself
-
-      java_lang_Thread::set_priority(JNIHandles::resolve_non_null(thread_handle), NearMaxPriority);
-
-      // Note that we cannot call os::set_priority because it expects Java
-      // priorities and we are *explicitly* using OS priorities so that it's
-      // possible to set the compiler thread priority higher than any Java
-      // thread.
-
-      int native_prio = CompilerThreadPriority;
-      if (native_prio == -1) {
-        if (UseCriticalCompilerThreadPriority) {
-          native_prio = os::java_to_os_priority[CriticalPriority];
-        } else {
-          native_prio = os::java_to_os_priority[NearMaxPriority];
-        }
-      }
-      os::set_native_priority(new_thread, native_prio);
-
-      java_lang_Thread::set_daemon(JNIHandles::resolve_non_null(thread_handle));
-
-      new_thread->set_threadObj(JNIHandles::resolve_non_null(thread_handle));
-      if (type == compiler_t) {
-        CompilerThread::cast(new_thread)->set_compiler(comp);
-      }
-      Threads::add(new_thread);
-      Thread::start(new_thread);
-    }
+    default:
+      ShouldNotReachHere();
   }
 
-  // First release lock before aborting VM.
-  if (new_thread == NULL || new_thread->osthread() == NULL) {
-    if (UseDynamicNumberOfCompilerThreads && type == compiler_t && comp->num_compiler_threads() > 0) {
-      if (new_thread != NULL) {
-        new_thread->smr_delete();
+  // At this point the new CompilerThread data-races with this startup
+  // thread (which is the main thread and NOT the VM thread).
+  // This means Java bytecodes being executed at startup can
+  // queue compile jobs which will run at whatever default priority the
+  // newly created CompilerThread runs at.
+
+
+  // At this point it may be possible that no osthread was created for the
+  // JavaThread due to lack of resources. We will handle that failure below.
+  // Also check new_thread so that static analysis is happy.
+  if (new_thread != NULL && new_thread->osthread() != NULL) {
+    Handle thread_oop(THREAD, JNIHandles::resolve_non_null(thread_handle));
+
+    if (type == compiler_t) {
+      CompilerThread::cast(new_thread)->set_compiler(comp);
+    }
+
+    // Note that we cannot call os::set_priority because it expects Java
+    // priorities and we are *explicitly* using OS priorities so that it's
+    // possible to set the compiler thread priority higher than any Java
+    // thread.
+
+    int native_prio = CompilerThreadPriority;
+    if (native_prio == -1) {
+      if (UseCriticalCompilerThreadPriority) {
+        native_prio = os::java_to_os_priority[CriticalPriority];
+      } else {
+        native_prio = os::java_to_os_priority[NearMaxPriority];
       }
+    }
+    os::set_native_priority(new_thread, native_prio);
+
+    // Note that this only sets the JavaThread _priority field, which by
+    // definition is limited to Java priorities and not OS priorities.
+    JavaThread::start_internal_daemon(THREAD, new_thread, thread_oop, NearMaxPriority);
+
+  } else { // osthread initialization failure
+    if (UseDynamicNumberOfCompilerThreads && type == compiler_t
+        && comp->num_compiler_threads() > 0) {
+      // The new thread is not known to Thread-SMR yet so we can just delete.
+      delete new_thread;
       return NULL;
+    } else {
+      vm_exit_during_initialization("java.lang.OutOfMemoryError",
+                                    os::native_thread_creation_failed_msg());
     }
-    vm_exit_during_initialization("java.lang.OutOfMemoryError",
-                                  os::native_thread_creation_failed_msg());
   }
 
-  // Let go of Threads_lock before yielding
   os::naked_yield(); // make sure that the compiler thread is started early (especially helpful on SOLARIS)
 
   return new_thread;
@@ -1013,7 +998,7 @@ void CompileBroker::init_compiler_sweeper_threads() {
     // for JVMCI compiler which can create further ones on demand.
     JVMCI_ONLY(if (!UseJVMCICompiler || !UseDynamicNumberOfCompilerThreads || i == 0) {)
     // Create a name for our thread.
-    sprintf(name_buffer, "%s CompilerThread%d", _compilers[1]->name(), i);
+    os::snprintf_checked(name_buffer, sizeof(name_buffer), "%s CompilerThread%d", _compilers[1]->name(), i);
     Handle thread_oop = create_thread_oop(name_buffer, CHECK);
     thread_handle = JNIHandles::make_global(thread_oop);
     JVMCI_ONLY(})
@@ -1037,7 +1022,7 @@ void CompileBroker::init_compiler_sweeper_threads() {
 
   for (int i = 0; i < _c1_count; i++) {
     // Create a name for our thread.
-    sprintf(name_buffer, "C1 CompilerThread%d", i);
+    os::snprintf_checked(name_buffer, sizeof(name_buffer), "C1 CompilerThread%d", i);
     Handle thread_oop = create_thread_oop(name_buffer, CHECK);
     jobject thread_handle = JNIHandles::make_global(thread_oop);
     _compiler1_objects[i] = thread_handle;
@@ -1084,18 +1069,34 @@ void CompileBroker::init_compiler_sweeper_threads() {
 
 void CompileBroker::possibly_add_compiler_threads(JavaThread* THREAD) {
 
+  int old_c2_count = 0, new_c2_count = 0, old_c1_count = 0, new_c1_count = 0;
+  const int c2_tasks_per_thread = 2, c1_tasks_per_thread = 4;
+
+  // Quick check if we already have enough compiler threads without taking the lock.
+  // Numbers may change concurrently, so we read them again after we have the lock.
+  if (_c2_compile_queue != nullptr) {
+    old_c2_count = get_c2_thread_count();
+    new_c2_count = MIN2(_c2_count, _c2_compile_queue->size() / c2_tasks_per_thread);
+  }
+  if (_c1_compile_queue != nullptr) {
+    old_c1_count = get_c1_thread_count();
+    new_c1_count = MIN2(_c1_count, _c1_compile_queue->size() / c1_tasks_per_thread);
+  }
+  if (new_c2_count <= old_c2_count && new_c1_count <= old_c1_count) return;
+
+  // Now, we do the more expensive operations.
   julong available_memory = os::available_memory();
   // If SegmentedCodeCache is off, both values refer to the single heap (with type CodeBlobType::All).
-  size_t available_cc_np  = CodeCache::unallocated_capacity(CodeBlobType::MethodNonProfiled),
-         available_cc_p   = CodeCache::unallocated_capacity(CodeBlobType::MethodProfiled);
+  size_t available_cc_np = CodeCache::unallocated_capacity(CodeBlobType::MethodNonProfiled),
+         available_cc_p  = CodeCache::unallocated_capacity(CodeBlobType::MethodProfiled);
 
-  // Only do attempt to start additional threads if the lock is free.
+  // Only attempt to start additional threads if the lock is free.
   if (!CompileThread_lock->try_lock()) return;
 
   if (_c2_compile_queue != NULL) {
-    int old_c2_count = _compilers[1]->num_compiler_threads();
-    int new_c2_count = MIN4(_c2_count,
-        _c2_compile_queue->size() / 2,
+    old_c2_count = get_c2_thread_count();
+    new_c2_count = MIN4(_c2_count,
+        _c2_compile_queue->size() / c2_tasks_per_thread,
         (int)(available_memory / (200*M)),
         (int)(available_cc_np / (128*K)));
 
@@ -1110,7 +1111,7 @@ void CompileBroker::possibly_add_compiler_threads(JavaThread* THREAD) {
         // transitions if we bind them to new JavaThreads.
         if (!THREAD->can_call_java()) break;
         char name_buffer[256];
-        sprintf(name_buffer, "%s CompilerThread%d", _compilers[1]->name(), i);
+        os::snprintf_checked(name_buffer, sizeof(name_buffer), "%s CompilerThread%d", _compilers[1]->name(), i);
         Handle thread_oop;
         {
           // We have to give up the lock temporarily for the Java calls.
@@ -1129,7 +1130,7 @@ void CompileBroker::possibly_add_compiler_threads(JavaThread* THREAD) {
           break;
         }
         // Check if another thread has beaten us during the Java calls.
-        if (_compilers[1]->num_compiler_threads() != i) break;
+        if (get_c2_thread_count() != i) break;
         jobject thread_handle = JNIHandles::make_global(thread_oop);
         assert(compiler2_object(i) == NULL, "Old one must be released!");
         _compiler2_objects[i] = thread_handle;
@@ -1151,9 +1152,9 @@ void CompileBroker::possibly_add_compiler_threads(JavaThread* THREAD) {
   }
 
   if (_c1_compile_queue != NULL) {
-    int old_c1_count = _compilers[0]->num_compiler_threads();
-    int new_c1_count = MIN4(_c1_count,
-        _c1_compile_queue->size() / 4,
+    old_c1_count = get_c1_thread_count();
+    new_c1_count = MIN4(_c1_count,
+        _c1_compile_queue->size() / c1_tasks_per_thread,
         (int)(available_memory / (100*M)),
         (int)(available_cc_p / (128*K)));
 
@@ -2746,7 +2747,7 @@ void CompileBroker::print_times(bool per_compiler, bool aggregate) {
     char tier_name[256];
     for (int tier = CompLevel_simple; tier <= CompilationPolicy::highest_compile_level(); tier++) {
       CompilerStatistics* stats = &_stats_per_level[tier-1];
-      sprintf(tier_name, "Tier%d", tier);
+      os::snprintf_checked(tier_name, sizeof(tier_name), "Tier%d", tier);
       print_times(tier_name, stats);
     }
   }
@@ -2768,8 +2769,8 @@ void CompileBroker::print_times(bool per_compiler, bool aggregate) {
   int total_bailout_count = CompileBroker::_total_bailout_count;
   int total_invalidated_count = CompileBroker::_total_invalidated_count;
 
-  int nmethods_size = CompileBroker::_sum_nmethod_code_size;
-  int nmethods_code_size = CompileBroker::_sum_nmethod_size;
+  int nmethods_code_size = CompileBroker::_sum_nmethod_code_size;
+  int nmethods_size = CompileBroker::_sum_nmethod_size;
 
   tty->cr();
   tty->print_cr("Accumulated compiler times");

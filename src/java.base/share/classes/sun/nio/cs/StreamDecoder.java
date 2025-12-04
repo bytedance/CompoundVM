@@ -42,6 +42,7 @@ import java.nio.charset.CoderResult;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.UnsupportedCharsetException;
+import java.util.Arrays;
 
 public class StreamDecoder extends Reader {
 
@@ -185,7 +186,13 @@ public class StreamDecoder extends Reader {
                 return n + 1;
             }
 
-            return n + implRead(cbuf, off, off + len);
+            // Read remaining characters
+            int nr = implRead(cbuf, off, off + len);
+
+            // At this point, n is either 1 if a leftover character was read,
+            // or 0 if no leftover character was read. If n is 1 and nr is -1,
+            // indicating EOF, then we don't return their sum as this loses data.
+            return (nr < 0) ? (n == 1 ? 1 : nr) : (n + nr);
         }
     }
 
@@ -212,6 +219,16 @@ public class StreamDecoder extends Reader {
         return !closed;
     }
 
+    public void fillZeroToPosition() throws IOException {
+        Object lock = this.lock;
+        synchronized (lock) {
+            lockedFillZeroToPosition();
+        }
+    }
+
+    private void lockedFillZeroToPosition() {
+        Arrays.fill(bb.array(), bb.arrayOffset(), bb.arrayOffset() + bb.position(), (byte)0);
+    }
 
     // -- Charset-based stream decoder impl --
 

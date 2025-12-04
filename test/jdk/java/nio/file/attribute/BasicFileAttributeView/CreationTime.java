@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2013, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2013, 2024, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2024 Alibaba Group Holding Limited. All Rights Reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,11 +22,23 @@
  * questions.
  */
 
-/* @test
- * @bug 8011536
+/* @test id=tmp
+ * @bug 8011536 8151430 8316304 8334339
  * @summary Basic test for creationTime attribute on platforms/file systems
- *     that support it.
- * @library ../..
+ *     that support it, tests using /tmp directory.
+ * @library  ../.. /test/lib
+ * @build jdk.test.lib.Platform
+ * @comment We see this failing with "UnsatisfiedLinkError: Native Library ...libCreationTimeHelper.so already loaded in another classloader". Thus run as othervm
+ * @run main/othervm/native CreationTime
+ */
+
+/* @test id=cwd
+ * @summary Basic test for creationTime attribute on platforms/file systems
+ *     that support it, tests using the test scratch directory, the test
+ *     scratch directory maybe at diff disk partition to /tmp on linux.
+ * @library  ../.. /test/lib
+ * @build jdk.test.lib.Platform
+ * @run main/othervm/native CreationTime .
  */
 
 import java.nio.file.Path;
@@ -34,9 +47,10 @@ import java.nio.file.attribute.*;
 import java.time.Instant;
 import java.io.IOException;
 
-public class CreationTime {
+import jdk.test.lib.Platform;
+import jtreg.SkippedException;
 
-    private static final java.io.PrintStream err = System.err;
+public class CreationTime {
 
     /**
      * Reads the creationTime attribute
@@ -63,7 +77,8 @@ public class CreationTime {
         FileTime creationTime = creationTime(file);
         Instant now = Instant.now();
         if (Math.abs(creationTime.toMillis()-now.toEpochMilli()) > 10000L) {
-            err.println("File creation time reported as: " + creationTime);
+            System.err.println("creationTime.toMillis() == " + creationTime.toMillis());
+            System.err.println("File creation time reported as: " + creationTime);
             throw new RuntimeException("Expected to be close to: " + now);
         }
 
@@ -81,7 +96,18 @@ public class CreationTime {
                 supportsCreationTimeRead = true;
                 supportsCreationTimeWrite = true;
             }
+        } else if (Platform.isLinux()) {
+            // Creation time read depends on statx system call support
+            try {
+                supportsCreationTimeRead = CreationTimeHelper.
+                        linuxIsCreationTimeSupported(file.toAbsolutePath().toString());
+            } catch (Throwable e) {
+                supportsCreationTimeRead = false;
+            }
+            // Creation time updates are not supported on Linux
+            supportsCreationTimeWrite = false;
         }
+        System.out.println(top + " supportsCreationTimeRead == " + supportsCreationTimeRead);
 
         /**
          * If the creation-time attribute is supported then change the file's
@@ -92,8 +118,11 @@ public class CreationTime {
             Instant plusHour = Instant.now().plusSeconds(60L * 60L);
             Files.setLastModifiedTime(file, FileTime.from(plusHour));
             FileTime current = creationTime(file);
-            if (!current.equals(creationTime))
+            if (!current.equals(creationTime)) {
+                System.err.println("current = " + current);
+                System.err.println("creationTime = " + creationTime);
                 throw new RuntimeException("Creation time should not have changed");
+            }
         }
 
         /**
@@ -113,7 +142,12 @@ public class CreationTime {
 
     public static void main(String[] args) throws IOException {
         // create temporary directory to run tests
-        Path dir = TestUtil.createTemporaryDirectory();
+        Path dir;
+        if (args.length == 0) {
+            dir = TestUtil.createTemporaryDirectory();
+        } else {
+            dir = TestUtil.createTemporaryDirectory(args[0]);
+        }
         try {
             test(dir);
         } finally {

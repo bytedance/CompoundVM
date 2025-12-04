@@ -49,7 +49,7 @@
 #include "runtime/orderAccess.hpp"
 #include "runtime/osThread.hpp"
 #include "runtime/perfData.hpp"
-#include "runtime/safefetch.inline.hpp"
+#include "runtime/safefetch.hpp"
 #include "runtime/safepointMechanism.inline.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/thread.inline.hpp"
@@ -321,15 +321,15 @@ void ObjectMonitor::ClearSuccOnSuspend::operator()(JavaThread* current) {
 // Enter support
 
 #if HOTSPOT_TARGET_CLASSLIB == 8
-bool ObjectMonitor::try_enter(Thread* current) {
+bool ObjectMonitor::try_enter(JavaThread* current) {
   if (current != _owner) {
-    if (current->is_lock_owned ((address)_owner)) {
+    if (current->is_lock_owned((address)_owner)) {
        assert(_recursions == 0, "internal state error");
        _owner = current ;
        _recursions = 1 ;
        return true;
     }
-    if (Atomic::cmpxchg (&_owner, (void*)(NULL), (void*)(current)) != NULL) {
+    if (Atomic::cmpxchg(&_owner, (void*)(NULL), (void*)(current)) != NULL) {
       return false;
     }
     return true;
