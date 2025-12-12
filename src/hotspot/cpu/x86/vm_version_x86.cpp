@@ -725,9 +725,10 @@ void VM_Version::get_processor_features() {
   }
   if (FLAG_IS_DEFAULT(UseAVX)) {
 #if HOTSPOT_TARGET_CLASSLIB == 8
-    // Don't use AVX-512 on older Skylakes/Cascadelakes unless explicitly requested.
+    // Don't use AVX-512 on older Skylakes/Cascadelakes/Icelake unless explicitly requested.
     if (use_avx_limit > 2 && ((is_intel_skylake() && _stepping < 5)
-            || is_intel_cascadelake())) {
+            || is_intel_cascadelake()
+            || is_intel_icelake())) {
 #elif HOTSPOT_TARGET_CLASSLIB == 17
     // Don't use AVX-512 on older Skylakes unless explicitly requested.
     if (use_avx_limit > 2 && is_intel_skylake() && _stepping < 5) {
