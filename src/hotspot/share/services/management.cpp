@@ -172,7 +172,7 @@ void Management::init() {
   _optional_support_jdk8.isThreadAllocatedMemorySupported = 1;
   _optional_support_jdk8.isRemoteDiagnosticCommandsSupported = 1;
 
-  _optional_support_jdk8.isBootClassPathSupported = 0;
+  _optional_support_jdk8.isBootClassPathSupported = 1;
 #endif // HOTSPOT_TARGET_CLASSLIB == 8
 
   // Registration of the diagnostic commands
