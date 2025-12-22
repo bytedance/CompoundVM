@@ -820,9 +820,7 @@ public final class String
     }
 
     private static void getChars(char[] value, int srcBegin, int srcEnd, char[] dst, int dstBegin) {
-        if (srcBegin < srcEnd) {
-            checkBoundsOffCount(srcBegin, srcEnd - srcBegin, value.length);
-        }
+        checkBoundsOffCount(srcBegin, srcEnd - srcBegin, value.length);
         for (int i = srcBegin; i < srcEnd; i++) {
             dst[dstBegin++] = value[i];
         }
