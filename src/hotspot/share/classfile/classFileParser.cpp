@@ -5171,12 +5171,18 @@ void ClassFileParser::fill_instance_klass(InstanceKlass* ik,
     check_illegal_static_method(ik, CHECK);
   }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  // module is null if classlib v8
+  ModuleEntry* module_entry = _loader_data->unnamed_module();
+  Handle module_handle;
+#else
   // Obtain this_klass' module entry
   ModuleEntry* module_entry = ik->module();
   assert(module_entry != nullptr, "module_entry should always be set");
 
   // Obtain java.lang.Module
   Handle module_handle(THREAD, module_entry->module());
+#endif
 
   // Allocate mirror and initialize static fields
   java_lang_Class::create_mirror(ik,

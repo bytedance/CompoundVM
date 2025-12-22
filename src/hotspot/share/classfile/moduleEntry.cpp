@@ -620,8 +620,12 @@ ModuleEntry* ModuleEntryTable::locked_create_entry(Handle module_handle,
   assert(module_name != nullptr, "ModuleEntryTable locked_create_entry should never be called for unnamed module.");
   assert(Module_lock->owned_by_self(), "should have the Module_lock");
   assert(lookup_only(module_name) == nullptr, "Module already exists");
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  ModuleEntry* entry = ModuleEntry::create_unnamed_module(loader_data);
+#else
   ModuleEntry* entry = new ModuleEntry(module_handle, is_open, module_name,
                                        module_version, module_location, loader_data);
+#endif
   bool created = _table.put(module_name, entry);
   assert(created, "should be");
   return entry;

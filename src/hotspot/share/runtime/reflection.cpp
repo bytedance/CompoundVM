@@ -623,14 +623,40 @@ bool Reflection::verify_member_access(const Klass* current_class,
     return true;
   }
 
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  const Klass* host_class = current_class;
+  while (host_class->is_instance_klass()){
+    const InstanceKlass* ik = InstanceKlass::cast(host_class);
+    if (!ik->is_hidden()) break;
+    InstanceKlass* next_host = const_cast<InstanceKlass*>(ik)->nest_host(THREAD);
+    if (next_host == NULL) break;
+    host_class = next_host;
+  }
+  if (host_class == member_class){
+    return true;
+  }
+#else
   if (current_class == member_class) {
     return true;
   }
+#endif
 
   if (access.is_protected()) {
     if (!protected_restriction) {
       // See if current_class (or outermost host class) is a subclass of member_class
       // An interface may not access protected members of j.l.Object
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+      if (!host_class->is_interface() && host_class->is_subclass_of(member_class)) {
+        if (access.is_static() || // static fields are ok, see 6622385
+            current_class == resolved_class ||
+            member_class == resolved_class ||
+            host_class->is_subclass_of(resolved_class) ||
+            resolved_class->is_subclass_of(host_class)) {
+          return true;
+        }
+      }
+#else
       if (!current_class->is_interface() && current_class->is_subclass_of(member_class)) {
         if (access.is_static() || // static fields are ok, see 6622385
             current_class == resolved_class ||
@@ -640,6 +666,7 @@ bool Reflection::verify_member_access(const Klass* current_class,
           return true;
         }
       }
+#endif
     }
   }
 
