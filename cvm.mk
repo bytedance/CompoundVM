@@ -19,7 +19,7 @@
 
 WORKSPACE := $(shell pwd)
 SHELL := /bin/bash
-BOOTJDK25 := $(WORKSPACE)/.bootjdks/jdk-24.0.1
+BOOTJDK25 := $(WORKSPACE)/.bootjdks/jdk-25.0.1
 BOOTJDK8 := $(WORKSPACE)/.bootjdks/jdk8u372-b07
 BUILDDIR := $(WORKSPACE)/cvm/build
 VERSION := $(shell cat $(WORKSPACE)/cvm/conf/version)
@@ -117,17 +117,17 @@ endef
 # '/' is indispensable otherwise target name will be treated as a file
 $(BOOTJDK25)/:
 	$(call setup_download_artifact, \
-		"https://download.java.net/java/GA/jdk24.0.1/24a58e0e276943138bf3e963e6291ac2/9/GPL/openjdk-24.0.1_linux-x64_bin.tar.gz", \
-		"$(WORKSPACE)/.bootjdks/bootjdk-24.0.1.tar.gz", \
-		"56319f30ef59f96ddd7c7c4df330f114", \
+		"https://download.java.net/java/GA/jdk25.0.1/2fbf10d8c78e40bd87641c434705079d/8/GPL/openjdk-25.0.1_linux-x64_bin.tar.gz", \
+		"$(WORKSPACE)/.bootjdks/bootjdk-25.0.1.tar.gz", \
+		"287121c969b100cbccee8d6a423681a0", \
 		$@)
 	#cp -f $(WORKSPACE)/bin/linux-x86_64/hsdis-amd64.so $$(dirname $$(find $@ -name libjava.so))
 
 $(BOOTJDK8)/:
 	$(call setup_download_artifact, \
-		"https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u372-b07/OpenJDK8U-jdk_x64_linux_hotspot_8u372b07.tar.gz", \
-		"$(WORKSPACE)/.bootjdks/bootjdk-8u372.tar.gz", \
-		"524d4fac3d2cc091265c35c829a36ea0", \
+		"https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u452-b09/OpenJDK8U-jdk_x64_linux_hotspot_8u452b09.tar.gz", \
+		"$(WORKSPACE)/.bootjdks/bootjdk-8u452.tar.gz", \
+		"6ad1623041892ad264125cda04e11441", \
 		$@)
 	#cp -f $(WORKSPACE)/bin/linux-x86_64/hsdis-amd64.so $$(dirname $$(find $@ -name libjava.so))
 
