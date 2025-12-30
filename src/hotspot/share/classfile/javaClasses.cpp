@@ -185,7 +185,7 @@ void JavaClasses::compute_offset(int& dest_offset, InstanceKlass* ik,
                                  bool is_static) {
   TempNewSymbol name = SymbolTable::probe(name_string, (int)strlen(name_string));
   if (name == nullptr) {
-    CLASSLIB8_EARLY_RETURN_();
+    // CLASSLIB8_EARLY_RETURN_();
     ResourceMark rm;
     log_error(class)("Name %s should be in the SymbolTable since its class is loaded", name_string);
     vm_exit_during_initialization("Invalid layout of well-known class", ik->external_name());
