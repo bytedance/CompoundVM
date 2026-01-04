@@ -20,7 +20,7 @@
 WORKSPACE := $(shell pwd)
 SHELL := /bin/bash
 BOOTJDK25 := $(WORKSPACE)/.bootjdks/jdk-25.0.1
-BOOTJDK8 := $(WORKSPACE)/.bootjdks/jdk8u372-b07
+BOOTJDK8 := $(WORKSPACE)/.bootjdks/jdk8u452-b09
 BUILDDIR := $(WORKSPACE)/cvm/build
 VERSION := $(shell cat $(WORKSPACE)/cvm/conf/version)
 OUTPUTDIR := $(WORKSPACE)/output
