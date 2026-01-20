@@ -11,8 +11,7 @@
 很多存量的Java业务仍然在使用老旧的 Java 版本（如 Java 8），对于这些存量业务，升级 JDK 往往需要付出较大成本。
 CompoundVM (CVM) 项目旨在解决这个痛点，通过将高版本 JVM 与低版本 JDK 组合，帮助业务用最小成本获得 Java 生态最新的性能收益。
 
-CVM 当前已经发布 JVM17 与 OpenJDK8 的组合 JDK，JVM25 与 JDK8 的组合正在开发中。
-此项目目前已经在多个线上生产业务长期稳定运行。
+CVM 当前已经发布 JVM17, JVM25 与 OpenJDK8 的组合 JDK, 目前已经在多个线上生产业务长期稳定运行。
 
 项目基于 OpenJDK 开发，当前已支持 x86_64/aarch64 linux 平台。
 
