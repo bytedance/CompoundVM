@@ -3310,24 +3310,19 @@ JVM_END
 
 JVM_ENTRY(jobject, JVM_LatestUserDefinedLoader(JNIEnv *env))
   for (vframeStream vfst(thread); !vfst.at_end(); vfst.next()) {
-#if HOTSPOT_TARGET_CLASSLIB == 8
-    // UseNewReflection
-    vfst.skip_reflection_related_frames(); // Only needed for 1.4 reflection
-    oop loader = vfst.method()->method_holder()->class_loader();
-    if (loader != NULL && !SystemDictionary::is_ext_class_loader(Handle(THREAD, loader))) {
-      return JNIHandles::make_local(THREAD, loader);
-    }
-#else
     InstanceKlass* ik = vfst.method()->method_holder();
     oop loader = ik->class_loader();
+#if HOTSPOT_TARGET_CLASSLIB == 8
+    if (loader != nullptr && !SystemDictionary::is_ext_class_loader(Handle(THREAD, loader))) {
+#else
     if (loader != NULL && !SystemDictionary::is_platform_class_loader(loader)) {
+#endif // HOTSPOT_TARGET_CLASSLIB == 8
       // Skip reflection related frames
       if (!ik->is_subclass_of(vmClasses::reflect_MethodAccessorImpl_klass()) &&
           !ik->is_subclass_of(vmClasses::reflect_ConstructorAccessorImpl_klass())) {
         return JNIHandles::make_local(THREAD, loader);
       }
     }
-#endif // HOTSPOT_TARGET_CLASSLIB == 8
   }
   return NULL;
 JVM_END
