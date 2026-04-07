@@ -335,11 +335,6 @@ class vframeStreamCommon : StackObj {
   // special security frames and prefixed native methods
   void security_get_caller_frame(int depth);
 
-#if HOTSPOT_TARGET_CLASSLIB == 8  
-  // Helper routine for JVM_LatestUserDefinedLoader -- needed for 1.4
-  // reflection implementation
-  void skip_reflection_related_frames();
-#endif
 };
 
 class vframeStream : public vframeStreamCommon {
