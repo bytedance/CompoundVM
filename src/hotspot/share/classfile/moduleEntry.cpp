@@ -694,6 +694,8 @@ void ModuleEntryTable::finalize_javabase(Handle module_handle, Symbol* version, 
 // classes needing their module field set are added to the fixup_module_list.
 // Their module field is set once java.base's java.lang.Module is known to the VM.
 void ModuleEntryTable::patch_javabase_entries(Handle module_handle) {
+  // skip for classlib8
+  CLASSLIB8_EARLY_RETURN_();
   if (module_handle.is_null()) {
     fatal("Unable to patch the module field of classes loaded prior to "
           JAVA_BASE_NAME "'s definition, invalid java.lang.Module");

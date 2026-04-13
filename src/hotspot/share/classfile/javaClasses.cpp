@@ -1127,6 +1127,8 @@ void java_lang_Class::initialize_mirror_fields(Klass* k,
 
 // Set the java.lang.Module module field in the java_lang_Class mirror
 void java_lang_Class::set_mirror_module_field(JavaThread* current, Klass* k, Handle mirror, Handle module) {
+  // skip for classlib8
+  CLASSLIB8_EARLY_RETURN_();
   if (module.is_null()) {
     // During startup, the module may be NULL only if java.base has not been defined yet.
     // Put the class on the fixup_module_list to patch later when the java.lang.Module
