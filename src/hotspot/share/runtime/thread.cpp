@@ -2688,9 +2688,9 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
     ResourceMark rm(main_thread);
     JDK_Version::set_java_version("1.8.0");
     JDK_Version::set_runtime_name("OpenJDK Runtime Environment");
-    JDK_Version::set_runtime_version("17.0.7+7");
-    JDK_Version::set_runtime_vendor_version("ByteDance Testing");
-    JDK_Version::set_runtime_vendor_vm_bug_url("https://bytedance.com/java/cvm/bugs");
+    JDK_Version::set_runtime_version("17.0.16+0");
+    JDK_Version::set_runtime_vendor_version("ByteDance CompoundVM");
+    JDK_Version::set_runtime_vendor_vm_bug_url("https://github.com/bytedance/CompoundVM/issues");
   }
 #else
   // Get the Java runtime name, version, and vendor info after java.lang.System is initialized.
