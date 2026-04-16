@@ -2374,8 +2374,12 @@ WB_END
 static JNINativeMethod methods[] = {
 #if HOTSPOT_TARGET_CLASSLIB == 8
   {CC"getObjectAddress",                 CC"(Ljava/lang/Object;)J", (void*)&WB_GetObjectAddress  },
+  {CC"getObjectSize",                    CC"(Ljava/lang/Object;)J", (void*)&WB_GetObjectSize     },
+  {CC"isObjectInOldGen",                 CC"(Ljava/lang/Object;)Z", (void*)&WB_isObjectInOldGen  },
 #elif HOTSPOT_TARGET_CLASSLIB == 17
   {CC"getObjectAddress0",                CC"(Ljava/lang/Object;)J", (void*)&WB_GetObjectAddress  },
+  {CC"getObjectSize0",                   CC"(Ljava/lang/Object;)J", (void*)&WB_GetObjectSize     },
+  {CC"isObjectInOldGen0",                CC"(Ljava/lang/Object;)Z", (void*)&WB_isObjectInOldGen  },
 #else
   #error "Only classlib 8 and 17 are supported."
 #endif
@@ -2443,6 +2447,16 @@ static JNINativeMethod methods[] = {
   {CC"deoptimizeFrames",   CC"(Z)I",                  (void*)&WB_DeoptimizeFrames  },
   {CC"isFrameDeoptimized", CC"(I)Z",                  (void*)&WB_IsFrameDeoptimized},
   {CC"deoptimizeAll",      CC"()V",                   (void*)&WB_DeoptimizeAll     },
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  {CC"deoptimizeMethod",   CC"(Ljava/lang/reflect/Executable;Z)I",
+                                                      (void*)&WB_DeoptimizeMethod  },
+  {CC"isMethodCompiled",   CC"(Ljava/lang/reflect/Executable;Z)Z",
+                                                      (void*)&WB_IsMethodCompiled  },
+  {CC"isMethodCompilable", CC"(Ljava/lang/reflect/Executable;IZ)Z",
+                                                      (void*)&WB_IsMethodCompilable},
+  {CC"isMethodQueuedForCompilation",
+      CC"(Ljava/lang/reflect/Executable;)Z",          (void*)&WB_IsMethodQueuedForCompilation},
+#elif HOTSPOT_TARGET_CLASSLIB == 17
   {CC"deoptimizeMethod0",   CC"(Ljava/lang/reflect/Executable;Z)I",
                                                       (void*)&WB_DeoptimizeMethod  },
   {CC"isMethodCompiled0",   CC"(Ljava/lang/reflect/Executable;Z)Z",
@@ -2451,29 +2465,52 @@ static JNINativeMethod methods[] = {
                                                       (void*)&WB_IsMethodCompilable},
   {CC"isMethodQueuedForCompilation0",
       CC"(Ljava/lang/reflect/Executable;)Z",          (void*)&WB_IsMethodQueuedForCompilation},
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
   {CC"isIntrinsicAvailable0",
       CC"(Ljava/lang/reflect/Executable;Ljava/lang/reflect/Executable;I)Z",
                                                       (void*)&WB_IsIntrinsicAvailable},
   {CC"makeMethodNotCompilable0",
       CC"(Ljava/lang/reflect/Executable;IZ)V",        (void*)&WB_MakeMethodNotCompilable},
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  {CC"testSetDontInlineMethod",
+      CC"(Ljava/lang/reflect/Executable;Z)Z",         (void*)&WB_TestSetDontInlineMethod},
+  {CC"getMethodCompilationLevel",
+      CC"(Ljava/lang/reflect/Executable;Z)I",         (void*)&WB_GetMethodCompilationLevel},
+  {CC"getMethodEntryBci",
+      CC"(Ljava/lang/reflect/Executable;)I",          (void*)&WB_GetMethodEntryBci},
+  {CC"testSetForceInlineMethod",
+      CC"(Ljava/lang/reflect/Executable;Z)Z",         (void*)&WB_TestSetForceInlineMethod},
+#elif HOTSPOT_TARGET_CLASSLIB == 17
   {CC"testSetDontInlineMethod0",
       CC"(Ljava/lang/reflect/Executable;Z)Z",         (void*)&WB_TestSetDontInlineMethod},
   {CC"getMethodCompilationLevel0",
       CC"(Ljava/lang/reflect/Executable;Z)I",         (void*)&WB_GetMethodCompilationLevel},
   {CC"getMethodEntryBci0",
       CC"(Ljava/lang/reflect/Executable;)I",          (void*)&WB_GetMethodEntryBci},
-  {CC"getCompileQueueSize",
-      CC"(I)I",                                       (void*)&WB_GetCompileQueueSize},
   {CC"testSetForceInlineMethod0",
       CC"(Ljava/lang/reflect/Executable;Z)Z",         (void*)&WB_TestSetForceInlineMethod},
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
+  {CC"getCompileQueueSize",
+      CC"(I)I",                                       (void*)&WB_GetCompileQueueSize},
   {CC"enqueueMethodForCompilation0",
       CC"(Ljava/lang/reflect/Executable;II)Z",        (void*)&WB_EnqueueMethodForCompilation},
   {CC"enqueueInitializerForCompilation0",
       CC"(Ljava/lang/Class;I)Z",                      (void*)&WB_EnqueueInitializerForCompilation},
   {CC"markMethodProfiled",
       CC"(Ljava/lang/reflect/Executable;)V",          (void*)&WB_MarkMethodProfiled},
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  {CC"clearMethodState",
+      CC"(Ljava/lang/reflect/Executable;)V",          (void*)&WB_ClearMethodState},
+#elif HOTSPOT_TARGET_CLASSLIB == 17
   {CC"clearMethodState0",
       CC"(Ljava/lang/reflect/Executable;)V",          (void*)&WB_ClearMethodState},
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
   {CC"lockCompilation",    CC"()V",                   (void*)&WB_LockCompilation},
   {CC"unlockCompilation",  CC"()V",                   (void*)&WB_UnlockCompilation},
   {CC"matchesMethod",
@@ -2526,7 +2563,13 @@ static JNINativeMethod methods[] = {
   {CC"metaspaceCapacityUntilGC", CC"()J",             (void*)&WB_MetaspaceCapacityUntilGC },
   {CC"metaspaceSharedRegionAlignment", CC"()J",       (void*)&WB_MetaspaceSharedRegionAlignment },
   {CC"getCPUFeatures",     CC"()Ljava/lang/String;",  (void*)&WB_GetCPUFeatures     },
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  {CC"getNMethod",         CC"(Ljava/lang/reflect/Executable;Z)[Ljava/lang/Object;",
+#elif HOTSPOT_TARGET_CLASSLIB == 17
   {CC"getNMethod0",         CC"(Ljava/lang/reflect/Executable;Z)[Ljava/lang/Object;",
+#else
+  #error "Only classlib 8 and 17 are supported."
+#endif
                                                       (void*)&WB_GetNMethod         },
   {CC"forceNMethodSweep",  CC"()V",                   (void*)&WB_ForceNMethodSweep  },
   {CC"allocateCodeBlob",   CC"(II)J",                 (void*)&WB_AllocateCodeBlob   },
