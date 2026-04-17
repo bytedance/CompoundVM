@@ -186,4 +186,3 @@ compiler/7184394/TestAESMain.java
 compiler/intrinsics/sha/cli/TestUseSHA1IntrinsicsOptionOnSupportedCPU.java
 compiler/intrinsics/sha/cli/TestUseSHA256IntrinsicsOptionOnSupportedCPU.java
 compiler/intrinsics/sha/cli/TestUseSHA512IntrinsicsOptionOnSupportedCPU.java
-compiler/intrinsics/sha/cli/TestUseSHAOptionOnSupportedCPU.java

@@ -32,15 +32,9 @@ compiler/profiling/spectrapredefineclass/Launcher.java
 compiler/rangechecks/TestRangeCheckSmearing.java
 compiler/rtm/cli/TestPrintPreciseRTMLockingStatisticsOptionOnUnsupportedConfig.java
 compiler/rtm/cli/TestRTMAbortRatioOptionOnUnsupportedConfig.java
-compiler/rtm/cli/TestRTMAbortThresholdOption.java
-compiler/rtm/cli/TestRTMLockingCalculationDelayOption.java
-compiler/rtm/cli/TestRTMLockingThresholdOption.java
-compiler/rtm/cli/TestRTMRetryCountOption.java
-compiler/rtm/cli/TestRTMSpinLoopCountOption.java
 compiler/rtm/cli/TestRTMTotalCountIncrRateOptionOnUnsupportedConfig.java
 compiler/rtm/cli/TestUseRTMDeoptOptionOnUnsupportedConfig.java
 compiler/rtm/cli/TestUseRTMForStackLocksOptionOnUnsupportedConfig.java
-compiler/rtm/cli/TestUseRTMXendForLockBusyOption.java
 compiler/stable/TestStableBoolean.java
 compiler/stable/TestStableChar.java
 compiler/stable/TestStableByte.java
@@ -175,7 +169,6 @@ testlibrary/ctw/test/JarDirTest.java
 testlibrary/ctw/test/JarsTest.java
 testlibrary_tests/whitebox/vm_flags/DoubleTest.java
 testlibrary_tests/whitebox/vm_flags/IntxTest.java
-runtime/NMT/MallocStressTest.java
 testlibrary_tests/TestMutuallyExclusivePlatformPredicates.java
 vmTestbase/nsk/jdb/monitor/monitor002/monitor002.java
 
@@ -184,5 +177,5 @@ compiler/intrinsics/sha/cli/TestUseSHA1IntrinsicsOptionOnUnsupportedCPU.java
 compiler/intrinsics/sha/cli/TestUseSHA256IntrinsicsOptionOnUnsupportedCPU.java
 compiler/intrinsics/sha/cli/TestUseSHA512IntrinsicsOptionOnUnsupportedCPU.java
 compiler/intrinsics/sha/cli/TestUseSHAOptionOnUnsupportedCPU.java
-runtime/containers/docker/DockerBasicTest.java
 compiler/rtm/cli/TestUseRTMLockingOptionOnUnsupportedVM.java
+runtime/containers/docker/DockerBasicTest.java
