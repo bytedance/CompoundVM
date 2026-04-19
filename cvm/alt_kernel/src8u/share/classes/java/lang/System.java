@@ -287,10 +287,8 @@ public final class System {
      */
     public static
     void setSecurityManager(final SecurityManager s) {
-        try {
+        if (s != null) {
             s.checkPackageAccess("java.lang");
-        } catch (Exception e) {
-            // no-op
         }
         setSecurityManager0(s);
     }
