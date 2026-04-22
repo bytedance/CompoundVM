@@ -25,7 +25,11 @@
 # questions.
 #
 
-name: 'Build (linux)'
+name: 'GTest (linux)'
+
+permissions:
+  contents: read
+  pull-requests: write
 
 on:
   workflow_call:
@@ -36,10 +40,6 @@ on:
       runs-on:
         required: true
         type: string
-      make-target:
-        required: false
-        type: string
-        default: 'cvm8default17'
       debug-levels:
         required: false
         type: string
@@ -55,8 +55,8 @@ on:
         type: string
 
 jobs:
-  build-linux:
-    name: build
+  gtest-linux:
+    name: gtest
     runs-on: ${{ inputs.runs-on }}
 
     strategy:
@@ -94,33 +94,23 @@ jobs:
 
       - name: 'Build'
         run: |
-          make -f cvm.mk ${{ inputs.make-target }} MODE=${{ matrix.debug-level}}
-          if [[ '${{ matrix.debug-level }}' == 'release' ]]; then
-            make -f cvm.mk jvm-patch MODE=release SKIP_BUILD=true
-          fi
+          make -f cvm.mk build_gtest_hotspot17 MODE=${{ matrix.debug-level}} SKIP_BUILD=true
         shell: bash
 
-      - name: 'Pack bundles'
-        run: |
-          tar czf CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}_${{ matrix.debug-level }}.tar.gz -C output CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}
-          tar czf CompoundVM_${{ steps.version.outputs.version }}_jvm_patch_${{ inputs.platform }}_${{ matrix.debug-level }}.tar.gz -C output/CompoundVM_${{ steps.version.outputs.version }}_jvm_patch_${{ inputs.platform }} .
-        shell: bash
-
-      - name: 'Upload bundles'
-        uses: actions/upload-artifact@v4
+      - name: 'Get bundles'
+        uses: actions/download-artifact@v4
         with:
           name: CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}_${{ matrix.debug-level }}.tar.gz
-          path: CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}_${{ matrix.debug-level }}.tar.gz
-          retention-days: 1
-          if-no-files-found: error
-          overwrite: true
+          path: .
 
-      - name: 'Upload bundles jvm patch'
-        uses: actions/upload-artifact@v4
-        if: matrix.debug-level == 'release'
-        with:
-          name: CompoundVM_${{ steps.version.outputs.version }}_jvm_patch_${{ inputs.platform }}_${{ matrix.debug-level }}.tar.gz
-          path: CompoundVM_${{ steps.version.outputs.version }}_jvm_patch_${{ inputs.platform }}_${{ matrix.debug-level }}.tar.gz
-          retention-days: 1
-          if-no-files-found: error
-          overwrite: true
+      - name: 'Unpack bundles'
+        run: |
+          rm -rf gtest-jdk
+          mkdir gtest-jdk
+          tar xzvf CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}_${{ matrix.debug-level }}.tar.gz -C gtest-jdk --strip-components=1
+        shell: bash
+
+      - name: 'Run gtests'
+        run: |
+          make -f cvm.mk test_gtest_hotspot17 MODE=${{ matrix.debug-level}} SKIP_BUILD=true HOTSPOT_GTEST_JDKDIR=${PWD}/gtest-jdk
+        shell: bash
