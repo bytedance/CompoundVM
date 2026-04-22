@@ -145,9 +145,14 @@ $(BOOTJDK8)/:
 	$(call setup_boot_jdk,$(BOOTJDK8_URL),$@)
 	#cp -f $(WORKSPACE)/bin/linux-$(CVM_ARCH)/hsdis-$(ARCH_DIR).so $$(dirname $$(find $@ -name libjava.so))
 
-jdk8u/jdk/src:
-	wget -nc https://github.com/openjdk/jdk8u/archive/refs/tags/jdk8u452-ga.tar.gz
-	[[ -d $(JDK8_SRCROOT) ]] || (mkdir -p $(JDK8_SRCROOT) && tar -xzf jdk8u452-ga.tar.gz -C $(JDK8_SRCROOT) --strip-components=1)
+JDK8_JDK_SRC := $(JDK8_SRCROOT)/jdk/src
+JDK8_SRC_TAR_URL := https://github.com/openjdk/jdk8u/archive/refs/tags/jdk8u452-ga.tar.gz
+JDK8_SRC_TAR := $(notdir $(JDK8_SRC_TAR_URL))
+
+$(JDK8_JDK_SRC):
+	rm -f $(JDK8_SRC_TAR)
+	wget -nc -O $(JDK8_SRC_TAR) $(JDK8_SRC_TAR_URL)
+	[[ -d $(JDK8_SRCROOT) ]] || (mkdir -p $(JDK8_SRCROOT) && tar -xzf $(JDK8_SRC_TAR) -C $(JDK8_SRCROOT) --strip-components=1)
 
 cvm8: jdk8vm17
 
@@ -216,7 +221,7 @@ endif
 	@echo "###### Done ######"
 	@echo
 
-build_jdk8u: -bootstrap jdk8u/jdk/src
+build_jdk8u: -bootstrap $(JDK8_JDK_SRC)
 	{ cd $(JDK8_SRCROOT); \
 		if [[ "x$$(find ./build -type f -name config.log | grep $(MODE))" = "x" ]]; then \
 			bash configure --with-debug-level=$(MODE) \
@@ -298,7 +303,7 @@ $(JTREG):
 
 # minimize the effort to download source code
 ifeq ($(SKIP_BUILD), true)
--setup_jtreg8: -init-dirs $(JTREG) jdk8u/jdk/src
+-setup_jtreg8: -init-dirs $(JTREG) $(JDK8_JDK_SRC)
 else
 -setup_jtreg8: $(JTREG) jdk8vm17
 endif
@@ -388,10 +393,10 @@ help:
 	@echo "  make test_jtreg8 JT_TEST=<test selection> JT_REPO=<repo dir>"
 	@echo "                     Run CVM8 jtreg8 test with given selection"
 	@echo "  make test_jtreg8_jdk JT_TEST=<test selection>"
-	@echo "                     Run CVM8 jtreg8 tests in directory jdk8u/jdk/test"
+	@echo "                     Run CVM8 jtreg8 tests in directory $(CVM8_SRCROOT)/jdk/test"
 	@echo "  make test_jtreg8_langtools JT_TEST=<test selection>"
-	@echo "                     Run CVM8 jtreg8 tests in directory jdk8u/langtools/test"
+	@echo "                     Run CVM8 jtreg8 tests in directory $(CVM8_SRCROOT)/langtools/test"
 	@echo "  make test_jtreg8_hotspot JT_TEST=<test selection>"
-	@echo "                     Run CVM8 jtreg8 tests in directory jdk8u/hotspot/test"
+	@echo "                     Run CVM8 jtreg8 tests in directory $(CVM8_SRCROOT)/hotspot/test"
 	@echo "  make test_cvm8 JT_TEST=<test selection>"
 	@echo "                     Run additional jtreg8 tests for CVM8 in directory test"
