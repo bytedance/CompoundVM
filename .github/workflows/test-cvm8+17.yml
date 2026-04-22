@@ -81,14 +81,14 @@ jobs:
       - name: 'Get bundles'
         uses: actions/download-artifact@v4
         with:
-          name: CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}.tar.gz
+          name: CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}_${{ inputs.debug-level }}.tar.gz
           path: .
 
       - name: 'Unpack bundles'
         run: |
           rm -rf cvm/build/jdk8
           mkdir -p cvm/build/jdk8
-          tar xzvf CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}.tar.gz -C cvm/build/jdk8 --strip-components=1
+          tar xzvf CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}_${{ inputs.debug-level }}.tar.gz -C cvm/build/jdk8 --strip-components=1
         shell: bash
 
       - name: 'Run tests'
@@ -100,13 +100,13 @@ jobs:
       - name: 'Get bundles jvm patch'
         uses: actions/download-artifact@v4
         with:
-          name: CompoundVM_${{ steps.version.outputs.version }}_jvm_patch_${{ inputs.platform }}.tar.gz
+          name: CompoundVM_${{ steps.version.outputs.version }}_jvm_patch_${{ inputs.platform }}_${{ inputs.debug-level }}.tar.gz
           path: .
 
       - name: 'Run sanity test jvm patch'
         run: |
           wget -nc https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u372-b07/OpenJDK8U-jdk_${{ inputs.arch }}_linux_hotspot_8u372b07.tar.gz
           tar xzf OpenJDK8U-jdk_${{ inputs.arch }}_linux_hotspot_8u372b07.tar.gz
-          tar xzf CompoundVM_${{ steps.version.outputs.version }}_jvm_patch_${{ inputs.platform }}.tar.gz -C jdk8u372-b07/
+          tar xzf CompoundVM_${{ steps.version.outputs.version }}_jvm_patch_${{ inputs.platform }}_${{ inputs.debug-level }}.tar.gz -C jdk8u372-b07/
           jdk8u372-b07/bin/java -version 2>&1 | grep "CompoundVM"
         shell: bash

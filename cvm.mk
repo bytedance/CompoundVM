@@ -238,25 +238,101 @@ build_jdk8u: -bootstrap $(JDK8_JDK_SRC)
 		[[ $$? -eq 0 ]] || exit 127; \
 	}
 
+# configure for jdk17u
+# $1 extra configure options
+define configure_jdk17u
+	bash configure \
+		--with-debug-level=$(MODE) \
+		--with-boot-jdk=$(BOOTJDK17) \
+		--with-hotspot-target-classlib=8 \
+		--with-vendor-name="ByteDance" \
+		--with-vendor-url="https://github.com/bytedance/CompoundVM" \
+		--with-vendor-bug-url="https://github.com/bytedance/CompoundVM/issues" \
+		--with-vendor-vm-bug-url="https://github.com/bytedance/CompoundVM/issues" \
+		--without-version-pre \
+		--without-version-opt \
+		--with-cvm-version-string=$(VERSION) \
+		--with-vendor-name="CompoundVM" \
+		$(1)
+endef
+
 # compile hotspot and java.base from jdk17u
 build_jdk17u: -bootstrap
 	{ \
 		if [[ "x$$(find ./build -type f -name config.log | grep $(MODE))" = "x" ]]; then \
-			bash configure --with-debug-level=$(MODE) \
-											--with-boot-jdk=$(BOOTJDK17) \
-											--with-hotspot-target-classlib=8 \
-											--with-vendor-name="ByteDance" \
-											--with-vendor-url="https://github.com/bytedance/CompoundVM" \
-											--with-vendor-bug-url="https://github.com/bytedance/CompoundVM/issues" \
-											--with-vendor-vm-bug-url="https://github.com/bytedance/CompoundVM/issues" \
-											--without-version-pre \
-											--without-version-opt \
-											--with-cvm-version-string=$(VERSION) \
-											--with-vendor-name="CompoundVM" \
-											; \
+			$(call configure_jdk17u) ; \
 		fi; \
 	}
 	make $(JDK_MAKE_OPTS) CONF=linux-$(CVM_ARCH)-server-$(MODE) hotspot jdk.jdwp.agent
+
+GTEST_VERSION ?= $(shell sed -n 's/^GTEST_VERSION=//p' $(WORKSPACE)/make/conf/github-actions.conf | head -n 1)
+GTEST_ROOT := $(WORKSPACE)/.gtest
+GTEST_ARCHIVE := $(GTEST_ROOT)/release-$(GTEST_VERSION).tar.gz
+GTEST_URL := https://github.com/google/googletest/archive/refs/tags/v$(GTEST_VERSION).tar.gz
+GTEST_DIR := $(GTEST_ROOT)/googletest-$(GTEST_VERSION)
+GTEST_HEADER := $(GTEST_DIR)/googletest/include/gtest/gtest.h
+
+$(GTEST_HEADER):
+	@echo "Installing googletest $(GTEST_VERSION) to $(GTEST_DIR)"
+	{ \
+		set -e; \
+		[[ -d $(GTEST_ROOT) ]] || mkdir -p $(GTEST_ROOT); \
+		rm -f $(GTEST_ARCHIVE); \
+		wget -q $(GTEST_URL) -O $(GTEST_ARCHIVE); \
+		rm -fr $(GTEST_DIR); \
+		tar xf $(GTEST_ARCHIVE) -C $(GTEST_ROOT); \
+		rm -f $(GTEST_ARCHIVE); \
+	}
+
+HOTSPOT_GTEST_BUILD_DIR := $(JDK17_SRCROOT)/build/linux-$(CVM_ARCH)-server-$(MODE)
+HOTSPOT_GTEST_LAUNCHER := $(HOTSPOT_GTEST_BUILD_DIR)/images/test/hotspot/gtest/server/gtestLauncher
+HOTSPOT_GTEST_TEST ?= gtest:all
+HOTSPOT_GTEST_SELECTOR := $(patsubst %/server,%,$(patsubst gtest:%,%,$(HOTSPOT_GTEST_TEST)))
+HOTSPOT_GTEST_FILTER := $(if $(filter all,$(HOTSPOT_GTEST_SELECTOR)),,--gtest_filter=$(HOTSPOT_GTEST_SELECTOR)*)
+HOTSPOT_GTEST_JDKDIR := $(OUTPUTDIR)/$(DISTRO_NAME)
+HOTSPOT_GTEST_WORKDIR := $(HOTSPOT_GTEST_BUILD_DIR)/gtest-manual
+HOTSPOT_GTEST_RESULT_DIR := $(HOTSPOT_GTEST_BUILD_DIR)/gtest-results
+
+ifeq ($(SKIP_BUILD), true)
+-configure_jdk17u_gtest: $(GTEST_HEADER) -bootstrap
+else
+-configure_jdk17u_gtest: $(GTEST_HEADER) cvm8default17
+endif
+	{ \
+		if [[ ! -f $(HOTSPOT_GTEST_BUILD_DIR)/spec.gmk ]] || \
+				! grep -Fqx 'GTEST_FRAMEWORK_SRC := $(GTEST_DIR)' $(HOTSPOT_GTEST_BUILD_DIR)/spec.gmk 2>/dev/null; then \
+			$(call configure_jdk17u,--with-gtest=$(GTEST_DIR)) ; \
+		fi; \
+	}
+
+build_gtest_hotspot17: -configure_jdk17u_gtest
+	$(MAKE) $(JDK_MAKE_OPTS) CONF=linux-$(CVM_ARCH)-server-$(MODE) test-image-hotspot-gtest
+
+ifeq ($(SKIP_BUILD), true)
+test_gtest_hotspot17:
+else
+test_gtest_hotspot17: build_gtest_hotspot17
+endif
+	@echo
+	@echo "Running hotspot gtest \"$(HOTSPOT_GTEST_TEST)\""
+	@echo "  Launcher: $(HOTSPOT_GTEST_LAUNCHER)"
+	@echo "  JDK under test: $(HOTSPOT_GTEST_JDKDIR)"
+	@echo "  Work dir: $(HOTSPOT_GTEST_WORKDIR)"
+	@echo "  Test report: $(HOTSPOT_GTEST_RESULT_DIR)"
+	@echo
+	@{ \
+		mkdir -p $(HOTSPOT_GTEST_WORKDIR) $(HOTSPOT_GTEST_RESULT_DIR) && \
+		cd $(HOTSPOT_GTEST_WORKDIR) && \
+		$(HOTSPOT_GTEST_LAUNCHER) \
+			-jdk $(HOTSPOT_GTEST_JDKDIR) \
+			$(HOTSPOT_GTEST_FILTER) \
+			--gtest_output=xml:$(HOTSPOT_GTEST_RESULT_DIR)/gtest.xml \
+			--gtest_catch_exceptions=0 \
+			> >(tee $(HOTSPOT_GTEST_RESULT_DIR)/gtest.txt); \
+		exit_code=$$?; \
+		echo $$exit_code > $(HOTSPOT_GTEST_RESULT_DIR)/exitcode.txt; \
+		exit $$exit_code; \
+	}
 
 ################ alternative kernel classes ########
 # here we copy the JDK17 kernel classes to separate diretory,
@@ -400,3 +476,6 @@ help:
 	@echo "                     Run CVM8 jtreg8 tests in directory $(CVM8_SRCROOT)/hotspot/test"
 	@echo "  make test_cvm8 JT_TEST=<test selection>"
 	@echo "                     Run additional jtreg8 tests for CVM8 in directory test"
+	@echo "  make test_gtest_hotspot17 HOTSPOT_GTEST_TEST=<gtest selection>"
+	@echo "                     Run hotspot gtests directly against the CVM output image"
+	@echo "                     e.g. HOTSPOT_GTEST_TEST='gtest:all'"

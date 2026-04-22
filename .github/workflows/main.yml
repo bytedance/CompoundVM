@@ -133,6 +133,30 @@ jobs:
     if: needs.select.outputs.linux-aarch64 == 'true' || needs.select.outputs.linux-cross-compile == 'true'
 
   ###
+  ### GTest jobs
+  ###
+
+  gtest-linux-x64:
+    name: linux-x64
+    needs:
+      - build-linux-x64
+    uses: ./.github/workflows/gtest-linux.yml
+    with:
+      platform: linux_x64
+      apt-gcc-version: '9'
+      runs-on: ubuntu-22.04
+
+  gtest-linux-aarch64:
+    name: linux-aarch64
+    needs:
+      - build-linux-aarch64
+    uses: ./.github/workflows/gtest-linux.yml
+    with:
+      platform: linux_aarch64
+      apt-gcc-version: '9'
+      runs-on: ubuntu-22.04-arm
+
+  ###
   ### Test jobs
   ###
 
@@ -165,8 +189,10 @@ jobs:
     if: always()
     needs:
       - build-linux-x64
+      - gtest-linux-x64
       - test-linux-x64
       - build-linux-aarch64
+      - gtest-linux-aarch64
       - test-linux-aarch64
 
     steps:
