@@ -323,7 +323,7 @@ const intx ObjectAlignmentInBytes = 8;
   product(bool, CriticalJNINatives, false,                                  \
           "(Deprecated) Check for critical JNI entry points")               \
                                                                             \
-  product(bool, UseAESIntrinsics, false, DIAGNOSTIC,                        \
+  product(bool, UseAESIntrinsics, false, CLASSLIB17_ONLY_FLAGS(DIAGNOSTIC,) \
           "Use intrinsics for AES versions of crypto")                      \
                                                                             \
   product(bool, UseAESCTRIntrinsics, false, DIAGNOSTIC,                     \
@@ -332,15 +332,15 @@ const intx ObjectAlignmentInBytes = 8;
   product(bool, UseMD5Intrinsics, false, DIAGNOSTIC,                        \
           "Use intrinsics for MD5 crypto hash function")                    \
                                                                             \
-  product(bool, UseSHA1Intrinsics, false, DIAGNOSTIC,                       \
+  product(bool, UseSHA1Intrinsics, false, CLASSLIB17_ONLY_FLAGS(DIAGNOSTIC,)      \
           "Use intrinsics for SHA-1 crypto hash function. "                 \
           "Requires that UseSHA is enabled.")                               \
                                                                             \
-  product(bool, UseSHA256Intrinsics, false, DIAGNOSTIC,                     \
+  product(bool, UseSHA256Intrinsics, false, CLASSLIB17_ONLY_FLAGS(DIAGNOSTIC,)    \
           "Use intrinsics for SHA-224 and SHA-256 crypto hash functions. "  \
           "Requires that UseSHA is enabled.")                               \
                                                                             \
-  product(bool, UseSHA512Intrinsics, false, DIAGNOSTIC,                     \
+  product(bool, UseSHA512Intrinsics, false, CLASSLIB17_ONLY_FLAGS(DIAGNOSTIC,)    \
           "Use intrinsics for SHA-384 and SHA-512 crypto hash functions. "  \
           "Requires that UseSHA is enabled.")                               \
                                                                             \
@@ -348,7 +348,7 @@ const intx ObjectAlignmentInBytes = 8;
           "Use intrinsics for SHA3 crypto hash function. "                  \
           "Requires that UseSHA is enabled.")                               \
                                                                             \
-  product(bool, UseCRC32Intrinsics, false, DIAGNOSTIC,                      \
+  product(bool, UseCRC32Intrinsics, false, CLASSLIB17_ONLY_FLAGS(DIAGNOSTIC,)     \
           "use intrinsics for java.util.zip.CRC32")                         \
                                                                             \
   product(bool, UseCRC32CIntrinsics, false, DIAGNOSTIC,                     \
