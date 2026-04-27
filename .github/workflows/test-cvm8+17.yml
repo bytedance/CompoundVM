@@ -55,6 +55,7 @@ jobs:
           - 'jdk/tier1'
           - 'langtools'
           - 'cvm8'
+          - 'hotspot8'
 
         include:
           - test-name: 'jdk/tier1'
@@ -65,6 +66,9 @@ jobs:
 
           - test-name: 'cvm8'
             test-suite: 'cvm8'
+
+          - test-name: 'hotspot8'
+            test-suite: 'hotspot8'
 
     steps:
       - name: 'Checkout the JDK source'
