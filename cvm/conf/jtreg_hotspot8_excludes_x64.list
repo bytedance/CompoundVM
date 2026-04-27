@@ -2,13 +2,11 @@ compiler/6859338/Test6859338.java
 compiler/7196199/Test7196199.java
 compiler/8004741/Test8004741.java
 compiler/EscapeAnalysis/TestUnsafePutAddressNullObjMustNotEscape.java
-compiler/intrinsics/muladd/TestMulAdd.java
 compiler/intrinsics/sha/sanity/TestSHA1Intrinsics.java
 compiler/intrinsics/sha/sanity/TestSHA1MultiBlockIntrinsics.java
 compiler/intrinsics/sha/sanity/TestSHA256Intrinsics.java
 compiler/intrinsics/sha/sanity/TestSHA256MultiBlockIntrinsics.java
 compiler/intrinsics/sha/sanity/TestSHA512Intrinsics.java
-compiler/intrinsics/squaretolen/TestSquareToLen.java
 compiler/jsr292/methodHandleExceptions/TestAMEnotNPE.java
 compiler/jsr292/RedefineMethodUsedByMultipleMethodHandles.java
 compiler/intrinsics/sha/sanity/TestSHA512MultiBlockIntrinsics.java
@@ -119,6 +117,7 @@ runtime/NMT/JcmdBaselineDetail.java
 runtime/NMT/JcmdDetailDiff.java
 runtime/NMT/JcmdSummaryDiff.java
 runtime/NMT/MallocSiteTypeChange.java
+runtime/NMT/MallocStressTest.java
 runtime/NMT/NMTWithCDS.java
 runtime/NMT/ShutdownTwice.java
 runtime/NMT/SummaryAfterShutdown.java
@@ -139,7 +138,6 @@ testlibrary_tests/whitebox/vm_flags/IntxTest.java
 testlibrary_tests/TestMutuallyExclusivePlatformPredicates.java
 vmTestbase/nsk/jdb/monitor/monitor002/monitor002.java
 
-compiler/intrinsics/montgomerymultiply/MontgomeryMultiplyTest.java
 compiler/intrinsics/sha/cli/TestUseSHA1IntrinsicsOptionOnUnsupportedCPU.java
 compiler/intrinsics/sha/cli/TestUseSHA256IntrinsicsOptionOnUnsupportedCPU.java
 compiler/intrinsics/sha/cli/TestUseSHA512IntrinsicsOptionOnUnsupportedCPU.java

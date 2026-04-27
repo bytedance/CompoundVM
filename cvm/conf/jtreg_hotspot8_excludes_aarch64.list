@@ -2,13 +2,11 @@ compiler/6859338/Test6859338.java
 compiler/7196199/Test7196199.java
 compiler/8004741/Test8004741.java
 compiler/EscapeAnalysis/TestUnsafePutAddressNullObjMustNotEscape.java
-compiler/intrinsics/muladd/TestMulAdd.java
 compiler/intrinsics/sha/sanity/TestSHA1Intrinsics.java
 compiler/intrinsics/sha/sanity/TestSHA1MultiBlockIntrinsics.java
 compiler/intrinsics/sha/sanity/TestSHA256Intrinsics.java
 compiler/intrinsics/sha/sanity/TestSHA256MultiBlockIntrinsics.java
 compiler/intrinsics/sha/sanity/TestSHA512Intrinsics.java
-compiler/intrinsics/squaretolen/TestSquareToLen.java
 compiler/jsr292/methodHandleExceptions/TestAMEnotNPE.java
 compiler/jsr292/RedefineMethodUsedByMultipleMethodHandles.java
 compiler/intrinsics/sha/sanity/TestSHA512MultiBlockIntrinsics.java
@@ -150,6 +148,4 @@ compiler/arguments/TestUseBMI1InstructionsOnUnsupportedCPU.java
 compiler/arguments/TestUseCountLeadingZerosInstructionOnUnsupportedCPU.java
 compiler/arguments/TestUseCountTrailingZerosInstructionOnUnsupportedCPU.java
 compiler/7184394/TestAESMain.java
-compiler/intrinsics/sha/cli/TestUseSHA1IntrinsicsOptionOnSupportedCPU.java
-compiler/intrinsics/sha/cli/TestUseSHA256IntrinsicsOptionOnSupportedCPU.java
 compiler/intrinsics/sha/cli/TestUseSHA512IntrinsicsOptionOnSupportedCPU.java
