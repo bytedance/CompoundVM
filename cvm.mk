@@ -305,7 +305,7 @@ $(JTREG):
 ifeq ($(SKIP_BUILD), true)
 -setup_jtreg8: -init-dirs $(JTREG) $(JDK8_JDK_SRC)
 else
--setup_jtreg8: $(JTREG) jdk8vm17
+-setup_jtreg8: $(JTREG) cvm8default17
 endif
 	$(eval JT8_OPTS=-jdk:${CVM8DIR} -w:${JT8_WORKDIR} -r:${JT8_REPORTDIR} -concurrency:auto -a -ea -esa -ignore:quiet -agentvm -v:fail,error,time -javaoption:-cvm ${JT8_OPTS})
 
@@ -370,7 +370,7 @@ test_jtreg8_jdk_core: -setup_jtreg8 -overlay-jdk8
 	$(eval JT_TEST = ":jdk_core")
 	$(call run_jtreg8_test,$(JDK8_SRCROOT)/jdk/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
 
-test_jtreg8_hotspot: -setup_jtreg8 -overlay-jtreg
+test_jtreg8_hotspot8: -setup_jtreg8 -overlay-jtreg
 	$(eval JT_REPO = hotspot)
 	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
 
@@ -396,7 +396,7 @@ help:
 	@echo "                     Run CVM8 jtreg8 tests in directory $(CVM8_SRCROOT)/jdk/test"
 	@echo "  make test_jtreg8_langtools JT_TEST=<test selection>"
 	@echo "                     Run CVM8 jtreg8 tests in directory $(CVM8_SRCROOT)/langtools/test"
-	@echo "  make test_jtreg8_hotspot JT_TEST=<test selection>"
+	@echo "  make test_jtreg8_hotspot8 JT_TEST=<test selection>"
 	@echo "                     Run CVM8 jtreg8 tests in directory $(CVM8_SRCROOT)/hotspot/test"
 	@echo "  make test_cvm8 JT_TEST=<test selection>"
 	@echo "                     Run additional jtreg8 tests for CVM8 in directory test"
