@@ -338,7 +338,13 @@ define overlay_single
 	@{ cd cvm/overlay/$(REPO) && cp -f --parents $(FILEPATH) $(DESTDIR)/; }
 endef
 
-JT_OPTS_EXCLUDE=-exclude:$(JDK8_SRCROOT)/jdk/test/ProblemList.txt -exclude:$(CVM8_SRCROOT)/conf/jtreg_jdk8_excludes.list
+ifeq ($(CVM_ARCH),x86_64)
+	JT_OPTS_EXCLUDE=-exclude:$(JDK8_SRCROOT)/jdk/test/ProblemList.txt -exclude:$(CVM8_SRCROOT)/conf/jtreg_jdk8_excludes.list -exclude:$(CVM8_SRCROOT)/conf/jtreg_hotspot8_excludes_x64.list
+else ifeq ($(CVM_ARCH),aarch64)
+	JT_OPTS_EXCLUDE=-exclude:$(JDK8_SRCROOT)/jdk/test/ProblemList.txt -exclude:$(CVM8_SRCROOT)/conf/jtreg_jdk8_excludes.list -exclude:$(CVM8_SRCROOT)/conf/jtreg_hotspot8_excludes_aarch64.list
+else
+	ARCH_ERROR := 1
+endif
 
 -overlay-jdk8:
 	$(call overlay_single,jdk8u,jdk/test/com/sun/jdi/BreakpointWithFullGC.sh,$(JDK8_SRCROOT))
