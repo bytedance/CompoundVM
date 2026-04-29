@@ -30,17 +30,6 @@ compiler/jsr292/RedefineMethodUsedByMultipleMethodHandles.java
 compiler/intrinsics/sha/sanity/TestSHA512MultiBlockIntrinsics.java
 compiler/profiling/spectrapredefineclass/Launcher.java
 compiler/rangechecks/TestRangeCheckSmearing.java
-compiler/rtm/cli/TestPrintPreciseRTMLockingStatisticsOptionOnUnsupportedConfig.java
-compiler/rtm/cli/TestRTMAbortRatioOptionOnUnsupportedConfig.java
-compiler/rtm/cli/TestRTMAbortThresholdOption.java
-compiler/rtm/cli/TestRTMLockingCalculationDelayOption.java
-compiler/rtm/cli/TestRTMLockingThresholdOption.java
-compiler/rtm/cli/TestRTMRetryCountOption.java
-compiler/rtm/cli/TestRTMSpinLoopCountOption.java
-compiler/rtm/cli/TestRTMTotalCountIncrRateOptionOnUnsupportedConfig.java
-compiler/rtm/cli/TestUseRTMDeoptOptionOnUnsupportedConfig.java
-compiler/rtm/cli/TestUseRTMForStackLocksOptionOnUnsupportedConfig.java
-compiler/rtm/cli/TestUseRTMXendForLockBusyOption.java
 compiler/stable/TestStableBoolean.java
 compiler/stable/TestStableChar.java
 compiler/stable/TestStableByte.java
@@ -186,3 +175,16 @@ compiler/7184394/TestAESMain.java
 compiler/intrinsics/sha/cli/TestUseSHA1IntrinsicsOptionOnSupportedCPU.java
 compiler/intrinsics/sha/cli/TestUseSHA256IntrinsicsOptionOnSupportedCPU.java
 compiler/intrinsics/sha/cli/TestUseSHA512IntrinsicsOptionOnSupportedCPU.java
+
+# RTM cli options are not supported on aarch64. CVM for now ignores unknown options
+compiler/rtm/cli/TestPrintPreciseRTMLockingStatisticsOptionOnUnsupportedConfig.java
+compiler/rtm/cli/TestRTMAbortRatioOptionOnUnsupportedConfig.java
+compiler/rtm/cli/TestRTMAbortThresholdOption.java
+compiler/rtm/cli/TestRTMLockingCalculationDelayOption.java
+compiler/rtm/cli/TestRTMLockingThresholdOption.java
+compiler/rtm/cli/TestRTMRetryCountOption.java
+compiler/rtm/cli/TestRTMSpinLoopCountOption.java
+compiler/rtm/cli/TestRTMTotalCountIncrRateOptionOnUnsupportedConfig.java
+compiler/rtm/cli/TestUseRTMDeoptOptionOnUnsupportedConfig.java
+compiler/rtm/cli/TestUseRTMForStackLocksOptionOnUnsupportedConfig.java
+compiler/rtm/cli/TestUseRTMXendForLockBusyOption.java
