@@ -36,9 +36,8 @@ public class StableConfiguration {
     static {
         Boolean value = WB.getBooleanVMFlag("FoldStableValues");
         isStableEnabled = (value == null ? false : value);
-        isServerWithStable = isStableEnabled && get();
+        isServerWithStable = isStableEnabled;
         System.out.println("@Stable:         " + (isStableEnabled ? "enabled" : "disabled"));
-        System.out.println("Server Compiler: " + get());
     }
 
     // The method 'get' below returns true if the method is server compiled
