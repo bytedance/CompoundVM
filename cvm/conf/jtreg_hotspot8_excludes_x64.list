@@ -13,15 +13,6 @@ compiler/rtm/cli/TestRTMAbortRatioOptionOnUnsupportedConfig.java
 compiler/rtm/cli/TestRTMTotalCountIncrRateOptionOnUnsupportedConfig.java
 compiler/rtm/cli/TestUseRTMDeoptOptionOnUnsupportedConfig.java
 compiler/rtm/cli/TestUseRTMForStackLocksOptionOnUnsupportedConfig.java
-compiler/stable/TestStableBoolean.java
-compiler/stable/TestStableChar.java
-compiler/stable/TestStableByte.java
-compiler/stable/TestStableDouble.java
-compiler/stable/TestStableFloat.java
-compiler/stable/TestStableInt.java
-compiler/stable/TestStableLong.java
-compiler/stable/TestStableObject.java
-compiler/stable/TestStableShort.java
 compiler/startup/NumCompilerThreadsCheck.java
 compiler/tiered/Level2RecompilationTest.java
 compiler/tiered/ConstantGettersTransitionsTest.java
