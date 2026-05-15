@@ -2471,9 +2471,9 @@ static JNINativeMethod methods[] = {
   {CC"isIntrinsicAvailable0",
       CC"(Ljava/lang/reflect/Executable;Ljava/lang/reflect/Executable;I)Z",
                                                       (void*)&WB_IsIntrinsicAvailable},
-  {CC"makeMethodNotCompilable0",
-      CC"(Ljava/lang/reflect/Executable;IZ)V",        (void*)&WB_MakeMethodNotCompilable},
 #if HOTSPOT_TARGET_CLASSLIB == 8
+  {CC"makeMethodNotCompilable",
+      CC"(Ljava/lang/reflect/Executable;IZ)V",        (void*)&WB_MakeMethodNotCompilable},
   {CC"testSetDontInlineMethod",
       CC"(Ljava/lang/reflect/Executable;Z)Z",         (void*)&WB_TestSetDontInlineMethod},
   {CC"getMethodCompilationLevel",
@@ -2483,6 +2483,8 @@ static JNINativeMethod methods[] = {
   {CC"testSetForceInlineMethod",
       CC"(Ljava/lang/reflect/Executable;Z)Z",         (void*)&WB_TestSetForceInlineMethod},
 #elif HOTSPOT_TARGET_CLASSLIB == 17
+  {CC"makeMethodNotCompilable0",
+      CC"(Ljava/lang/reflect/Executable;IZ)V",        (void*)&WB_MakeMethodNotCompilable},
   {CC"testSetDontInlineMethod0",
       CC"(Ljava/lang/reflect/Executable;Z)Z",         (void*)&WB_TestSetDontInlineMethod},
   {CC"getMethodCompilationLevel0",

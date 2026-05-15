@@ -34,21 +34,25 @@ public class NMethod {
     return obj == null ? null : new NMethod(obj);
   }
   private NMethod(Object[] obj) {
-    assert obj.length == 3;
-    comp_level = (Integer) obj[0];
-    compile_id = (Integer) obj[1];
+    assert obj.length == 5;
+    comp_level = (Integer) obj[1];
     insts = (byte[]) obj[2];
+    compile_id = (Integer) obj[3];
+    entry_point = (Long) obj[4];
   }
   public final byte[] insts;
   public final int comp_level;
   public final int compile_id;
+  public final long entry_point;
 
   @Override
   public String toString() {
-    return "NMethod{" +
-        "insts=" + insts +
-        ", comp_level=" + comp_level +
-        ", compile_id=" + compile_id +
-        '}';
+    return "NMethod{"
+        + super.toString()
+        + ", insts=" + insts
+        + ", comp_level=" + comp_level
+        + ", compile_id=" + compile_id
+        + ", entry_point=" + entry_point
+        + '}';
   }
 }

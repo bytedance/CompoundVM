@@ -14,14 +14,8 @@ compiler/rtm/cli/TestRTMTotalCountIncrRateOptionOnUnsupportedConfig.java
 compiler/rtm/cli/TestUseRTMDeoptOptionOnUnsupportedConfig.java
 compiler/rtm/cli/TestUseRTMForStackLocksOptionOnUnsupportedConfig.java
 compiler/startup/NumCompilerThreadsCheck.java
-compiler/tiered/Level2RecompilationTest.java
-compiler/tiered/ConstantGettersTransitionsTest.java
 compiler/tiered/NonTieredLevelsTest.java
-compiler/tiered/TieredLevelsTest.java
 compiler/tiered/LevelTransitionTest.java
-compiler/whitebox/EnqueueMethodForCompilationTest.java
-compiler/whitebox/GetNMethodTest.java
-compiler/whitebox/MakeMethodNotCompilableTest.java
 gc/6941923/Test6941923.java
 gc/arguments/TestAggressiveHeap.java
 gc/arguments/TestG1ConcRefinementThreads.java
