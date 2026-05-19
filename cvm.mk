@@ -440,6 +440,13 @@ endif
 	$(call overlay_single,jdk8u,hotspot/test/compiler/8004741/Test8004741.java, $(JDK8_SRCROOT))
 	$(call overlay_single,jdk8u,hotspot/test/compiler/stable/StableConfiguration.java, $(JDK8_SRCROOT))
 	$(call overlay_single,jdk8u,hotspot/test/testlibrary/whitebox/sun/hotspot/code/NMethod.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/gc/arguments/TestAggressiveHeap.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/gc/arguments/TestG1ConcRefinementThreads.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/gc/arguments/TestG1HeapRegionSize.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/gc/arguments/TestHeapFreeRatio.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/gc/arguments/TestInitialTenuringThreshold.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/gc/arguments/TestUnrecognizedVMOptionsHandling.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/gc/arguments/TestUseCompressedOopsErgoTools.java, $(JDK8_SRCROOT))
 
 -overlay-jtreg:
 	$(call overlay_single,jdk8u,test/jtreg-ext/requires/VMProps.java, $(JDK8_SRCROOT))
