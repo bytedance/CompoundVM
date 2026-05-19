@@ -86,9 +86,9 @@ public class WhiteBox {
   // Runtime
   // Make sure class name is in the correct format
   public boolean isClassAlive(String name) {
-    return isClassAlive0(name.replace('.', '/'));
+    return countAliveClasses0(name.replace('.', '/')) != 0;
   }
-  private native boolean isClassAlive0(String name);
+  private native int countAliveClasses0(String name);
   public native boolean isMonitorInflated(Object obj);
   public native void forceSafepoint();
 

@@ -18,7 +18,6 @@ compiler/tiered/NonTieredLevelsTest.java
 compiler/tiered/LevelTransitionTest.java
 gc/6941923/Test6941923.java
 gc/arguments/TestSurvivorAlignmentInBytesOption.java
-gc/class_unloading/TestClassUnloadingDisabled.java
 gc/class_unloading/TestCMSClassUnloadingEnabledHWM.java
 gc/class_unloading/TestG1ClassUnloadingHWM.java
 gc/ergonomics/TestDynamicNumberOfGCThreads.java
@@ -63,14 +62,6 @@ runtime/CDSCompressedKPtrs/CDSCompressedKPtrs.java
 runtime/CDSCompressedKPtrs/CDSCompressedKPtrsError.java
 runtime/CheckEndorsedAndExtDirs/EndorsedExtDirs.java
 runtime/ClassFile/UnsupportedClassFileVersion.java
-runtime/ClassUnload/ConstantPoolDependsTest.java
-runtime/ClassUnload/DictionaryDependsTest.java
-runtime/ClassUnload/KeepAliveClass.java
-runtime/ClassUnload/KeepAliveClassLoader.java
-runtime/ClassUnload/KeepAliveObject.java
-runtime/ClassUnload/KeepAliveSoftReference.java
-runtime/ClassUnload/SuperDependsTest.java
-runtime/ClassUnload/UnloadTest.java
 runtime/CommandLine/PrintFlagsUintxTest.java
 runtime/CommandLine/TraceExceptionsTest.java
 runtime/CommandLine/UnrecognizedVMOption.java
