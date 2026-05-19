@@ -17,15 +17,8 @@ compiler/startup/NumCompilerThreadsCheck.java
 compiler/tiered/NonTieredLevelsTest.java
 compiler/tiered/LevelTransitionTest.java
 gc/6941923/Test6941923.java
-gc/arguments/TestAggressiveHeap.java
-gc/arguments/TestG1ConcRefinementThreads.java
-gc/arguments/TestG1HeapRegionSize.java
-gc/arguments/TestHeapFreeRatio.java
-gc/arguments/TestInitialTenuringThreshold.java
 gc/arguments/TestSurvivorAlignmentInBytesOption.java
-gc/arguments/TestUnrecognizedVMOptionsHandling.java
 gc/class_unloading/TestClassUnloadingDisabled.java
-gc/arguments/TestUseCompressedOopsErgo.java
 gc/class_unloading/TestCMSClassUnloadingEnabledHWM.java
 gc/class_unloading/TestG1ClassUnloadingHWM.java
 gc/ergonomics/TestDynamicNumberOfGCThreads.java
