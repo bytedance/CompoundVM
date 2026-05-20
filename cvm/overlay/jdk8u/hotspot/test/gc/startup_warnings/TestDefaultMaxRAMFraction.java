@@ -36,7 +36,7 @@ public class TestDefaultMaxRAMFraction {
   public static void main(String[] args) throws Exception {
     ProcessBuilder pb = ProcessTools.createJavaProcessBuilder("-XX:DefaultMaxRAMFraction=4", "-version");
     OutputAnalyzer output = new OutputAnalyzer(pb.start());
-    output.shouldContain("warning: DefaultMaxRAMFraction is deprecated and will likely be removed in a future release. Use MaxRAMFraction instead.");
+    output.shouldContain("warning: Option DefaultMaxRAMFraction was deprecated in version 8.0 and will likely be removed in a future release. Use option MaxRAMFraction instead.");
     output.shouldNotContain("error");
     output.shouldHaveExitValue(0);
   }
