@@ -45,7 +45,6 @@ gc/metaspace/TestMetaspaceSizeFlags.java
 gc/parallelScavenge/AdaptiveGCBoundary.java
 gc/startup_warnings/TestCMSForegroundFlags.java
 gc/startup_warnings/TestCMSIncrementalMode.java
-gc/startup_warnings/TestDefaultMaxRAMFraction.java
 gc/startup_warnings/TestDefNewCMS.java
 gc/startup_warnings/TestIncGC.java
 gc/6581734/Test6581734.java
