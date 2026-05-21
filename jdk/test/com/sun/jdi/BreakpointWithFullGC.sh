@@ -120,7 +120,7 @@ jdbFailIfNotPresent 'System\..*bottom of loop'
 jdbFailIfNotPresent 'System\..*end of test'
 
 # make sure we had at least one full GC
-debuggeeFailIfNotPresent 'Full GC'
+debuggeeFailIfNotPresent 'Full GC|Pause Full'
 
 # check for error message due to thread ID change
 debuggeeFailIfPresent \

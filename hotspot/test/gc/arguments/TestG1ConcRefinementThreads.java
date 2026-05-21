@@ -41,22 +41,26 @@ public class TestG1ConcRefinementThreads {
   public static void main(String args[]) throws Exception {
     // default case
     runG1ConcRefinementThreadsTest(
-        new String[]{}, // automatically selected
-        AUTO_SELECT_THREADS_COUNT /* use default setting */);
+        new String[]{},
+        AUTO_SELECT_THREADS_COUNT,
+        false);
 
-    // zero setting case
+    // zero setting case: the JDK 17 kernel preserves the explicit zero instead
+    // of replacing it with the ergonomic ParallelGCThreads value.
     runG1ConcRefinementThreadsTest(
-        new String[]{"-XX:G1ConcRefinementThreads=0"}, // automatically selected
-        AUTO_SELECT_THREADS_COUNT /* set to zero */);
+        new String[]{"-XX:G1ConcRefinementThreads=0"},
+        AUTO_SELECT_THREADS_COUNT,
+        true);
 
-    // non-zero sestting case
+    // non-zero setting case
     runG1ConcRefinementThreadsTest(
-        new String[]{"-XX:G1ConcRefinementThreads="+Integer.toString(PASSED_THREADS_COUNT)},
-        PASSED_THREADS_COUNT);
+        new String[]{"-XX:G1ConcRefinementThreads=" + Integer.toString(PASSED_THREADS_COUNT)},
+        PASSED_THREADS_COUNT,
+        false);
   }
 
   private static void runG1ConcRefinementThreadsTest(String[] passedOpts,
-          int expectedValue) throws Exception {
+          int expectedValue, boolean explicitZero) throws Exception {
     List<String> vmOpts = new ArrayList<>();
     if (passedOpts.length > 0) {
       Collections.addAll(vmOpts, passedOpts);
@@ -68,13 +72,16 @@ public class TestG1ConcRefinementThreads {
 
     output.shouldHaveExitValue(0);
     String stdout = output.getStdout();
-    checkG1ConcRefinementThreadsConsistency(stdout, expectedValue);
+    checkG1ConcRefinementThreadsConsistency(stdout, expectedValue, explicitZero);
   }
 
-  private static void checkG1ConcRefinementThreadsConsistency(String output, int expectedValue) {
+  private static void checkG1ConcRefinementThreadsConsistency(String output, int expectedValue,
+          boolean explicitZero) {
     int actualValue = getIntValue("G1ConcRefinementThreads", output);
 
-    if (expectedValue == 0) {
+    if (explicitZero) {
+      expectedValue = 0;
+    } else if (expectedValue == 0) {
       // If expectedValue is automatically selected, set it same as ParallelGCThreads.
       expectedValue = getIntValue("ParallelGCThreads", output);
     }

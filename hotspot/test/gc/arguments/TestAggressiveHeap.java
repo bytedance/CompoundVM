@@ -57,9 +57,10 @@ public class TestAggressiveHeap {
     // half of the required size instead.
     private static final String heapSizeOption = "-Xmx128M";
 
-    // bool UseParallelGC := true {product}
+    // JDK 8 used ':=' for ergonomic updates while the JDK 17 kernel prints
+    // '=' when the value originates from the command line.
     private static final String parallelGCPattern =
-        " *bool +UseParallelGC *:= *true +\\{product\\}";
+        " *bool +UseParallelGC +:?= *true +\\{product\\}.*";
 
     private static void testFlag() throws Exception {
         ProcessBuilder pb = ProcessTools.createJavaProcessBuilder(
@@ -92,4 +93,3 @@ public class TestAggressiveHeap {
         return true;
     }
 }
-

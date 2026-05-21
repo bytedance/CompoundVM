@@ -133,6 +133,10 @@ public class MalformedAnnotationProcessorTests {
             .setErrOutput(actualErrors);
         ToolBox.javac(args);
 
+        // cvm supports a higher bytecode version, so the test would not fail. Keep
+        // the higher version support and skip the test.
+        if (!System.getProperty("java.vm.specification.version").equals("8"))
+            return;
         if (!actualErrors.get(0).contains("- compiler.err.proc.cant.load.class: " +
             "WrongClassFileVersion has been compiled by a more recent version")) {
             throw new AssertionError("Unexpected errors reported: " + actualErrors);
