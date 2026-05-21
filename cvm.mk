@@ -412,9 +412,9 @@ define overlay_single
 endef
 
 ifeq ($(CVM_ARCH),x86_64)
-	JT_OPTS_EXCLUDE=-exclude:$(JDK8_SRCROOT)/jdk/test/ProblemList.txt -exclude:$(CVM8_SRCROOT)/conf/jtreg_jdk8_excludes.list -exclude:$(CVM8_SRCROOT)/conf/jtreg_hotspot8_excludes_x64.list
+	JT_OPTS_EXCLUDE=-exclude:$(JDK8_SRCROOT)/jdk/test/ProblemList.txt -exclude:$(JDK8_SRCROOT)/cvm/conf/jtreg_jdk8_excludes.list -exclude:$(JDK8_SRCROOT)/cvm/conf/jtreg_hotspot8_excludes_x64.list
 else ifeq ($(CVM_ARCH),aarch64)
-	JT_OPTS_EXCLUDE=-exclude:$(JDK8_SRCROOT)/jdk/test/ProblemList.txt -exclude:$(CVM8_SRCROOT)/conf/jtreg_jdk8_excludes.list -exclude:$(CVM8_SRCROOT)/conf/jtreg_hotspot8_excludes_aarch64.list
+	JT_OPTS_EXCLUDE=-exclude:$(JDK8_SRCROOT)/jdk/test/ProblemList.txt -exclude:$(JDK8_SRCROOT)/cvm/conf/jtreg_jdk8_excludes.list -exclude:$(JDK8_SRCROOT)/cvm/conf/jtreg_hotspot8_excludes_aarch64.list
 else
 	ARCH_ERROR := 1
 endif
