@@ -1,0 +1,125 @@
+# This project is a modified version of OpenJDK, licensed under GPL v2.
+# Modifications Copyright (C) 2025 ByteDance Inc.
+#
+# Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
+# DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+#
+# This code is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License version 2 only, as
+# published by the Free Software Foundation.  Oracle designates this
+# particular file as subject to the "Classpath" exception as provided
+# by Oracle in the LICENSE file that accompanied this code.
+#
+# This code is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+# version 2 for more details (a copy is included in the LICENSE file that
+# accompanied this code).
+#
+# You should have received a copy of the GNU General Public License version
+# 2 along with this work; if not, write to the Free Software Foundation,
+# Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+# or visit www.oracle.com if you need additional information or have any
+# questions.
+#
+
+name: 'GTest (linux)'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  workflow_call:
+    inputs:
+      platform:
+        required: true
+        type: string
+      runs-on:
+        required: true
+        type: string
+      debug-levels:
+        required: false
+        type: string
+        default: '[ "fastdebug", "release" ]'
+      apt-gcc-version:
+        required: true
+        type: string
+      apt-architecture:
+        required: false
+        type: string
+      apt-extra-packages:
+        required: false
+        type: string
+
+jobs:
+  gtest-linux:
+    name: gtest
+    runs-on: ${{ inputs.runs-on }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        debug-level: ${{ fromJSON(inputs.debug-levels) }}
+
+    steps:
+      - name: 'Checkout the jdk8u source'
+        uses: actions/checkout@v3
+        with:
+          path: cvm/jdk8u
+
+      - name: 'Checkout the jdk17u-target8 source'
+        uses: actions/checkout@v3
+        with:
+          ref: dev/v2/jdk17u-target8
+          path: .
+
+
+      - name: 'Determine version'
+        id: version
+        run: echo "::set-output name=version::$(cat ./cvm/conf/version)"
+
+      - name: 'Set architecture'
+        id: arch
+        run: |
+          # Set a proper suffix for packages if using a different architecture
+          if [[ '${{ inputs.apt-architecture }}' != '' ]]; then
+            echo 'suffix=:${{ inputs.apt-architecture }}' >> $GITHUB_OUTPUT
+          fi
+
+      # Upgrading apt to solve libc6 installation bugs, see JDK-8260460.
+      - name: 'Install toolchain and dependencies'
+        run: |
+          # Install dependencies using apt-get
+          if [[ '${{ inputs.apt-architecture }}' != '' ]]; then
+            sudo dpkg --add-architecture ${{ inputs.apt-architecture }}
+          fi
+          sudo apt-get update
+          sudo apt-get install --only-upgrade apt
+          sudo apt-get install gcc-${{ inputs.apt-gcc-version }} g++-${{ inputs.apt-gcc-version }} libxrandr-dev${{ steps.arch.outputs.suffix }} libxtst-dev${{ steps.arch.outputs.suffix }} libcups2-dev${{ steps.arch.outputs.suffix }} libasound2-dev${{ steps.arch.outputs.suffix }} ${{ inputs.apt-extra-packages }}
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-${{ inputs.apt-gcc-version }} 100 --slave /usr/bin/g++ g++ /usr/bin/g++-${{ inputs.apt-gcc-version }}
+
+      - name: 'Build'
+        run: |
+          make -f cvm.mk build_gtest_hotspot17 MODE=${{ matrix.debug-level}} SKIP_BUILD=true
+        shell: bash
+
+      - name: 'Get bundles'
+        uses: actions/download-artifact@v4
+        with:
+          name: CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}_${{ matrix.debug-level }}.tar.gz
+          path: .
+
+      - name: 'Unpack bundles'
+        run: |
+          rm -rf gtest-jdk
+          mkdir gtest-jdk
+          tar xzvf CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}_${{ matrix.debug-level }}.tar.gz -C gtest-jdk --strip-components=1
+        shell: bash
+
+      - name: 'Run gtests'
+        run: |
+          make -f cvm.mk test_gtest_hotspot17 MODE=${{ matrix.debug-level}} SKIP_BUILD=true HOTSPOT_GTEST_JDKDIR=${PWD}/gtest-jdk
+        shell: bash
