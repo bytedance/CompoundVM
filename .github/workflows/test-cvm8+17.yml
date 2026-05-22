@@ -71,8 +71,14 @@ jobs:
             test-suite: 'hotspot8'
 
     steps:
-      - name: 'Checkout the JDK source'
+      - name: 'Checkout the JDK17 source'
         uses: actions/checkout@v3
+
+      - name: 'Checkout the JDK8 source'
+        uses: actions/checkout@v3
+        with:
+          ref: dev/v2/jdk8u
+          path: cvm/jdk8u
 
       - name: 'Determine version'
         id: version
