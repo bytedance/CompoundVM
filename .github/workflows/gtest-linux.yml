@@ -65,17 +65,16 @@ jobs:
         debug-level: ${{ fromJSON(inputs.debug-levels) }}
 
     steps:
-      - name: 'Checkout the jdk8u source'
-        uses: actions/checkout@v3
-        with:
-          path: cvm/jdk8u
-
       - name: 'Checkout the jdk17u-target8 source'
         uses: actions/checkout@v3
         with:
           ref: dev/v2/jdk17u-target8
           path: .
 
+      - name: 'Checkout the jdk8u source'
+        uses: actions/checkout@v3
+        with:
+          path: cvm/jdk8u
 
       - name: 'Determine version'
         id: version
