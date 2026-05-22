@@ -149,7 +149,7 @@ JDK8_JDK_SRC := $(JDK8_SRCROOT)/jdk/src
 
 $(JDK8_JDK_SRC):
 	git worktree prune
-	git worktree add $(JDK8_SRCROOT) dev/cvm8_17_layout_v2_jdk8u
+	git worktree add $(JDK8_SRCROOT) dev/v2/jdk8u
 
 cvm8: jdk8vm17
 
