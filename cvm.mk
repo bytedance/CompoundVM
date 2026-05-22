@@ -399,18 +399,6 @@ define run_jtreg8_test
 	@{ cd ${JT8_DIR} && ${CUR_CMD}; }
 endef
 
-# Overwrite upstream source file with the modified version shipped in CompoundVM repo
-# $1   repository name from within cvm/overlay
-# $2   filepath relative to $1
-# $3   destination repo directory
-define overlay_single
-	$(eval REPO=$(1))
-	$(eval FILEPATH=$(2))
-	$(eval DESTDIR=$(3))
-	@{ test -e $(DESTDIR)/$(FILEPATH)_origin || cp -f $(DESTDIR)/$(FILEPATH) $(DESTDIR)/$(FILEPATH)_origin; }
-	@{ cd cvm/overlay/$(REPO) && cp -f --parents $(FILEPATH) $(DESTDIR)/; }
-endef
-
 ifeq ($(CVM_ARCH),x86_64)
 	JT_OPTS_EXCLUDE=-exclude:$(JDK8_SRCROOT)/jdk/test/ProblemList.txt -exclude:$(JDK8_SRCROOT)/cvm/conf/jtreg_jdk8_excludes.list -exclude:$(JDK8_SRCROOT)/cvm/conf/jtreg_hotspot8_excludes_x64.list
 else ifeq ($(CVM_ARCH),aarch64)
@@ -419,10 +407,7 @@ else
 	ARCH_ERROR := 1
 endif
 
--overlay-jtreg:
-	#$(call overlay_single,jdk8u,test/jtreg-ext/requires/VMProps.java, $(JDK8_SRCROOT))
-
-test_jtreg8: -setup_jtreg8 -overlay-jtreg
+test_jtreg8: -setup_jtreg8
 	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST))
 
 test_jtreg8_cvm8: -setup_jtreg8
@@ -439,7 +424,7 @@ test_jtreg8_jdk_core: -setup_jtreg8
 	$(eval JT_TEST = ":jdk_core")
 	$(call run_jtreg8_test,$(JDK8_SRCROOT)/jdk/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
 
-test_jtreg8_hotspot8: -setup_jtreg8 -overlay-jtreg
+test_jtreg8_hotspot8: -setup_jtreg8
 	$(eval JT_REPO = hotspot)
 	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
 
