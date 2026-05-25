@@ -1,3 +1,5 @@
+// This project is a modified version of OpenJDK, licensed under GPL v2.
+// Modifications Copyright (C) 2025 ByteDance Inc.
 /*
  * Copyright (c) 2013, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
@@ -41,6 +43,10 @@ public class Platform {
 
     public static boolean isServer() {
         return vmName.endsWith(" Server VM");
+    }
+
+    public static boolean isCVM() {
+        return vmName.contains("CompoundVM");
     }
 
     public static boolean isGraal() {

@@ -72,9 +72,11 @@ public class Versions {
     public static void main(String [] args) throws Exception {
         String classVersion   = getProperty("java.class.version");
         String javaVersion    = getProperty("java.version");
-        String VMVersion      = getProperty("java.vm.version");
+        String VMSpecVersion  = getProperty("java.vm.specification.version");
         String runtimeVersion = getProperty("java.runtime.version");
         String specVersion    = getProperty("java.specification.version");
+
+        boolean isCVM = VMSpecVersion.equals("17");
 
         if (! (javaVersion.startsWith(specVersion) &&
                runtimeVersion.startsWith(specVersion)))
@@ -95,7 +97,7 @@ public class Versions {
         cl = new URLClassLoader(new URL[]{new File("./").toURL()}, null);
 
         checkClassVersion(majorVersion    , minorVersion    , true );
-        checkClassVersion(majorVersion + 1, minorVersion    , false);
-        checkClassVersion(majorVersion    , minorVersion + 1, false);
+        checkClassVersion(majorVersion + 1, minorVersion    , isCVM);
+        checkClassVersion(majorVersion    , minorVersion + 1, isCVM);
     }
 }

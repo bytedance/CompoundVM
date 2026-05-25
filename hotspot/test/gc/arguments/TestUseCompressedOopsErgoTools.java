@@ -52,7 +52,13 @@ class TestUseCompressedOopsErgoTools {
 
   public static long getMaxHeapForCompressedOops(String[] vmargs) throws Exception {
     OutputAnalyzer output = runWhiteBoxTest(vmargs, DetermineMaxHeapForCompressedOops.class.getName(), new String[] {}, false);
-    return Long.parseLong(output.getStdout());
+    String stdout = output.getStdout();
+    Matcher m = Pattern.compile("(-?\\d+)").matcher(stdout);
+    long res = 0;
+    while (m.find()) {
+        res = Long.parseLong(m.group(1)); // get the last number in stdout
+    }
+    return res;
   }
 
   public static boolean is64bitVM() {
@@ -174,4 +180,3 @@ class TestUseCompressedOopsErgoTools {
     return expect(flags, false, false, 0);
   }
 }
-

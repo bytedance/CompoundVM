@@ -63,13 +63,12 @@ public class TestInitialTenuringThreshold {
     // successful tests
     runWithThresholds(0, 10, false);
     runWithThresholds(5, 5, false);
+    runWithThresholds(8, 16, false);
     // failing tests
     runWithThresholds(10, 0, true);
     runWithThresholds(9, 8, true);
     runWithThresholds(-1, 8, true);
     runWithThresholds(8, -1, true);
-    runWithThresholds(8, 16, true);
     runWithThresholds(16, 8, true);
   }
 }
-
