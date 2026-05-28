@@ -49,6 +49,25 @@ concurrency:
 
 jobs:
 
+  check-commit:
+    name: Check commit
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Check commit messages
+        run: |
+          python3 .github/scripts/check_commit.py --range origin/${{ github.base_ref }}..HEAD
+
   ###
   ### Determine platforms to include
   ###
@@ -112,25 +131,29 @@ jobs:
 
   build-linux-x64:
     name: linux-x64
-    needs: select
+    needs:
+      - select
+      - check-commit
     uses: ./.github/workflows/build-linux.yml
     with:
       platform: linux_x64
       apt-gcc-version: '9'
       runs-on: ubuntu-22.04
     # The linux-x64 jdk bundle is used as buildjdk for the cross-compile job
-    if: needs.select.outputs.linux-x64 == 'true' || needs.select.outputs.linux-cross-compile == 'true'
+    if: (github.event_name != 'pull_request' || needs.check-commit.result == 'success') && (needs.select.outputs.linux-x64 == 'true' || needs.select.outputs.linux-cross-compile == 'true')
 
   build-linux-aarch64:
     name: linux-aarch64
-    needs: select
+    needs:
+      - select
+      - check-commit
     uses: ./.github/workflows/build-linux.yml
     with:
       platform: linux_aarch64
       apt-gcc-version: '9'
       runs-on: ubuntu-22.04-arm
     # The linux-aarch64 jdk bundle is used as buildjdk for the cross-compile job
-    if: needs.select.outputs.linux-aarch64 == 'true' || needs.select.outputs.linux-cross-compile == 'true'
+    if: (github.event_name != 'pull_request' || needs.check-commit.result == 'success') && (needs.select.outputs.linux-aarch64 == 'true' || needs.select.outputs.linux-cross-compile == 'true')
 
   ###
   ### GTest jobs
