@@ -449,7 +449,6 @@ endif
 	$(call overlay_single,jdk8u,hotspot/test/gc/arguments/TestUseCompressedOopsErgoTools.java, $(JDK8_SRCROOT))
 	$(call overlay_single,jdk8u,hotspot/test/testlibrary/whitebox/sun/hotspot/WhiteBox.java, $(JDK8_SRCROOT))
 	$(call overlay_single,jdk8u,hotspot/test/gc/startup_warnings/TestDefaultMaxRAMFraction.java, $(JDK8_SRCROOT))
-	$(call overlay_single,jdk8u,hotspot/test/ProblemList.txt, $(JDK8_SRCROOT))
 
 -overlay-jtreg:
 	$(call overlay_single,jdk8u,test/jtreg-ext/requires/VMProps.java, $(JDK8_SRCROOT))
