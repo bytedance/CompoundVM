@@ -13,6 +13,7 @@ compiler/rtm/cli/TestRTMAbortRatioOptionOnUnsupportedConfig.java
 compiler/rtm/cli/TestRTMTotalCountIncrRateOptionOnUnsupportedConfig.java
 compiler/rtm/cli/TestUseRTMDeoptOptionOnUnsupportedConfig.java
 compiler/rtm/cli/TestUseRTMForStackLocksOptionOnUnsupportedConfig.java
+compiler/rtm/cli/TestUseRTMLockingOptionOnUnsupportedVM.java
 compiler/startup/NumCompilerThreadsCheck.java
 compiler/tiered/NonTieredLevelsTest.java
 compiler/tiered/LevelTransitionTest.java
