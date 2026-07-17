@@ -307,6 +307,7 @@ class ClassLoader: AllStatic {
   // Modular java runtime image is present vs. a build with exploded modules
   static bool has_jrt_entry() { return (_jrt_entry != NULL); }
   static ClassPathEntry* get_jrt_entry() { return _jrt_entry; }
+  static ClassPathEntry* get_first_append_entry() { return first_append_entry(); }
   static void close_jrt_image();
 
   // Add a module's exploded directory to the boot loader's exploded module build list

@@ -63,8 +63,6 @@ runtime/6929067/Test6929067.sh
 runtime/6981737/Test6981737.java
 runtime/7110720/Test7110720.sh
 runtime/7162488/Test7162488.sh
-runtime/CDSCompressedKPtrs/CDSCompressedKPtrs.java
-runtime/CDSCompressedKPtrs/CDSCompressedKPtrsError.java
 runtime/CheckEndorsedAndExtDirs/EndorsedExtDirs.java
 runtime/ClassFile/UnsupportedClassFileVersion.java
 runtime/CommandLine/PrintFlagsUintxTest.java
@@ -88,19 +86,11 @@ runtime/NMT/JcmdBaselineDetail.java
 runtime/NMT/JcmdDetailDiff.java
 runtime/NMT/JcmdSummaryDiff.java
 runtime/NMT/MallocSiteTypeChange.java
-runtime/NMT/NMTWithCDS.java
 runtime/NMT/ShutdownTwice.java
 runtime/NMT/SummaryAfterShutdown.java
 runtime/NMT/ThreadedVirtualAllocTestType.java
 runtime/NMT/VirtualAllocCommitUncommitRecommit.java
 runtime/NMT/VirtualAllocTestType.java
-runtime/SharedArchiveFile/CdsDifferentObjectAlignment.java
-runtime/SharedArchiveFile/CdsSameObjectAlignment.java
-runtime/SharedArchiveFile/LimitSharedSizes.java
-runtime/SharedArchiveFile/PrintSharedArchiveAndExit.java
-runtime/SharedArchiveFile/SharedArchiveFile.java
-runtime/SharedArchiveFile/SharedBaseAddress.java https://github.com/bytedance/CompoundVM/issues/150 linux-aarch64
-runtime/SharedArchiveFile/SpaceUtilizationCheck.java
 serviceability/dcmd/ClassLoaderStatsTest.java
 serviceability/ParserTest.java
 testlibrary_tests/whitebox/vm_flags/DoubleTest.java
@@ -114,3 +104,9 @@ compiler/arguments/TestUseCountLeadingZerosInstructionOnUnsupportedCPU.java
 compiler/arguments/TestUseCountTrailingZerosInstructionOnUnsupportedCPU.java
 compiler/7184394/TestAESMain.java
 compiler/intrinsics/sha/cli/TestUseSHA512IntrinsicsOptionOnSupportedCPU.java
+
+# CDS
+## This test do not supported for hotspot8 after "8072061: Automatically determine optimal sizes for the CDS regions"
+runtime/SharedArchiveFile/LimitSharedSizes.java
+## This test do not supported for hotspot8 after "8232069: Enable CDS even when UseCompressedClassPointers and/or UseCompressedOops are false"
+runtime/CDSCompressedKPtrs/CDSCompressedKPtrsError.java

@@ -487,10 +487,16 @@ void FileMapInfo::allocate_shared_path_table(TRAPS) {
   Arguments::assert_is_dumping_archive();
 
   ClassLoaderData* loader_data = ClassLoaderData::the_null_class_loader_data();
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
   ClassPathEntry* jrt = ClassLoader::get_jrt_entry();
 
   assert(jrt != NULL,
          "No modular java runtime image present when allocating the CDS classpath entry table");
+#else
+  // HOTSPOT_TARGET_CLASSLIB == 8: no jrt_entry, boot classpath entries
+  // are all in the first_append_entry list.
+  ClassPathEntry* jrt = ClassLoader::get_first_append_entry();
+#endif
 
   _shared_path_table.dumptime_init(loader_data, CHECK);
 
@@ -579,7 +585,9 @@ int FileMapInfo::num_non_existent_class_paths() {
 
 int FileMapInfo::get_module_shared_path_index(Symbol* location) {
   if (location->starts_with("jrt:", 4) && get_number_of_shared_paths() > 0) {
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
     assert(shared_path(0)->is_modules_image(), "first shared_path must be the modules image");
+#endif
     return 0;
   }
 
@@ -656,6 +664,7 @@ void FileMapInfo::update_jar_manifest(ClassPathEntry *cpe, SharedClassPathEntry*
 }
 
 char* FileMapInfo::skip_first_path_entry(const char* path) {
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
   size_t path_sep_len = strlen(os::path_separator());
   char* p = strstr((char*)path, os::path_separator());
   if (p != NULL) {
@@ -672,6 +681,9 @@ char* FileMapInfo::skip_first_path_entry(const char* path) {
     } );
   }
   return p;
+#else // HOTSPOT_TARGET_CLASSLIB == 8: no modules image to skip
+  return (char*)path;
+#endif
 }
 
 int FileMapInfo::num_paths(const char* path) {
@@ -754,8 +766,12 @@ bool FileMapInfo::validate_boot_class_paths() {
   // common cases, the dump time boot path might contain modules_image only.
   char* runtime_boot_path = Arguments::get_sysclasspath();
   char* rp = skip_first_path_entry(runtime_boot_path);
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
   assert(shared_path(0)->is_modules_image(), "first shared_path must be the modules image");
   int dp_len = header()->app_class_paths_start_index() - 1; // ignore the first path to the module image
+#else
+  int dp_len = header()->app_class_paths_start_index(); // no modules image to ignore
+#endif
   bool mismatch = false;
 
   bool relaxed_check = !header()->has_platform_or_app_classes();
@@ -867,7 +883,9 @@ bool FileMapInfo::validate_shared_path_table() {
     //
     // When dynamic archiving is enabled, the _shared_path_table is overwritten
     // to include the application path and stored in the top layer archive.
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
     assert(shared_path(0)->is_modules_image(), "first shared_path must be the modules image");
+#endif
     if (header()->app_class_paths_start_index() > 1) {
       DynamicDumpSharedSpaces = false;
       warning(
@@ -914,8 +932,10 @@ bool FileMapInfo::validate_shared_path_table() {
   }
 
   if (header()->max_used_path_index() == 0) {
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
     // default archive only contains the module image in the bootclasspath
     assert(shared_path(0)->is_modules_image(), "first shared_path must be the modules image");
+#endif
   } else {
     if (!validate_boot_class_paths() || !validate_app_class_paths(shared_app_paths_len)) {
       fail_continue("shared class paths mismatch (hint: enable -Xlog:class+path=info to diagnose the failure)");
@@ -1062,10 +1082,12 @@ bool FileMapInfo::init_from_file(int fd) {
     return false;
   }
 
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
   if (!Arguments::has_jimage()) {
     FileMapInfo::fail_continue("The shared archive file cannot be used with an exploded module build.");
     return false;
   }
+#endif
 
   unsigned int expected_magic = is_static() ? CDS_ARCHIVE_MAGIC : CDS_DYNAMIC_ARCHIVE_MAGIC;
   if (header()->magic() != expected_magic) {

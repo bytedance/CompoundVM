@@ -71,8 +71,12 @@ inline void ClassLoader::load_zip_library_if_needed() {
 
 inline int ClassLoader::num_boot_classpath_entries() {
   Arguments::assert_is_dumping_archive();
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
   assert(has_jrt_entry(), "must have a java runtime image");
   int num_entries = 1; // count the runtime image
+#else
+  int num_entries = 0; // no runtime image for classlib 8
+#endif
   ClassPathEntry* e = first_append_entry();
   while (e != NULL) {
     num_entries ++;
@@ -82,11 +86,15 @@ inline int ClassLoader::num_boot_classpath_entries() {
 }
 
 inline ClassPathEntry* ClassLoader::get_next_boot_classpath_entry(ClassPathEntry* e) {
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
   if (e == ClassLoader::_jrt_entry) {
     return first_append_entry();
   } else {
     return e->next();
   }
+#else // HOTSPOT_TARGET_CLASSLIB == 8: no jrt_entry, just walk the list
+  return e->next();
+#endif
 }
 
 // Helper function used by CDS code to get the number of app classpath
