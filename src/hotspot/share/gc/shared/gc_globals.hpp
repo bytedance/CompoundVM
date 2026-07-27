@@ -698,7 +698,9 @@
   product(uintx, GCDrainStackTargetSize, 64,                                \
           "Number of entries we will try to leave on the stack "            \
           "during parallel gc")                                             \
-          range(0, max_juint)
+          range(0, max_juint)                                               \
+  product(bool, CVMG1AsDefaultGC, false,                                    \
+          "Defaults to G1 GC if unspecified")
 
 // end of GC_FLAGS
 

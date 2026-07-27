@@ -100,6 +100,13 @@ void GCConfig::fail_if_non_included_gc_is_selected() {
 #if HOTSPOT_TARGET_CLASSLIB == 8
 void GCConfig::select_gc_ergonomically() {
   if (os::is_server_class_machine()) {
+    // if CVMG1AsDefaultGC is set, then use G1 as the default GC.
+#if INCLUDE_G1GC
+    if (CVMG1AsDefaultGC) {
+        FLAG_SET_ERGO_IF_DEFAULT(UseG1GC, true);
+        return;
+    }
+#endif
 #if INCLUDE_PARALLELGC
     FLAG_SET_ERGO_IF_DEFAULT(UseParallelGC, true);
 #elif INCLUDE_G1GC

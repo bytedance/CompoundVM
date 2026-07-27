@@ -457,7 +457,12 @@ endif
 test_jtreg8: -setup_jtreg8 -overlay-jdk8  -overlay-langtools8 -overlay-jtreg
 	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST))
 
-test_jtreg8_cvm8: -setup_jtreg8
+prepare_cvm8_testlibrary:
+	@mkdir -p $(CVM8_SRCROOT)/test
+	@ln -sfn $(CVM8_SRCROOT)/jdk8u/hotspot/test/testlibrary \
+	    $(CVM8_SRCROOT)/test/testlibrary
+
+test_jtreg8_cvm8: prepare_cvm8_testlibrary -setup_jtreg8
 	$(call run_jtreg8_test,$(CVM8_SRCROOT)/test,$(JT_TEST))
 
 test_jtreg8_jdk: -setup_jtreg8 -overlay-jdk8
