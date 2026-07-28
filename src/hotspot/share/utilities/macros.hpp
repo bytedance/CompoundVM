@@ -643,6 +643,7 @@
   #define CLASSLIB17_ONLY(code)
   #define CLASSLIB8_EARLY_RETURN(ret) return ret
   #define CLASSLIB8_EARLY_RETURN_() return
+  #define CLASSLIB17_ONLY_FLAGS(...)
   #ifndef PRODUCT
     #define CLASSLIB8_DEBUG_ONLY(code) code
   #else
@@ -655,6 +656,7 @@
     #define CLASSLIB8_EARLY_RETURN(ret)
     #define CLASSLIB8_EARLY_RETURN_()
     #define CLASSLIB8_DEBUG_ONLY(code)
+    #define CLASSLIB17_ONLY_FLAGS(...) __VA_ARGS__
   #else
     #error("Unsupported class library version: " HOTSPOT_TARGET_CLASSLIB)
   #endif

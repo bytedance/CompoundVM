@@ -145,9 +145,14 @@ $(BOOTJDK8)/:
 	$(call setup_boot_jdk,$(BOOTJDK8_URL),$@)
 	#cp -f $(WORKSPACE)/bin/linux-$(CVM_ARCH)/hsdis-$(ARCH_DIR).so $$(dirname $$(find $@ -name libjava.so))
 
-jdk8u/jdk/src:
-	wget -nc https://tosv.byted.org/obj/rtdev/adoptium/src/jdk8u452-ga.tar.gz
-	[[ -d $(JDK8_SRCROOT) ]] || (mkdir -p $(JDK8_SRCROOT) && tar -xzf jdk8u452-ga.tar.gz -C $(JDK8_SRCROOT) --strip-components=1)
+JDK8_JDK_SRC := $(JDK8_SRCROOT)/jdk/src
+JDK8_SRC_TAR_URL := https://tosv.byted.org/obj/rtdev/adoptium/src/jdk8u452-ga.tar.gz
+JDK8_SRC_TAR := $(notdir $(JDK8_SRC_TAR_URL))
+
+$(JDK8_JDK_SRC):
+	rm -f $(JDK8_SRC_TAR)
+	wget -nc -O $(JDK8_SRC_TAR) $(JDK8_SRC_TAR_URL)
+	[[ -d $(JDK8_SRCROOT) ]] || (mkdir -p $(JDK8_SRCROOT) && tar -xzf $(JDK8_SRC_TAR) -C $(JDK8_SRCROOT) --strip-components=1)
 
 cvm8: jdk8vm17
 
@@ -216,7 +221,7 @@ endif
 	@echo "###### Done ######"
 	@echo
 
-build_jdk8u: -bootstrap jdk8u/jdk/src
+build_jdk8u: -bootstrap $(JDK8_JDK_SRC)
 	{ cd $(JDK8_SRCROOT); \
 		if [[ "x$$(find ./build -type f -name config.log | grep $(MODE))" = "x" ]]; then \
 			bash configure --with-debug-level=$(MODE) \
@@ -233,26 +238,101 @@ build_jdk8u: -bootstrap jdk8u/jdk/src
 		[[ $$? -eq 0 ]] || exit 127; \
 	}
 
+# configure for jdk17u
+# $1 extra configure options
+define configure_jdk17u
+	bash configure \
+		--with-debug-level=$(MODE) \
+		--with-boot-jdk=$(BOOTJDK17) \
+		--with-hotspot-target-classlib=8 \
+		--with-vendor-name="ByteDance" \
+		--with-vendor-url="https://github.com/bytedance/CompoundVM" \
+		--with-vendor-bug-url="https://github.com/bytedance/CompoundVM/issues" \
+		--with-vendor-vm-bug-url="https://github.com/bytedance/CompoundVM/issues" \
+		--without-version-pre \
+		--without-version-opt \
+		--with-cvm-version-string=$(VERSION) \
+		--with-vendor-name="CompoundVM" \
+		$(1)
+endef
+
 # compile hotspot and java.base from jdk17u
 build_jdk17u: -bootstrap
 	{ \
 		if [[ "x$$(find ./build -type f -name config.log | grep $(MODE))" = "x" ]]; then \
-			bash configure --with-debug-level=$(MODE) \
-											--with-boot-jdk=$(BOOTJDK17) \
-											--with-jtreg=no \
-											--with-hotspot-target-classlib=8 \
-											--with-vendor-name="ByteDance" \
-											--with-vendor-url="https://github.com/bytedance/CompoundVM" \
-											--with-vendor-bug-url="https://github.com/bytedance/CompoundVM/issues" \
-											--with-vendor-vm-bug-url="https://github.com/bytedance/CompoundVM/issues" \
-											--without-version-pre \
-											--without-version-opt \
-											--with-cvm-version-string=$(VERSION) \
-											--with-vendor-name="CompoundVM" \
-											; \
+			$(call configure_jdk17u) ; \
 		fi; \
 	}
 	make $(JDK_MAKE_OPTS) CONF=linux-$(CVM_ARCH)-server-$(MODE) hotspot jdk.jdwp.agent
+
+GTEST_VERSION ?= $(shell sed -n 's/^GTEST_VERSION=//p' $(WORKSPACE)/make/conf/github-actions.conf | head -n 1)
+GTEST_ROOT := $(WORKSPACE)/.gtest
+GTEST_ARCHIVE := $(GTEST_ROOT)/release-$(GTEST_VERSION).tar.gz
+GTEST_URL := https://github.com/google/googletest/archive/refs/tags/v$(GTEST_VERSION).tar.gz
+GTEST_DIR := $(GTEST_ROOT)/googletest-$(GTEST_VERSION)
+GTEST_HEADER := $(GTEST_DIR)/googletest/include/gtest/gtest.h
+
+$(GTEST_HEADER):
+	@echo "Installing googletest $(GTEST_VERSION) to $(GTEST_DIR)"
+	{ \
+		set -e; \
+		[[ -d $(GTEST_ROOT) ]] || mkdir -p $(GTEST_ROOT); \
+		rm -f $(GTEST_ARCHIVE); \
+		wget -q $(GTEST_URL) -O $(GTEST_ARCHIVE); \
+		rm -fr $(GTEST_DIR); \
+		tar xf $(GTEST_ARCHIVE) -C $(GTEST_ROOT); \
+		rm -f $(GTEST_ARCHIVE); \
+	}
+
+HOTSPOT_GTEST_BUILD_DIR := $(JDK17_SRCROOT)/build/linux-$(CVM_ARCH)-server-$(MODE)
+HOTSPOT_GTEST_LAUNCHER := $(HOTSPOT_GTEST_BUILD_DIR)/images/test/hotspot/gtest/server/gtestLauncher
+HOTSPOT_GTEST_TEST ?= gtest:all
+HOTSPOT_GTEST_SELECTOR := $(patsubst %/server,%,$(patsubst gtest:%,%,$(HOTSPOT_GTEST_TEST)))
+HOTSPOT_GTEST_FILTER := $(if $(filter all,$(HOTSPOT_GTEST_SELECTOR)),,--gtest_filter=$(HOTSPOT_GTEST_SELECTOR)*)
+HOTSPOT_GTEST_JDKDIR := $(OUTPUTDIR)/$(DISTRO_NAME)
+HOTSPOT_GTEST_WORKDIR := $(HOTSPOT_GTEST_BUILD_DIR)/gtest-manual
+HOTSPOT_GTEST_RESULT_DIR := $(HOTSPOT_GTEST_BUILD_DIR)/gtest-results
+
+ifeq ($(SKIP_BUILD), true)
+-configure_jdk17u_gtest: $(GTEST_HEADER) -bootstrap
+else
+-configure_jdk17u_gtest: $(GTEST_HEADER) cvm8default17
+endif
+	{ \
+		if [[ ! -f $(HOTSPOT_GTEST_BUILD_DIR)/spec.gmk ]] || \
+				! grep -Fqx 'GTEST_FRAMEWORK_SRC := $(GTEST_DIR)' $(HOTSPOT_GTEST_BUILD_DIR)/spec.gmk 2>/dev/null; then \
+			$(call configure_jdk17u,--with-gtest=$(GTEST_DIR)) ; \
+		fi; \
+	}
+
+build_gtest_hotspot17: -configure_jdk17u_gtest
+	$(MAKE) $(JDK_MAKE_OPTS) CONF=linux-$(CVM_ARCH)-server-$(MODE) test-image-hotspot-gtest
+
+ifeq ($(SKIP_BUILD), true)
+test_gtest_hotspot17:
+else
+test_gtest_hotspot17: build_gtest_hotspot17
+endif
+	@echo
+	@echo "Running hotspot gtest \"$(HOTSPOT_GTEST_TEST)\""
+	@echo "  Launcher: $(HOTSPOT_GTEST_LAUNCHER)"
+	@echo "  JDK under test: $(HOTSPOT_GTEST_JDKDIR)"
+	@echo "  Work dir: $(HOTSPOT_GTEST_WORKDIR)"
+	@echo "  Test report: $(HOTSPOT_GTEST_RESULT_DIR)"
+	@echo
+	@{ \
+		mkdir -p $(HOTSPOT_GTEST_WORKDIR) $(HOTSPOT_GTEST_RESULT_DIR) && \
+		cd $(HOTSPOT_GTEST_WORKDIR) && \
+		$(HOTSPOT_GTEST_LAUNCHER) \
+			-jdk $(HOTSPOT_GTEST_JDKDIR) \
+			$(HOTSPOT_GTEST_FILTER) \
+			--gtest_output=xml:$(HOTSPOT_GTEST_RESULT_DIR)/gtest.xml \
+			--gtest_catch_exceptions=0 \
+			> >(tee $(HOTSPOT_GTEST_RESULT_DIR)/gtest.txt); \
+		exit_code=$$?; \
+		echo $$exit_code > $(HOTSPOT_GTEST_RESULT_DIR)/exitcode.txt; \
+		exit $$exit_code; \
+	}
 
 ################ alternative kernel classes ########
 # here we copy the JDK17 kernel classes to separate diretory,
@@ -299,9 +379,9 @@ $(JTREG):
 
 # minimize the effort to download source code
 ifeq ($(SKIP_BUILD), true)
--setup_jtreg8: -init-dirs $(JTREG) jdk8u/jdk/src
+-setup_jtreg8: -init-dirs $(JTREG) $(JDK8_JDK_SRC)
 else
--setup_jtreg8: $(JTREG) jdk8vm17
+-setup_jtreg8: $(JTREG) cvm8default17
 endif
 	$(eval JT8_OPTS=-jdk:${CVM8DIR} -w:${JT8_WORKDIR} -r:${JT8_REPORTDIR} -concurrency:auto -a -ea -esa -ignore:quiet -agentvm -v:fail,error,time -javaoption:-cvm ${JT8_OPTS})
 
@@ -334,7 +414,13 @@ define overlay_single
 	@{ cd cvm/overlay/$(REPO) && cp -f --parents $(FILEPATH) $(DESTDIR)/; }
 endef
 
-JT_OPTS_EXCLUDE=-exclude:$(JDK8_SRCROOT)/jdk/test/ProblemList.txt -exclude:$(CVM8_SRCROOT)/conf/jtreg_jdk8_excludes.list
+ifeq ($(CVM_ARCH),x86_64)
+	JT_OPTS_EXCLUDE=-exclude:$(JDK8_SRCROOT)/$(JT_REPO)/test/ProblemList.txt -exclude:$(CVM8_SRCROOT)/conf/jtreg_jdk8_excludes.list -exclude:$(CVM8_SRCROOT)/conf/jtreg_hotspot8_excludes_x64.list
+else ifeq ($(CVM_ARCH),aarch64)
+	JT_OPTS_EXCLUDE=-exclude:$(JDK8_SRCROOT)/$(JT_REPO)/test/ProblemList.txt -exclude:$(CVM8_SRCROOT)/conf/jtreg_jdk8_excludes.list -exclude:$(CVM8_SRCROOT)/conf/jtreg_hotspot8_excludes_aarch64.list
+else
+	ARCH_ERROR := 1
+endif
 
 -overlay-jdk8:
 	$(call overlay_single,jdk8u,jdk/test/com/sun/jdi/BreakpointWithFullGC.sh,$(JDK8_SRCROOT))
@@ -345,6 +431,24 @@ JT_OPTS_EXCLUDE=-exclude:$(JDK8_SRCROOT)/jdk/test/ProblemList.txt -exclude:$(CVM
 -overlay-langtools8:
 	$(call overlay_single,jdk8u,langtools/test/tools/javac/annotations/8218152/MalformedAnnotationProcessorTests.java, $(JDK8_SRCROOT))
 	$(call overlay_single,jdk8u,langtools/test/tools/javac/6508981/TestInferBinaryName.java, $(JDK8_SRCROOT))
+
+-overlay-hotspot8:
+	$(call overlay_single,jdk8u,hotspot/test/testlibrary/com/oracle/java/testlibrary/Platform.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/testlibrary/com/oracle/java/testlibrary/cli/CommandLineOptionTest.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/compiler/6859338/Test6859338.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/compiler/7196199/Test7196199.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/compiler/8004741/Test8004741.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/compiler/stable/StableConfiguration.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/testlibrary/whitebox/sun/hotspot/code/NMethod.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/gc/arguments/TestAggressiveHeap.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/gc/arguments/TestG1ConcRefinementThreads.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/gc/arguments/TestG1HeapRegionSize.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/gc/arguments/TestHeapFreeRatio.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/gc/arguments/TestInitialTenuringThreshold.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/gc/arguments/TestUnrecognizedVMOptionsHandling.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/gc/arguments/TestUseCompressedOopsErgoTools.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/testlibrary/whitebox/sun/hotspot/WhiteBox.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,hotspot/test/gc/startup_warnings/TestDefaultMaxRAMFraction.java, $(JDK8_SRCROOT))
 
 -overlay-jtreg:
 	$(call overlay_single,jdk8u,test/jtreg-ext/requires/VMProps.java, $(JDK8_SRCROOT))
@@ -366,7 +470,7 @@ test_jtreg8_jdk_core: -setup_jtreg8 -overlay-jdk8
 	$(eval JT_TEST = ":jdk_core")
 	$(call run_jtreg8_test,$(JDK8_SRCROOT)/jdk/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
 
-test_jtreg8_hotspot: -setup_jtreg8 -overlay-jtreg
+test_jtreg8_hotspot8: -setup_jtreg8 -overlay-jtreg -overlay-hotspot8
 	$(eval JT_REPO = hotspot)
 	$(call run_jtreg8_test,$(JDK8_SRCROOT)/$(JT_REPO)/test,$(JT_TEST),$(JT_OPTS_EXCLUDE))
 
@@ -389,10 +493,13 @@ help:
 	@echo "  make test_jtreg8 JT_TEST=<test selection> JT_REPO=<repo dir>"
 	@echo "                     Run CVM8 jtreg8 test with given selection"
 	@echo "  make test_jtreg8_jdk JT_TEST=<test selection>"
-	@echo "                     Run CVM8 jtreg8 tests in directory jdk8u/jdk/test"
+	@echo "                     Run CVM8 jtreg8 tests in directory $(CVM8_SRCROOT)/jdk/test"
 	@echo "  make test_jtreg8_langtools JT_TEST=<test selection>"
-	@echo "                     Run CVM8 jtreg8 tests in directory jdk8u/langtools/test"
-	@echo "  make test_jtreg8_hotspot JT_TEST=<test selection>"
-	@echo "                     Run CVM8 jtreg8 tests in directory jdk8u/hotspot/test"
+	@echo "                     Run CVM8 jtreg8 tests in directory $(CVM8_SRCROOT)/langtools/test"
+	@echo "  make test_jtreg8_hotspot8 JT_TEST=<test selection>"
+	@echo "                     Run CVM8 jtreg8 tests in directory $(CVM8_SRCROOT)/hotspot/test"
 	@echo "  make test_cvm8 JT_TEST=<test selection>"
 	@echo "                     Run additional jtreg8 tests for CVM8 in directory test"
+	@echo "  make test_gtest_hotspot17 HOTSPOT_GTEST_TEST=<gtest selection>"
+	@echo "                     Run hotspot gtests directly against the CVM output image"
+	@echo "                     e.g. HOTSPOT_GTEST_TEST='gtest:all'"

@@ -698,19 +698,19 @@
   product(bool, UseCharacterCompareIntrinsics, false, DIAGNOSTIC,           \
           "Enables intrinsification of java.lang.Character functions")      \
                                                                             \
-  product(bool, UseMultiplyToLenIntrinsic, false, DIAGNOSTIC,               \
+  product(bool, UseMultiplyToLenIntrinsic, false, CLASSLIB17_ONLY_FLAGS(DIAGNOSTIC,)                    \
           "Enables intrinsification of BigInteger.multiplyToLen()")         \
                                                                             \
-  product(bool, UseSquareToLenIntrinsic, false, DIAGNOSTIC,                 \
+  product(bool, UseSquareToLenIntrinsic, false, CLASSLIB17_ONLY_FLAGS(DIAGNOSTIC,)                      \
           "Enables intrinsification of BigInteger.squareToLen()")           \
                                                                             \
-  product(bool, UseMulAddIntrinsic, false, DIAGNOSTIC,                      \
+  product(bool, UseMulAddIntrinsic, false, CLASSLIB17_ONLY_FLAGS(DIAGNOSTIC,)                           \
           "Enables intrinsification of BigInteger.mulAdd()")                \
                                                                             \
-  product(bool, UseMontgomeryMultiplyIntrinsic, false, DIAGNOSTIC,          \
+  product(bool, UseMontgomeryMultiplyIntrinsic, false, CLASSLIB17_ONLY_FLAGS(DIAGNOSTIC,)               \
           "Enables intrinsification of BigInteger.montgomeryMultiply()")    \
                                                                             \
-  product(bool, UseMontgomerySquareIntrinsic, false, DIAGNOSTIC,            \
+  product(bool, UseMontgomerySquareIntrinsic, false, CLASSLIB17_ONLY_FLAGS(DIAGNOSTIC,)                 \
           "Enables intrinsification of BigInteger.montgomerySquare()")      \
                                                                             \
   product(bool, EnableVectorSupport, false, EXPERIMENTAL,                   \

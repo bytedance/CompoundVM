@@ -2707,10 +2707,18 @@ void os::jvm_path(char *buf, jint buflen) {
         len = strlen(buf);
         assert(len < buflen, "Ran out of buffer room");
         jrelib_p = buf + len;
+
+#if HOTSPOT_TARGET_CLASSLIB == 8
+        snprintf(jrelib_p, buflen-len, "/jre/lib/%s", HOTSPOT_LIB_ARCH);
+        if (0 != access(buf, F_OK)) {
+          snprintf(jrelib_p, buflen-len, "/lib/%s", HOTSPOT_LIB_ARCH);
+        }
+#else
         snprintf(jrelib_p, buflen-len, "/jre/lib");
         if (0 != access(buf, F_OK)) {
           snprintf(jrelib_p, buflen-len, "/lib");
         }
+#endif
 
         if (0 == access(buf, F_OK)) {
           // Use current module name "libjvm.so"
