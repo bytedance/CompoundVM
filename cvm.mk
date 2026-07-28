@@ -244,6 +244,7 @@ define configure_jdk17u
 	bash configure \
 		--with-debug-level=$(MODE) \
 		--with-boot-jdk=$(BOOTJDK17) \
+		--without-jtreg \
 		--with-hotspot-target-classlib=8 \
 		--with-vendor-name="ByteDance" \
 		--with-vendor-url="https://github.com/bytedance/CompoundVM" \
