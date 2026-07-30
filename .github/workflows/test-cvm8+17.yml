@@ -17,7 +17,7 @@
 # 2 along with this work; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
 
-name: 'Run tests'
+name: "Run tests"
 
 on:
   workflow_call:
@@ -52,58 +52,64 @@ jobs:
       fail-fast: false
       matrix:
         test-name:
-          - 'jdk/tier1'
-          - 'langtools'
-          - 'cvm8'
-          - 'hotspot8'
+          - "jdk/tier1"
+          - "langtools"
+          - "cvm8"
+          - "hotspot8"
 
         include:
-          - test-name: 'jdk/tier1'
-            test-suite: 'jdk_tier1'
+          - test-name: "jdk/tier1"
+            test-suite: "jdk_tier1"
 
-          - test-name: 'langtools'
-            test-suite: 'langtools'
+          - test-name: "langtools"
+            test-suite: "langtools"
 
-          - test-name: 'cvm8'
-            test-suite: 'cvm8'
+          - test-name: "cvm8"
+            test-suite: "cvm8"
 
-          - test-name: 'hotspot8'
-            test-suite: 'hotspot8'
+          - test-name: "hotspot8"
+            test-suite: "hotspot8"
 
     steps:
-      - name: 'Checkout the JDK source'
+      - name: "Checkout the JDK source"
         uses: actions/checkout@v3
 
-      - name: 'Determine version'
+      - name: "Determine version"
         id: version
         run: echo "::set-output name=version::$(cat ./cvm/conf/version)"
 
-      - name: 'Get bundles'
+      - name: "Get bundles"
         uses: actions/download-artifact@v4
         with:
           name: CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}_${{ inputs.debug-level }}.tar.gz
           path: .
 
-      - name: 'Unpack bundles'
+      - name: "Unpack bundles"
         run: |
           rm -rf cvm/build/jdk8
           mkdir -p cvm/build/jdk8
           tar xzvf CompoundVM_${{ steps.version.outputs.version }}_${{ inputs.platform }}_${{ inputs.debug-level }}.tar.gz -C cvm/build/jdk8 --strip-components=1
         shell: bash
 
-      - name: 'Run tests'
+      - name: "Run tests"
         id: run-tests
         run: |
+          echo "ptrace_scope:"
+          cat /proc/sys/kernel/yama/ptrace_scope || true
+          echo "Capabilities:"
+          capsh --print || true
+          echo "Seccomp:"
+          grep Seccomp /proc/self/status || true
           make -f cvm.mk test_jtreg8_${{ matrix.test-suite }} SKIP_BUILD=true MODE=${{ inputs.debug-level }}
         shell: bash
 
-      - name: 'Get bundles jvm patch'
+      - name: "Get bundles jvm patch"
         uses: actions/download-artifact@v4
         with:
           name: CompoundVM_${{ steps.version.outputs.version }}_jvm_patch_${{ inputs.platform }}_${{ inputs.debug-level }}.tar.gz
           path: .
 
-      - name: 'Run sanity test jvm patch'
+      - name: "Run sanity test jvm patch"
         run: |
           wget -nc https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u372-b07/OpenJDK8U-jdk_${{ inputs.arch }}_linux_hotspot_8u372b07.tar.gz
           tar xzf OpenJDK8U-jdk_${{ inputs.arch }}_linux_hotspot_8u372b07.tar.gz
