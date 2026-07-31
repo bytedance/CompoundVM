@@ -32,13 +32,7 @@ gc/g1/TestG1TraceEagerReclaimHumongousObjects.java
 gc/g1/TestGCLogMessages.java
 gc/g1/TestHumongousAllocInitialMark.java
 gc/g1/TestPrintRegionRememberedSetInfo.java
-gc/g1/TestStringDeduplicationAgeThreshold.java
-gc/g1/TestStringDeduplicationFullGC.java
-gc/g1/TestStringDeduplicationInterned.java
-gc/g1/TestStringDeduplicationPrintOptions.java
 gc/g1/TestStringDeduplicationTableRehash.java
-gc/g1/TestStringDeduplicationTableResize.java
-gc/g1/TestStringDeduplicationYoungGC.java
 gc/g1/TestStringSymbolTableStats.java
 gc/logging/TestGCId.java
 gc/metaspace/TestMetaspaceSizeFlags.java
