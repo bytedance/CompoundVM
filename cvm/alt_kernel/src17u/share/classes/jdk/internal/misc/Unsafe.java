@@ -60,7 +60,7 @@ public final class Unsafe {
 
     private static native void registerNatives();
     static {
-//        registerNatives();
+        registerNatives();
     }
 
     private Unsafe() {}
