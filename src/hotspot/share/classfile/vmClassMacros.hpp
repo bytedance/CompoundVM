@@ -131,7 +131,6 @@
   do_klass(StringBuffer_klass,                          java_lang_StringBuffer                                ) \
   do_klass(StringBuilder_klass,                         java_lang_StringBuilder                               ) \
   do_klass(UnsafeConstants_klass,                       jdk_internal_misc_UnsafeConstants                     ) \
-  do_klass(internal_Unsafe_klass,                       jdk_internal_misc_Unsafe                              ) \
   do_klass(module_Modules_klass,                        jdk_internal_module_Modules                           ) \
                                                                                                                 \
   /* support for CDS */                                                                                         \
