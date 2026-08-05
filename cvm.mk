@@ -49,6 +49,13 @@ JAR ?= $(BOOTJDK17)/bin/jar
 JDK17_SRCROOT := $(WORKSPACE)
 CVM8_SRCROOT := $(WORKSPACE)/cvm
 JDK8_SRCROOT := $(CVM8_SRCROOT)/jdk8u
+
+# Debug-specific jtreg options
+ifeq ($(filter fastdebug slowdebug,$(MODE)),)
+  JT8_DEBUG_OPTS :=
+else
+  JT8_DEBUG_OPTS := -exclude:$(CVM8_SRCROOT)/conf/jtreg-debug.list -timeout:4
+endif
 SRC_BUILDDIR_8 :=
 SRC_BUILDDIR_17 :=
 SCRIPTS_DIR ?= $(WORKSPACE)/scripts
@@ -383,7 +390,7 @@ ifeq ($(SKIP_BUILD), true)
 else
 -setup_jtreg8: $(JTREG) cvm8default17
 endif
-	$(eval JT8_OPTS=-jdk:${CVM8DIR} -w:${JT8_WORKDIR} -r:${JT8_REPORTDIR} -concurrency:auto -a -ea -esa -ignore:quiet -agentvm -v:fail,error,time -javaoption:-cvm ${JT8_OPTS})
+	$(eval JT8_OPTS=-jdk:${CVM8DIR} -w:${JT8_WORKDIR} -r:${JT8_REPORTDIR} -concurrency:auto -a -ea -esa -ignore:quiet -agentvm -v:fail,error,time -javaoption:-cvm $(JT8_DEBUG_OPTS) ${JT8_OPTS})
 
 # Setup bootstrap JDK from a given URL
 # $1  root directory of jtreg

@@ -184,7 +184,7 @@ jobs:
   ###
 
   test-linux-x64:
-    name: linux-x64
+    name: linux-x64 (release)
     needs:
       - build-linux-x64
     uses: ./.github/workflows/test-cvm8+17.yml
@@ -194,8 +194,19 @@ jobs:
       runs-on: ubuntu-22.04
       debug-level: release
 
+  test-linux-x64-fastdebug:
+    name: linux-x64 (fastdebug)
+    needs:
+      - build-linux-x64
+    uses: ./.github/workflows/test-cvm8+17.yml
+    with:
+      platform: linux_x64
+      arch: x64
+      runs-on: ubuntu-22.04
+      debug-level: fastdebug
+
   test-linux-aarch64:
-    name: linux-aarch64
+    name: linux-aarch64 (release)
     needs:
       - build-linux-aarch64
     uses: ./.github/workflows/test-cvm8+17.yml
@@ -204,6 +215,17 @@ jobs:
       arch: aarch64
       runs-on: ubuntu-22.04-arm
       debug-level: release
+
+  test-linux-aarch64-fastdebug:
+    name: linux-aarch64 (fastdebug)
+    needs:
+      - build-linux-aarch64
+    uses: ./.github/workflows/test-cvm8+17.yml
+    with:
+      platform: linux_aarch64
+      arch: aarch64
+      runs-on: ubuntu-22.04-arm
+      debug-level: fastdebug
 
   # Remove bundles so they are not misconstrued as binary distributions from the JDK project
   remove-bundles:
@@ -214,9 +236,11 @@ jobs:
       - build-linux-x64
       - gtest-linux-x64
       - test-linux-x64
+      - test-linux-x64-fastdebug
       - build-linux-aarch64
       - gtest-linux-aarch64
       - test-linux-aarch64
+      - test-linux-aarch64-fastdebug
 
     steps:
         # Hack to get hold of the api environment variables that are only defined for actions

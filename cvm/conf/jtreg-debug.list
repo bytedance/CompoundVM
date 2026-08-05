@@ -1,0 +1,21 @@
+# maybe test case bug, needed to investigate later
+hotspot/runtime/version/CrashReportTest.java 0000000 linux-all
+
+# maybe cvm bug, test will trigger jvm assert, needed to investigate later
+compiler/intrinsics/unsafe/UnsafeGetAddressTest.java 0000000 linux-all
+runtime/containers/cgroup/CgroupSubsystemFactory.java 0000000 linux-all
+
+# maybe cvm uncompatibale to jdk8 api
+compiler/ciReplay/TestVM_no_comp_level.sh
+
+# maybe environmental issue
+compiler/ciReplay/TestSA.sh
+
+# get debug build info in test needed to be improve later
+runtime/CommandLine/CompilerConfigFileWarning.java
+runtime/CommandLine/ConfigFileWarning.java
+
+# cvm use hotspot17, cause do not compatibale to hotspot8 tests
+runtime/6888954/vmerrors.sh
+runtime/NMT/JcmdWithNMTDisabled.java
+runtime/NMT/PrintNMTStatisticsWithNMTDisabled.java
