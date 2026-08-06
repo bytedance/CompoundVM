@@ -136,7 +136,7 @@ public class CrashReportTest {
     private static void verifyJREVersion(List<String> lines) throws Exception {
         Pattern pattern = Pattern.compile(
                 "# JRE version:.*" + Pattern.quote(EXPECTED_VENDOR_VERSION)
-                        + ".*\\(build " + Pattern.quote(EXPECTED_RUNTIME_VERSION) + "\\)");
+                        + ".*\\((?:fastdebug |slowdebug )?build " + Pattern.quote(EXPECTED_RUNTIME_VERSION) + "\\)");
         for (String line : lines) {
             if (pattern.matcher(line).find()) {
                 System.out.println("PASS: JRE version line contains vendor version and runtime version.");
