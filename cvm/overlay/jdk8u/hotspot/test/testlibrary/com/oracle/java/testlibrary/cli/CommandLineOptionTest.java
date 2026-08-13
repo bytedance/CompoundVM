@@ -293,7 +293,9 @@ public abstract class CommandLineOptionTest {
      * @throws RuntimeException when VM type is unknown.
      */
     private static String getVMTypeOption() {
-        if (Platform.isServer()) {
+        if (Platform.isCVM()) {
+            return "-cvm";
+        } else if (Platform.isServer()) {
             return "-server";
         } else if (Platform.isClient()) {
             return "-client";
@@ -301,8 +303,6 @@ public abstract class CommandLineOptionTest {
             return "-minimal";
         } else if (Platform.isGraal()) {
             return "-graal";
-        } else if (Platform.isCVM()) {
-            return "-cvm";
         }
         throw new RuntimeException("Unknown VM mode.");
     }
