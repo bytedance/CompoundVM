@@ -42,7 +42,7 @@ public class Platform {
     }
 
     public static boolean isServer() {
-        return vmName.endsWith(" Server VM");
+        return vmName.contains(" Server VM");
     }
 
     public static boolean isCVM() {

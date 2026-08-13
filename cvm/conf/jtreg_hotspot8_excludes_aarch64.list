@@ -8,7 +8,6 @@ compiler/jsr292/methodHandleExceptions/TestAMEnotNPE.java
 compiler/jsr292/RedefineMethodUsedByMultipleMethodHandles.java
 compiler/intrinsics/sha/sanity/TestSHA512MultiBlockIntrinsics.java
 compiler/profiling/spectrapredefineclass/Launcher.java
-compiler/rtm/cli/TestPrintPreciseRTMLockingStatisticsOptionOnUnsupportedConfig.java
 compiler/rtm/cli/TestRTMAbortRatioOptionOnUnsupportedConfig.java
 compiler/rtm/cli/TestRTMAbortThresholdOption.java
 compiler/rtm/cli/TestRTMLockingCalculationDelayOption.java
@@ -18,6 +17,7 @@ compiler/rtm/cli/TestRTMSpinLoopCountOption.java
 compiler/rtm/cli/TestRTMTotalCountIncrRateOptionOnUnsupportedConfig.java
 compiler/rtm/cli/TestUseRTMDeoptOptionOnUnsupportedConfig.java
 compiler/rtm/cli/TestUseRTMForStackLocksOptionOnUnsupportedConfig.java
+compiler/rtm/cli/TestUseRTMLockingOptionOnUnsupportedCPU.java 0000000 linux-aarch64 # This test failed since IgnoreUnrecognizedVMOptions seted to true by default in cvm
 compiler/rtm/cli/TestUseRTMXendForLockBusyOption.java
 compiler/startup/NumCompilerThreadsCheck.java
 compiler/tiered/NonTieredLevelsTest.java

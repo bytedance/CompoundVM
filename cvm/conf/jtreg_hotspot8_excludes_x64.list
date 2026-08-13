@@ -8,7 +8,6 @@ compiler/jsr292/methodHandleExceptions/TestAMEnotNPE.java
 compiler/jsr292/RedefineMethodUsedByMultipleMethodHandles.java
 compiler/intrinsics/sha/sanity/TestSHA512MultiBlockIntrinsics.java
 compiler/profiling/spectrapredefineclass/Launcher.java
-compiler/rtm/cli/TestPrintPreciseRTMLockingStatisticsOptionOnUnsupportedConfig.java
 compiler/rtm/cli/TestRTMAbortRatioOptionOnUnsupportedConfig.java
 compiler/rtm/cli/TestRTMTotalCountIncrRateOptionOnUnsupportedConfig.java
 compiler/rtm/cli/TestUseRTMDeoptOptionOnUnsupportedConfig.java
