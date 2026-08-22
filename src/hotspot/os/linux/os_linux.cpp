@@ -349,11 +349,20 @@ julong os::physical_memory() {
   return phys_mem;
 }
 
+// Returns the resident set size (RSS) of the process.
+// Falls back to using VmRSS from /proc/self/status if /proc/self/smaps_rollup is unavailable.
+// Note: On kernels with memory cgroups or shared memory, VmRSS may underreport RSS.
+// Users requiring accurate RSS values should be aware of this limitation.
 size_t os::rss() {
   size_t size = 0;
-  os::Linux::meminfo_t info;
-  if (os::Linux::query_process_memory_info(&info)) {
-    size = info.vmrss * K;
+  os::Linux::accurate_meminfo_t accurate_info;
+  if (os::Linux::query_accurate_process_memory_info(&accurate_info) && accurate_info.rss != -1) {
+    size = accurate_info.rss * K;
+  } else {
+    os::Linux::meminfo_t info;
+    if (os::Linux::query_process_memory_info(&info)) {
+      size = info.vmrss * K;
+    }
   }
   return size;
 }
@@ -469,13 +478,11 @@ bool os::Linux::get_tick_information(CPUPerfTicks* pticks, int which_logical_cpu
 }
 
 #ifndef SYS_gettid
-// i386: 224, amd64: 186, sparc: 143
+// i386: 224, amd64: 186
   #if defined(__i386__)
     #define SYS_gettid 224
   #elif defined(__amd64__)
     #define SYS_gettid 186
-  #elif defined(__sparc__)
-    #define SYS_gettid 143
   #else
     #error "Define SYS_gettid for this architecture"
   #endif
@@ -2363,6 +2370,37 @@ bool os::Linux::query_process_memory_info(os::Linux::meminfo_t* info) {
   return false;
 }
 
+// Accurate memory information need Linux 4.14 or newer
+bool os::Linux::query_accurate_process_memory_info(os::Linux::accurate_meminfo_t* info) {
+  FILE* f = os::fopen("/proc/self/smaps_rollup", "r");
+  if (f == nullptr) {
+    return false;
+  }
+
+  const size_t num_values = sizeof(os::Linux::accurate_meminfo_t) / sizeof(size_t);
+  size_t num_found = 0;
+  char buf[256];
+  info->rss = info->pss = info->pssdirty = info->pssanon =
+      info->pssfile = info->pssshmem = info->swap = info->swappss = -1;
+
+  while (::fgets(buf, sizeof(buf), f) != nullptr && num_found < num_values) {
+    if ( (info->rss == -1        && sscanf(buf, "Rss: %zd kB", &info->rss) == 1) ||
+         (info->pss == -1        && sscanf(buf, "Pss: %zd kB", &info->pss) == 1) ||
+         (info->pssdirty == -1   && sscanf(buf, "Pss_Dirty: %zd kB", &info->pssdirty) == 1) ||
+         (info->pssanon == -1    && sscanf(buf, "Pss_Anon: %zd kB", &info->pssanon) == 1) ||
+         (info->pssfile == -1    && sscanf(buf, "Pss_File: %zd kB", &info->pssfile) == 1) ||
+         (info->pssshmem == -1   && sscanf(buf, "Pss_Shmem: %zd kB", &info->pssshmem) == 1) ||
+         (info->swap == -1       && sscanf(buf, "Swap: %zd kB", &info->swap) == 1) ||
+         (info->swappss == -1    && sscanf(buf, "SwapPss: %zd kB", &info->swappss) == 1)
+         )
+    {
+      num_found ++;
+    }
+  }
+  fclose(f);
+  return true;
+}
+
 #ifdef __GLIBC__
 // For Glibc, print a one-liner with the malloc tunables.
 // Most important and popular is MALLOC_ARENA_MAX, but we are
@@ -2447,6 +2485,7 @@ void os::Linux::print_uptime_info(outputStream* st) {
   if (ret == 0) {
     os::print_dhm(st, "OS uptime:", (long) sinfo.uptime);
   }
+  assert(ret == 0, "sysinfo failed: %s", os::strerror(errno));
 }
 
 bool os::Linux::print_container_info(outputStream* st) {
@@ -2504,9 +2543,18 @@ bool os::Linux::print_container_info(outputStream* st) {
     st->print_cr("%s", i == OSCONTAINER_ERROR ? "not supported" : "no shares");
   }
 
+  jlong j = OSContainer::cpu_usage_in_micros();
+  st->print("cpu_usage_in_micros: ");
+  if (j >= 0) {
+    st->print_cr(JLONG_FORMAT, j);
+  } else {
+    st->print_cr("%s", j == OSCONTAINER_ERROR ? "not supported" : "no usage");
+  }
+
   OSContainer::print_container_helper(st, OSContainer::memory_limit_in_bytes(), "memory_limit_in_bytes");
   OSContainer::print_container_helper(st, OSContainer::memory_and_swap_limit_in_bytes(), "memory_and_swap_limit_in_bytes");
   OSContainer::print_container_helper(st, OSContainer::memory_soft_limit_in_bytes(), "memory_soft_limit_in_bytes");
+  OSContainer::print_container_helper(st, OSContainer::memory_throttle_limit_in_bytes(), "memory_throttle_limit_in_bytes");
   OSContainer::print_container_helper(st, OSContainer::memory_usage_in_bytes(), "memory_usage_in_bytes");
   OSContainer::print_container_helper(st, OSContainer::memory_max_usage_in_bytes(), "memory_max_usage_in_bytes");
   OSContainer::print_container_helper(st, OSContainer::rss_usage_in_bytes(), "rss_usage_in_bytes");
@@ -2514,7 +2562,7 @@ bool os::Linux::print_container_info(outputStream* st) {
 
   OSContainer::print_version_specific_info(st);
 
-  jlong j = OSContainer::pids_max();
+  j = OSContainer::pids_max();
   st->print("maximum number of tasks: ");
   if (j > 0) {
     st->print_cr(JLONG_FORMAT, j);
@@ -2560,16 +2608,18 @@ void os::print_memory_info(outputStream* st) {
 
   // values in struct sysinfo are "unsigned long"
   struct sysinfo si;
-  sysinfo(&si);
-
+  int ret = sysinfo(&si);
+  assert(ret == 0, "sysinfo failed: %s", os::strerror(errno));
   st->print(", physical " UINT64_FORMAT "k",
             os::physical_memory() >> 10);
   st->print("(" UINT64_FORMAT "k free)",
             os::available_memory() >> 10);
-  st->print(", swap " UINT64_FORMAT "k",
-            ((jlong)si.totalswap * si.mem_unit) >> 10);
-  st->print("(" UINT64_FORMAT "k free)",
-            ((jlong)si.freeswap * si.mem_unit) >> 10);
+  if (ret == 0) {
+    st->print(", swap " UINT64_FORMAT "k",
+              ((jlong)si.totalswap * si.mem_unit) >> 10);
+    st->print("(" UINT64_FORMAT "k free)",
+              ((jlong)si.freeswap * si.mem_unit) >> 10);
+  }
   st->cr();
   st->print("Page Sizes: ");
   _page_sizes.print_on(st);
@@ -2701,8 +2751,6 @@ const char* search_string = "CPU";
 const char* search_string = "cpu";
 #elif defined(S390)
 const char* search_string = "machine =";
-#elif defined(SPARC)
-const char* search_string = "cpu";
 #else
 const char* search_string = "Processor";
 #endif
@@ -2754,8 +2802,6 @@ void os::get_summary_cpu_info(char* cpuinfo, size_t length) {
   strncpy(cpuinfo, LP64_ONLY("RISCV64") NOT_LP64("RISCV32"), length);
 #elif defined(S390)
   strncpy(cpuinfo, "S390", length);
-#elif defined(SPARC)
-  strncpy(cpuinfo, "sparcv9", length);
 #elif defined(ZERO_LIBARCH)
   strncpy(cpuinfo, ZERO_LIBARCH, length);
 #else
@@ -5238,7 +5284,7 @@ int os::get_core_path(char* buffer, size_t bufferSize) {
 
     if (core_pattern[0] == '|') {
       written = jio_snprintf(buffer, bufferSize,
-                             "\"%s\" (or dumping to %s/core.%d)",
+                             "\"%s\" (alternatively, falling back to %s/core.%d)",
                              &core_pattern[1], p, current_process_id());
     } else if (pid_pos != nullptr) {
       *pid_pos = '\0';

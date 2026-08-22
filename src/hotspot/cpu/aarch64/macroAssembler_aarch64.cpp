@@ -639,12 +639,13 @@ void MacroAssembler::set_last_Java_frame(Register last_java_sp,
     last_java_sp = esp;
   }
 
-  str(last_java_sp, Address(rthread, JavaThread::last_Java_sp_offset()));
-
   // last_java_fp is optional
   if (last_java_fp->is_valid()) {
     str(last_java_fp, Address(rthread, JavaThread::last_Java_fp_offset()));
   }
+
+  // We must set sp last.
+  str(last_java_sp, Address(rthread, JavaThread::last_Java_sp_offset()));
 }
 
 void MacroAssembler::set_last_Java_frame(Register last_java_sp,
@@ -2697,6 +2698,17 @@ void MacroAssembler::store_sized_value(Address dst, Register src, size_t size_in
   case  2:  strh(src, dst); break;
   case  1:  strb(src, dst); break;
   default:  ShouldNotReachHere();
+  }
+}
+
+void MacroAssembler::narrow_subword_type(Register reg, BasicType bt) {
+  assert(is_subword_type(bt), "required");
+  switch (bt) {
+  case T_BOOLEAN: andw(reg, reg, 1); break;
+  case T_BYTE:    sxtbw(reg, reg); break;
+  case T_CHAR:    uxthw(reg, reg); break;
+  case T_SHORT:   sxthw(reg, reg); break;
+  default:        ShouldNotReachHere();
   }
 }
 
@@ -5941,6 +5953,9 @@ address MacroAssembler::arrays_equals(Register a1, Register a2, Register tmp3,
     //      return false;
     bind(A_IS_NOT_NULL);
     ldrw(cnt1, Address(a1, length_offset));
+    ldrw(tmp5, Address(a2, length_offset));
+    cmp(cnt1, tmp5);
+    br(NE, DONE); // If lengths differ, return false
     // Increase loop counter by diff between base- and actual start-offset.
     addw(cnt1, cnt1, extra_length);
     lea(a1, Address(a1, start_offset));
@@ -6007,6 +6022,9 @@ address MacroAssembler::arrays_equals(Register a1, Register a2, Register tmp3,
     cbz(a1, DONE);
     ldrw(cnt1, Address(a1, length_offset));
     cbz(a2, DONE);
+    ldrw(tmp5, Address(a2, length_offset));
+    cmp(cnt1, tmp5);
+    br(NE, DONE); // If lengths differ, return false
     // Increase loop counter by diff between base- and actual start-offset.
     addw(cnt1, cnt1, extra_length);
 

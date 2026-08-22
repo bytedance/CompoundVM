@@ -1148,9 +1148,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
     Label L;
     __ ld(x28, Address(xmethod, Method::native_function_offset()));
     ExternalAddress unsatisfied(SharedRuntime::native_method_throw_unsatisfied_link_error_entry());
-    __ la(t, unsatisfied);
-    __ load_long_misaligned(t1, Address(t, 0), t0, 2); // 2 bytes aligned, but not 4 or 8
-
+    __ la(t1, unsatisfied);
     __ bne(x28, t1, L);
     __ call_VM(noreg,
                CAST_FROM_FN_PTR(address,
@@ -1229,15 +1227,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   {
     Label L, Continue;
 
-    // We need an acquire here to ensure that any subsequent load of the
-    // global SafepointSynchronize::_state flag is ordered after this load
-    // of the thread-local polling word. We don't want this poll to
-    // return false (i.e. not safepointing) and a later poll of the global
-    // SafepointSynchronize::_state spuriously to return true.
-    //
-    // This is to avoid a race when we're in a native->Java transition
-    // racing the code which wakes up from a safepoint.
-    __ safepoint_poll(L, true /* at_return */, true /* acquire */, false /* in_nmethod */);
+    __ safepoint_poll(L, true /* at_return */, false /* in_nmethod */);
     __ lwu(t1, Address(xthread, JavaThread::suspend_flags_offset()));
     __ beqz(t1, Continue);
     __ bind(L);
@@ -1388,7 +1378,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
 
   Label slow_path;
   Label fast_path;
-  __ safepoint_poll(slow_path, true /* at_return */, false /* acquire */, false /* in_nmethod */);
+  __ safepoint_poll(slow_path, true /* at_return */, false /* in_nmethod */);
   __ j(fast_path);
 
   __ bind(slow_path);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, 2025, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2007, 2026, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -2577,6 +2577,11 @@ static bool can_subword_truncate(Node* in, const Type* type) {
     return false;
   }
 
+  // Since casts specifically change the type of a node, stay on the safe side and do not truncate them.
+  if (in->is_ConstraintCast()) {
+    return false;
+  }
+
   // Cannot be truncated:
   switch (opc) {
   case Op_AbsI:
@@ -2589,12 +2594,19 @@ static bool can_subword_truncate(Node* in, const Type* type) {
   case Op_RotateRight:
   case Op_RotateLeft:
   case Op_PopCountI:
+  case Op_ReverseBytesS:
+  case Op_ReverseBytesUS:
   case Op_ReverseBytesI:
   case Op_ReverseI:
   case Op_CountLeadingZerosI:
   case Op_CountTrailingZerosI:
+  case Op_IsFiniteF:
+  case Op_IsFiniteD:
   case Op_IsInfiniteF:
   case Op_IsInfiniteD:
+  case Op_CmpLTMask:
+  case Op_RoundF:
+  case Op_RoundD:
   case Op_ExtractS:
   case Op_ExtractC:
   case Op_ExtractB:

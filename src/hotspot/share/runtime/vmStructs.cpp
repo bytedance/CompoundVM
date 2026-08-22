@@ -624,6 +624,7 @@
   nonstatic_field(JavaThread,                  _active_handles,                               JNIHandleBlock*)                       \
   nonstatic_field(JavaThread,                  _monitor_owner_id,                             int64_t)                               \
   volatile_nonstatic_field(JavaThread,         _terminated,                                   JavaThread::TerminatedTypes)           \
+  nonstatic_field(JavaThread,                  _cont_entry,                                   ContinuationEntry*)                    \
   nonstatic_field(Thread,                      _osthread,                                     OSThread*)                             \
                                                                                                                                      \
   /************/                                                                                                                     \
@@ -666,6 +667,14 @@
                                                                                                                                      \
      static_field(VMRegImpl,                   regName[0],                                    const char*)                           \
      static_field(VMRegImpl,                   stack0,                                        VMReg)                                 \
+                                                                                                                                     \
+  /******************************************************************************************/                                       \
+  /* CI (NOTE: these CI fields are retained in VMStructs for the benefit of external tools, */                                       \
+  /* to ease their migration to a future alternative.)                                      */                                       \
+  /******************************************************************************************/                                       \
+                                                                                                                                     \
+  nonstatic_field(CompilerThread,              _env,                                          ciEnv*)                                \
+  nonstatic_field(ciEnv,                       _task,                                         CompileTask*)                          \
                                                                                                                                      \
   /************/                                                                                                                     \
   /* Monitors */                                                                                                                     \
@@ -798,7 +807,8 @@
   nonstatic_field(Mutex,                       _name,                                         const char*)                           \
   static_field(Mutex,                          _mutex_array,                                  Mutex**)                               \
   static_field(Mutex,                          _num_mutex,                                    int)                                   \
-  volatile_nonstatic_field(Mutex,              _owner,                                        Thread*)
+  volatile_nonstatic_field(Mutex,              _owner,                                        Thread*)                               \
+  static_field(ContinuationEntry,              _return_pc,                                    address)
 
 //--------------------------------------------------------------------------------
 // VM_TYPES
@@ -1150,6 +1160,12 @@
   declare_toplevel_type(BasicLock)                                        \
   declare_toplevel_type(BasicObjectLock)                                  \
                                                                           \
+  /*********************/                                                 \
+  /* CI */                                                                \
+  /*********************/                                                 \
+                                                                          \
+  declare_toplevel_type(ciEnv)                                            \
+                                                                          \
   /********************/                                                  \
   /* -XX flags        */                                                  \
   /********************/                                                  \
@@ -1266,6 +1282,7 @@
   declare_toplevel_type(FileMapHeader)                                    \
   declare_toplevel_type(CDSFileMapRegion)                                 \
   declare_toplevel_type(UpcallStub::FrameData)                            \
+  declare_toplevel_type(ContinuationEntry)                                \
                                                                           \
   /************/                                                          \
   /* GC types */                                                          \

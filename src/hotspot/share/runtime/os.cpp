@@ -704,8 +704,8 @@ void* os::malloc(size_t size, MemTag mem_tag, const NativeCallStack& stack) {
   if (CDSConfig::is_dumping_static_archive()) {
     // Need to deterministically fill all the alignment gaps in C++ structures.
     ::memset(inner_ptr, 0, size);
-  } else {
-    DEBUG_ONLY(::memset(inner_ptr, uninitBlockPad, size);)
+  } else if (ZapCHeap) {
+    ::memset(inner_ptr, uninitBlockPad, size);
   }
   DEBUG_ONLY(break_if_ptr_caught(inner_ptr);)
   return inner_ptr;
@@ -778,7 +778,7 @@ void* os::realloc(void *memblock, size_t size, MemTag mem_tag, const NativeCallS
 
 #ifdef ASSERT
     assert(old_size == free_info.size, "Sanity");
-    if (old_size < size) {
+    if (ZapCHeap && old_size < size) {
       // We also zap the newly extended region.
       ::memset((char*)new_inner_ptr + old_size, uninitBlockPad, size - old_size);
     }
@@ -2639,6 +2639,10 @@ jint os::set_minimum_stack_sizes() {
     return JNI_ERR;
   }
   return JNI_OK;
+}
+
+jlong os::get_minimum_java_stack_size() {
+  return static_cast<jlong>(_java_thread_min_stack_allowed);
 }
 
 // Builds a platform dependent Agent_OnLoad_<lib_name> function name

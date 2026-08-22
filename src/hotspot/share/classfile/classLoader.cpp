@@ -715,6 +715,7 @@ ClassPathEntry* ClassLoader::create_class_path_entry(JavaThread* current,
     if (zip != nullptr && error_msg == nullptr) {
       new_entry = new ClassPathZipEntry(zip, path);
     } else {
+      log_info(class, path)("failed: %s, err: %s", path, error_msg);
       return nullptr;
     }
     log_info(class, path)("opened: %s", path);
@@ -1214,10 +1215,7 @@ void ClassLoader::record_result(JavaThread* current, InstanceKlass* ik,
   oop loader = ik->class_loader();
   char* src = (char*)stream->source();
   if (src == nullptr) {
-    if (loader == nullptr) {
-      // JFR classes
-      ik->set_shared_classpath_index(0);
-    }
+    ik->set_shared_classpath_index(-1); // unsupported location
     return;
   }
 

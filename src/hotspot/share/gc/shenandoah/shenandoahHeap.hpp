@@ -293,6 +293,7 @@ private:
 public:
 
   inline HeapWord* base() const { return _heap_region.start(); }
+  inline HeapWord* end()  const { return _heap_region.end(); }
 
   inline size_t num_regions() const { return _num_regions; }
   inline bool is_heap_region_special() { return _heap_region_special; }
@@ -680,7 +681,7 @@ public:
 
 // ---------- CDS archive support
 
-  bool can_load_archived_objects() const override { return !ShenandoahCardBarrier; }
+  bool can_load_archived_objects() const override { return true; }
   HeapWord* allocate_loaded_archive_space(size_t size) override;
   void complete_loaded_archive_space(MemRegion archive_space) override;
 

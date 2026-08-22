@@ -113,6 +113,8 @@ intx MetaspaceShared::_relocation_delta;
 char* MetaspaceShared::_requested_base_address;
 Array<Method*>* MetaspaceShared::_archived_method_handle_intrinsics = nullptr;
 bool MetaspaceShared::_use_optimized_module_handling = true;
+int volatile MetaspaceShared::_preimage_static_archive_dumped = 0;
+FileMapInfo* MetaspaceShared::_output_mapinfo = nullptr;
 
 // The CDS archive is divided into the following regions:
 //     rw  - read-write metadata
@@ -321,6 +323,24 @@ void MetaspaceShared::initialize_for_static_dump() {
     MetaspaceShared::unrecoverable_writing_error();
   }
   _symbol_region.init(&_symbol_rs, &_symbol_vs);
+  if (CDSConfig::is_dumping_preimage_static_archive()) {
+    // We are in the AOT training run. User code is executed.
+    //
+    // On Windows, if the user code closes System.out and we open the AOT config file for output
+    // only at VM exit, we might get back the same file HANDLE as stdout, and the AOT config
+    // file may get corrupted by UL logs. By opening early, we ensure that the output
+    // HANDLE is different than stdout so we can avoid such corruption.
+    open_output_mapinfo();
+  } else {
+    // No need for the above as we won't execute any user code.
+  }
+}
+
+void MetaspaceShared::open_output_mapinfo() {
+  const char* static_archive = CDSConfig::output_archive_path();
+  assert(static_archive != nullptr, "sanity");
+  _output_mapinfo = new FileMapInfo(static_archive, true);
+  _output_mapinfo->open_as_output();
 }
 
 // Called by universe_post_init()
@@ -551,14 +571,13 @@ private:
 
 public:
 
-  VM_PopulateDumpSharedSpace(StaticArchiveBuilder& b) :
-    VM_Operation(), _heap_info(), _map_info(nullptr), _builder(b) {}
+  VM_PopulateDumpSharedSpace(StaticArchiveBuilder& b, FileMapInfo* map_info) :
+    VM_Operation(), _heap_info(), _map_info(map_info), _builder(b) {}
 
   bool skip_operation() const { return false; }
 
   VMOp_Type type() const { return VMOp_PopulateDumpSharedSpace; }
   ArchiveHeapInfo* heap_info()  { return &_heap_info; }
-  FileMapInfo* map_info() const { return _map_info; }
   void doit();   // outline because gdb sucks
   bool allow_nested_vm_operations() const { return true; }
 }; // class VM_PopulateDumpSharedSpace
@@ -688,12 +707,6 @@ void VM_PopulateDumpSharedSpace::doit() {
   CppVtables::zero_archived_vtables();
 
   // Write the archive file
-  if (CDSConfig::is_dumping_final_static_archive()) {
-    FileMapInfo::free_current_info(); // FIXME: should not free current info
-  }
-  const char* static_archive = CDSConfig::output_archive_path();
-  assert(static_archive != nullptr, "sanity");
-  _map_info = new FileMapInfo(static_archive, true);
   _map_info->populate_header(MetaspaceShared::core_region_alignment());
   _map_info->set_early_serialized_data(early_serialized_data);
   _map_info->set_serialized_data(serialized_data);
@@ -919,7 +932,21 @@ void MetaspaceShared::exercise_runtime_cds_code(TRAPS) {
   CDSProtectionDomain::to_file_URL("dummy.jar", Handle(), CHECK);
 }
 
+bool MetaspaceShared::preimage_static_archive_dumped() {
+  assert(CDSConfig::is_dumping_preimage_static_archive(), "Required");
+  return Atomic::load_acquire(&_preimage_static_archive_dumped) == 1;
+}
+
 void MetaspaceShared::preload_and_dump_impl(StaticArchiveBuilder& builder, TRAPS) {
+  if (CDSConfig::is_dumping_preimage_static_archive()) {
+    // When dumping to the AOT configuration file ensure this function is only executed once.
+    // Multiple invocations may happen via JCmd, during VM exit or other means (in the future)
+    // from different threads and possibly concurrently.
+    if (Atomic::cmpxchg(&_preimage_static_archive_dumped, 0, 1) != 0) {
+      return;
+    }
+  }
+
   if (CDSConfig::is_dumping_classic_static_archive()) {
     // We are running with -Xshare:dump
     preload_classes(CHECK);
@@ -1012,7 +1039,14 @@ void MetaspaceShared::preload_and_dump_impl(StaticArchiveBuilder& builder, TRAPS
   }
 #endif
 
-  VM_PopulateDumpSharedSpace op(builder);
+  if (!CDSConfig::is_dumping_preimage_static_archive()) {
+    if (CDSConfig::is_dumping_final_static_archive()) {
+      FileMapInfo::free_current_info(); // FIXME: should not free current info
+    }
+    open_output_mapinfo();
+  }
+
+  VM_PopulateDumpSharedSpace op(builder, _output_mapinfo);
   VMThread::execute(&op);
 
   if (AOTCodeCache::is_on_for_dump() && CDSConfig::is_dumping_final_static_archive()) {
@@ -1026,7 +1060,9 @@ void MetaspaceShared::preload_and_dump_impl(StaticArchiveBuilder& builder, TRAPS
     CDSConfig::disable_dumping_aot_code();
   }
 
-  bool status = write_static_archive(&builder, op.map_info(), op.heap_info());
+  bool status = write_static_archive(&builder, _output_mapinfo, op.heap_info());
+  assert(!_output_mapinfo->is_open(), "Must be closed already");
+  _output_mapinfo = nullptr;
   if (status && CDSConfig::is_dumping_preimage_static_archive()) {
     tty->print_cr("%s AOTConfiguration recorded: %s",
                   CDSConfig::has_temp_aot_config_file() ? "Temporary" : "", AOTConfiguration);
@@ -1044,11 +1080,10 @@ bool MetaspaceShared::write_static_archive(ArchiveBuilder* builder, FileMapInfo*
   // relocate the data so that it can be mapped to MetaspaceShared::requested_base_address()
   // without runtime relocation.
   builder->relocate_to_requested();
-
-  map_info->open_as_output();
   if (!map_info->is_open()) {
     return false;
   }
+  map_info->prepare_for_writing();
   builder->write_archive(map_info, heap_info);
 
   if (AllowArchivingWithJavaAgent) {
@@ -1270,7 +1305,7 @@ void MetaspaceShared::unrecoverable_loading_error(const char* message) {
   } else if (CDSConfig::new_aot_flags_used()) {
     vm_exit_during_initialization("Unable to use AOT cache.", nullptr);
   } else {
-    vm_exit_during_initialization("Unable to use shared archive.", nullptr);
+    vm_exit_during_initialization("Unable to use shared archive. Unrecoverable archive loading error (run with -Xlog:aot,cds for details)", message);
   }
 }
 
@@ -1287,6 +1322,10 @@ void MetaspaceShared::report_loading_error(const char* format, ...) {
   LogStream ls_cds(level, LogTagSetMapping<LOG_TAGS(cds)>::tagset());
 
   LogStream& ls = CDSConfig::new_aot_flags_used() ? ls_aot : ls_cds;
+  if (!ls.is_enabled()) {
+    return;
+  }
+
   va_list ap;
   va_start(ap, format);
 
@@ -1394,6 +1433,7 @@ FileMapInfo* MetaspaceShared::open_static_archive() {
   FileMapInfo* mapinfo = new FileMapInfo(static_archive, true);
   if (!mapinfo->open_as_input()) {
     delete(mapinfo);
+    log_info(cds)("Opening of static archive %s failed", static_archive);
     return nullptr;
   }
   return mapinfo;

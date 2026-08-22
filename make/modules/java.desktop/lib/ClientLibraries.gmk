@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2011, 2025, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2011, 2026, Oracle and/or its affiliates. All rights reserved.
 # DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
 #
 # This code is free software; you can redistribute it and/or modify it
@@ -177,7 +177,8 @@ ifeq ($(ENABLE_HEADLESS_ONLY), false)
   endif
 
   LIBSPLASHSCREEN_CFLAGS += -DSPLASHSCREEN -DPNG_NO_MMX_CODE \
-      -DPNG_ARM_NEON_OPT=0 -DPNG_ARM_NEON_IMPLEMENTATION=0
+      -DPNG_ARM_NEON_OPT=0 -DPNG_ARM_NEON_IMPLEMENTATION=0 \
+      -DPNG_LOONGARCH_LSX_OPT=0
 
   ifeq ($(call isTargetOs, linux)+$(call isTargetCpuArch, ppc), true+true)
     LIBSPLASHSCREEN_CFLAGS += -DPNG_POWERPC_VSX_OPT=0
@@ -235,7 +236,7 @@ ifeq ($(ENABLE_HEADLESS_ONLY), false)
       DISABLED_WARNINGS_gcc_dgif_lib.c := sign-compare, \
       DISABLED_WARNINGS_gcc_jcmaster.c := implicit-fallthrough, \
       DISABLED_WARNINGS_gcc_jdphuff.c := shift-negative-value, \
-      DISABLED_WARNINGS_gcc_png.c := maybe-uninitialized unused-function, \
+      DISABLED_WARNINGS_gcc_png.c := maybe-uninitialized, \
       DISABLED_WARNINGS_gcc_pngerror.c := maybe-uninitialized, \
       DISABLED_WARNINGS_gcc_splashscreen_gfx_impl.c := implicit-fallthrough \
           maybe-uninitialized, \
@@ -246,7 +247,6 @@ ifeq ($(ENABLE_HEADLESS_ONLY), false)
       DISABLED_WARNINGS_clang := deprecated-non-prototype, \
       DISABLED_WARNINGS_clang_dgif_lib.c := sign-compare, \
       DISABLED_WARNINGS_clang_gzwrite.c := format-nonliteral, \
-      DISABLED_WARNINGS_clang_png.c := unused-function, \
       DISABLED_WARNINGS_clang_splashscreen_impl.c := sign-compare \
           unused-but-set-variable unused-function, \
       DISABLED_WARNINGS_clang_splashscreen_png.c := \
@@ -256,6 +256,7 @@ ifeq ($(ENABLE_HEADLESS_ONLY), false)
       DISABLED_WARNINGS_microsoft_dgif_lib.c := 4018 4267, \
       DISABLED_WARNINGS_microsoft_splashscreen_impl.c := 4018 4267 4244, \
       DISABLED_WARNINGS_microsoft_splashscreen_png.c := 4267, \
+      DISABLED_WARNINGS_microsoft_pngread.c := 4146, \
       DISABLED_WARNINGS_microsoft_splashscreen_sys.c := 4267 4244, \
       LDFLAGS := $(ICONV_LDFLAGS), \
       LDFLAGS_windows := -delayload:user32.dll, \

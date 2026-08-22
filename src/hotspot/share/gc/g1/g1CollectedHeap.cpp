@@ -28,6 +28,7 @@
 #include "code/codeCache.hpp"
 #include "compiler/oopMap.hpp"
 #include "gc/g1/g1Allocator.inline.hpp"
+#include "gc/g1/g1Analytics.hpp"
 #include "gc/g1/g1Arguments.hpp"
 #include "gc/g1/g1BarrierSet.hpp"
 #include "gc/g1/g1BatchedTask.hpp"
@@ -387,22 +388,26 @@ HeapWord* G1CollectedHeap::allocate_new_tlab(size_t min_size,
   assert_heap_not_locked_and_not_at_safepoint();
   assert(!is_humongous(requested_size), "we do not allow humongous TLABs");
 
-  return attempt_allocation(min_size, requested_size, actual_size);
+  // Do not allow a GC because we are allocating a new TLAB to avoid an issue
+  // with UseGCOverheadLimit: although this GC would return null if the overhead
+  // limit would be exceeded, but it would likely free at least some space.
+  // So the subsequent outside-TLAB allocation could be successful anyway and
+  // the indication that the overhead limit had been exceeded swallowed.
+  return attempt_allocation(min_size, requested_size, actual_size, false /* allow_gc */);
 }
 
-HeapWord*
-G1CollectedHeap::mem_allocate(size_t word_size,
-                              bool*  gc_overhead_limit_was_exceeded) {
+HeapWord* G1CollectedHeap::mem_allocate(size_t word_size,
+                                        bool*  gc_overhead_limit_was_exceeded) {
   assert_heap_not_locked_and_not_at_safepoint();
 
   if (is_humongous(word_size)) {
     return attempt_allocation_humongous(word_size);
   }
   size_t dummy = 0;
-  return attempt_allocation(word_size, word_size, &dummy);
+  return attempt_allocation(word_size, word_size, &dummy, true /* allow_gc */);
 }
 
-HeapWord* G1CollectedHeap::attempt_allocation_slow(uint node_index, size_t word_size) {
+HeapWord* G1CollectedHeap::attempt_allocation_slow(uint node_index, size_t word_size, bool allow_gc) {
   ResourceMark rm; // For retrieving the thread names in log messages.
 
   // Make sure you read the note in attempt_allocation_humongous().
@@ -429,6 +434,8 @@ HeapWord* G1CollectedHeap::attempt_allocation_slow(uint node_index, size_t word_
       result = _allocator->attempt_allocation_locked(node_index, word_size);
       if (result != nullptr) {
         return result;
+      } else if (!allow_gc) {
+        return nullptr;
       }
 
       // Read the GC count while still holding the Heap_lock.
@@ -446,8 +453,15 @@ HeapWord* G1CollectedHeap::attempt_allocation_slow(uint node_index, size_t word_
     log_trace(gc, alloc)("%s: Unsuccessfully scheduled collection allocating %zu words",
                          Thread::current()->name(), word_size);
 
+    // Has the gc overhead limit been reached in the meantime? If so, this mutator
+    // should receive null even when unsuccessfully scheduling a collection as well
+    // for global consistency.
+    if (gc_overhead_limit_exceeded()) {
+      return nullptr;
+    }
+
     // We can reach here if we were unsuccessful in scheduling a collection (because
-    // another thread beat us to it). In this case immeditealy retry the allocation
+    // another thread beat us to it). In this case immediately retry the allocation
     // attempt because another thread successfully performed a collection and possibly
     // reclaimed enough space. The first attempt (without holding the Heap_lock) is
     // here and the follow-on attempt will be at the start of the next loop
@@ -592,7 +606,8 @@ void G1CollectedHeap::dealloc_archive_regions(MemRegion range) {
 
 inline HeapWord* G1CollectedHeap::attempt_allocation(size_t min_word_size,
                                                      size_t desired_word_size,
-                                                     size_t* actual_word_size) {
+                                                     size_t* actual_word_size,
+                                                     bool allow_gc) {
   assert_heap_not_locked_and_not_at_safepoint();
   assert(!is_humongous(desired_word_size), "attempt_allocation() should not "
          "be called for humongous allocation requests");
@@ -604,7 +619,7 @@ inline HeapWord* G1CollectedHeap::attempt_allocation(size_t min_word_size,
 
   if (result == nullptr) {
     *actual_word_size = desired_word_size;
-    result = attempt_allocation_slow(node_index, desired_word_size);
+    result = attempt_allocation_slow(node_index, desired_word_size, allow_gc);
   }
 
   assert_heap_not_locked();
@@ -687,6 +702,13 @@ HeapWord* G1CollectedHeap::attempt_allocation_humongous(size_t word_size) {
 
     log_trace(gc, alloc)("%s: Unsuccessfully scheduled collection allocating %zu",
                          Thread::current()->name(), word_size);
+
+    // Has the gc overhead limit been reached in the meantime? If so, this mutator
+    // should receive null even when unsuccessfully scheduling a collection as well
+    // for global consistency.
+    if (gc_overhead_limit_exceeded()) {
+      return nullptr;
+    }
 
     // We can reach here if we were unsuccessful in scheduling a collection (because
     // another thread beat us to it).
@@ -890,25 +912,62 @@ void G1CollectedHeap::resize_heap_if_necessary(size_t allocation_word_size) {
   }
 }
 
+void G1CollectedHeap::update_gc_overhead_counter() {
+  assert(SafepointSynchronize::is_at_safepoint(), "precondition");
+
+  if (!UseGCOverheadLimit) {
+    return;
+  }
+
+  bool gc_time_over_limit = (_policy->analytics()->long_term_pause_time_ratio() * 100) >= GCTimeLimit;
+  double free_space_percent = percent_of(num_available_regions() * G1HeapRegion::GrainBytes, max_capacity());
+  bool free_space_below_limit = free_space_percent < GCHeapFreeLimit;
+
+  log_debug(gc)("GC Overhead Limit: GC Time %f Free Space %f Counter %zu",
+                (_policy->analytics()->long_term_pause_time_ratio() * 100),
+                free_space_percent,
+                _gc_overhead_counter);
+
+  if (gc_time_over_limit && free_space_below_limit) {
+    _gc_overhead_counter++;
+  } else {
+    _gc_overhead_counter = 0;
+  }
+}
+
+bool G1CollectedHeap::gc_overhead_limit_exceeded() {
+  return _gc_overhead_counter >= GCOverheadLimitThreshold;
+}
+
 HeapWord* G1CollectedHeap::satisfy_failed_allocation_helper(size_t word_size,
                                                             bool do_gc,
                                                             bool maximal_compaction,
                                                             bool expect_null_mutator_alloc_region) {
-  // Let's attempt the allocation first.
-  HeapWord* result =
-    attempt_allocation_at_safepoint(word_size,
-                                    expect_null_mutator_alloc_region);
-  if (result != nullptr) {
-    return result;
-  }
+  // Skip allocation if GC overhead limit has been exceeded to let the mutator run
+  // into an OOME. It can either exit "gracefully" or try to free up memory asap.
+  // For the latter situation, keep running GCs. If the mutator frees up enough
+  // memory quickly enough, the overhead(s) will go below the threshold(s) again
+  // and the VM may continue running.
+  // If we did not continue garbage collections, the (gc overhead) limit may decrease
+  // enough by itself to not count as exceeding the limit any more, in the worst
+  // case bouncing back-and-forth all the time.
+  if (!gc_overhead_limit_exceeded()) {
+    // Let's attempt the allocation first.
+    HeapWord* result =
+      attempt_allocation_at_safepoint(word_size,
+                                      expect_null_mutator_alloc_region);
+    if (result != nullptr) {
+      return result;
+    }
 
-  // In a G1 heap, we're supposed to keep allocation from failing by
-  // incremental pauses.  Therefore, at least for now, we'll favor
-  // expansion over collection.  (This might change in the future if we can
-  // do something smarter than full collection to satisfy a failed alloc.)
-  result = expand_and_allocate(word_size);
-  if (result != nullptr) {
-    return result;
+    // In a G1 heap, we're supposed to keep allocation from failing by
+    // incremental pauses.  Therefore, at least for now, we'll favor
+    // expansion over collection.  (This might change in the future if we can
+    // do something smarter than full collection to satisfy a failed alloc.)
+    result = expand_and_allocate(word_size);
+    if (result != nullptr) {
+      return result;
+    }
   }
 
   if (do_gc) {
@@ -931,6 +990,10 @@ HeapWord* G1CollectedHeap::satisfy_failed_allocation_helper(size_t word_size,
 
 HeapWord* G1CollectedHeap::satisfy_failed_allocation(size_t word_size) {
   assert_at_safepoint_on_vm_thread();
+
+  // Update GC overhead limits after the initial garbage collection leading to this
+  // allocation attempt.
+  update_gc_overhead_counter();
 
   // Attempts to allocate followed by Full GC.
   HeapWord* result =
@@ -965,6 +1028,10 @@ HeapWord* G1CollectedHeap::satisfy_failed_allocation(size_t word_size) {
 
   assert(!soft_ref_policy()->should_clear_all_soft_refs(),
          "Flag should have been handled and cleared prior to this point");
+
+  if (gc_overhead_limit_exceeded()) {
+    log_info(gc)("GC Overhead Limit exceeded too often (%zu).", GCOverheadLimitThreshold);
+  }
 
   // What else?  We might try synchronous finalization later.  If the total
   // space available is large enough for the allocation, then a more
@@ -1131,6 +1198,7 @@ public:
 
 G1CollectedHeap::G1CollectedHeap() :
   CollectedHeap(),
+  _gc_overhead_counter(0),
   _service_thread(nullptr),
   _periodic_gc_task(nullptr),
   _free_arena_memory_task(nullptr),
@@ -1690,6 +1758,66 @@ static bool gc_counter_less_than(uint x, uint y) {
 #define LOG_COLLECT_CONCURRENTLY_COMPLETE(cause, result) \
   LOG_COLLECT_CONCURRENTLY(cause, "complete %s", BOOL_TO_STR(result))
 
+bool G1CollectedHeap::wait_full_mark_finished(GCCause::Cause cause,
+                                              uint old_marking_started_before,
+                                              uint old_marking_started_after,
+                                              uint old_marking_completed_after) {
+  // Request is finished if a full collection (concurrent or stw)
+  // was started after this request and has completed, e.g.
+  // started_before < completed_after.
+  if (gc_counter_less_than(old_marking_started_before,
+                           old_marking_completed_after)) {
+    LOG_COLLECT_CONCURRENTLY_COMPLETE(cause, true);
+    return true;
+  }
+
+  if (old_marking_started_after != old_marking_completed_after) {
+    // If there is an in-progress cycle (possibly started by us), then
+    // wait for that cycle to complete, e.g.
+    // while completed_now < started_after.
+    LOG_COLLECT_CONCURRENTLY(cause, "wait");
+    MonitorLocker ml(G1OldGCCount_lock);
+    while (gc_counter_less_than(_old_marking_cycles_completed,
+                                old_marking_started_after)) {
+      ml.wait();
+    }
+    // Request is finished if the collection we just waited for was
+    // started after this request.
+    if (old_marking_started_before != old_marking_started_after) {
+      LOG_COLLECT_CONCURRENTLY(cause, "complete after wait");
+      return true;
+    }
+  }
+  return false;
+}
+
+// After calling wait_full_mark_finished(), this method determines whether we
+// previously failed for ordinary reasons (concurrent cycle in progress, whitebox
+// has control). Returns if this has been such an ordinary reason.
+static bool should_retry_vm_op(GCCause::Cause cause,
+                               VM_G1TryInitiateConcMark* op) {
+  if (op->cycle_already_in_progress()) {
+    // If VMOp failed because a cycle was already in progress, it
+    // is now complete.  But it didn't finish this user-requested
+    // GC, so try again.
+    LOG_COLLECT_CONCURRENTLY(cause, "retry after in-progress");
+    return true;
+  } else if (op->whitebox_attached()) {
+    // If WhiteBox wants control, wait for notification of a state
+    // change in the controller, then try again.  Don't wait for
+    // release of control, since collections may complete while in
+    // control.  Note: This won't recognize a STW full collection
+    // while waiting; we can't wait on multiple monitors.
+    LOG_COLLECT_CONCURRENTLY(cause, "whitebox control stall");
+    MonitorLocker ml(ConcurrentGCBreakpoints::monitor());
+    if (ConcurrentGCBreakpoints::is_controlled()) {
+      ml.wait();
+    }
+    return true;
+  }
+  return false;
+}
+
 bool G1CollectedHeap::try_collect_concurrently(GCCause::Cause cause,
                                                uint gc_counter,
                                                uint old_marking_started_before) {
@@ -1750,7 +1878,45 @@ bool G1CollectedHeap::try_collect_concurrently(GCCause::Cause cause,
         LOG_COLLECT_CONCURRENTLY(cause, "ignoring STW full GC");
         old_marking_started_before = old_marking_started_after;
       }
+    } else if (GCCause::is_codecache_requested_gc(cause)) {
+      // For a CodeCache requested GC, before marking, progress is ensured as the
+      // following Remark pause unloads code (and signals the requester such).
+      // Otherwise we must ensure that it is restarted.
+      //
+      // For a CodeCache requested GC, a successful GC operation means that
+      // (1) marking is in progress. I.e. the VMOp started the marking or a
+      //     Remark pause is pending from a different VM op; we will potentially
+      //     abort a mixed phase if needed.
+      // (2) a new cycle was started (by this thread or some other), or
+      // (3) a Full GC was performed.
+      //
+      // Cases (2) and (3) are detected together by a change to
+      // _old_marking_cycles_started.
+      //
+      // Compared to other "automatic" GCs (see below), we do not consider being
+      // in whitebox as sufficient too because we might be anywhere within that
+      // cycle and we need to make progress.
+      if (op.mark_in_progress() ||
+          (old_marking_started_before != old_marking_started_after)) {
+        LOG_COLLECT_CONCURRENTLY_COMPLETE(cause, true);
+        return true;
+      }
+
+      if (wait_full_mark_finished(cause,
+                                  old_marking_started_before,
+                                  old_marking_started_after,
+                                  old_marking_completed_after)) {
+        return true;
+      }
+
+      if (should_retry_vm_op(cause, &op)) {
+        continue;
+      }
     } else if (!GCCause::is_user_requested_gc(cause)) {
+      assert(cause == GCCause::_g1_humongous_allocation ||
+             cause == GCCause::_g1_periodic_collection,
+             "Unsupported cause %s", GCCause::to_string(cause));
+
       // For an "automatic" (not user-requested) collection, we just need to
       // ensure that progress is made.
       //
@@ -1762,11 +1928,6 @@ bool G1CollectedHeap::try_collect_concurrently(GCCause::Cause cause,
       // (5) a Full GC was performed.
       // Cases (4) and (5) are detected together by a change to
       // _old_marking_cycles_started.
-      //
-      // Note that (1) does not imply (4).  If we're still in the mixed
-      // phase of an earlier concurrent collection, the request to make the
-      // collection a concurrent start won't be honored.  If we don't check for
-      // both conditions we'll spin doing back-to-back collections.
       if (op.gc_succeeded() ||
           op.cycle_already_in_progress() ||
           op.whitebox_attached() ||
@@ -1790,31 +1951,11 @@ bool G1CollectedHeap::try_collect_concurrently(GCCause::Cause cause,
              BOOL_TO_STR(op.gc_succeeded()),
              old_marking_started_before, old_marking_started_after);
 
-      // Request is finished if a full collection (concurrent or stw)
-      // was started after this request and has completed, e.g.
-      // started_before < completed_after.
-      if (gc_counter_less_than(old_marking_started_before,
-                               old_marking_completed_after)) {
-        LOG_COLLECT_CONCURRENTLY_COMPLETE(cause, true);
+      if (wait_full_mark_finished(cause,
+                                  old_marking_started_before,
+                                  old_marking_started_after,
+                                  old_marking_completed_after)) {
         return true;
-      }
-
-      if (old_marking_started_after != old_marking_completed_after) {
-        // If there is an in-progress cycle (possibly started by us), then
-        // wait for that cycle to complete, e.g.
-        // while completed_now < started_after.
-        LOG_COLLECT_CONCURRENTLY(cause, "wait");
-        MonitorLocker ml(G1OldGCCount_lock);
-        while (gc_counter_less_than(_old_marking_cycles_completed,
-                                    old_marking_started_after)) {
-          ml.wait();
-        }
-        // Request is finished if the collection we just waited for was
-        // started after this request.
-        if (old_marking_started_before != old_marking_started_after) {
-          LOG_COLLECT_CONCURRENTLY(cause, "complete after wait");
-          return true;
-        }
       }
 
       // If VMOp was successful then it started a new cycle that the above
@@ -1823,23 +1964,7 @@ bool G1CollectedHeap::try_collect_concurrently(GCCause::Cause cause,
       // a new cycle was started.
       assert(!op.gc_succeeded(), "invariant");
 
-      if (op.cycle_already_in_progress()) {
-        // If VMOp failed because a cycle was already in progress, it
-        // is now complete.  But it didn't finish this user-requested
-        // GC, so try again.
-        LOG_COLLECT_CONCURRENTLY(cause, "retry after in-progress");
-        continue;
-      } else if (op.whitebox_attached()) {
-        // If WhiteBox wants control, wait for notification of a state
-        // change in the controller, then try again.  Don't wait for
-        // release of control, since collections may complete while in
-        // control.  Note: This won't recognize a STW full collection
-        // while waiting; we can't wait on multiple monitors.
-        LOG_COLLECT_CONCURRENTLY(cause, "whitebox control stall");
-        MonitorLocker ml(ConcurrentGCBreakpoints::monitor());
-        if (ConcurrentGCBreakpoints::is_controlled()) {
-          ml.wait();
-        }
+      if (should_retry_vm_op(cause, &op)) {
         continue;
       }
     }

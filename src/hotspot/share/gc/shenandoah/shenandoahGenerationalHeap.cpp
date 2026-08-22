@@ -53,21 +53,6 @@ public:
     ShenandoahGenerationalInitLogger logger;
     logger.print_all();
   }
-
-  void print_heap() override {
-    ShenandoahInitLogger::print_heap();
-
-    ShenandoahGenerationalHeap* heap = ShenandoahGenerationalHeap::heap();
-
-    ShenandoahYoungGeneration* young = heap->young_generation();
-    log_info(gc, init)("Young Generation Soft Size: " EXACTFMT, EXACTFMTARGS(young->soft_max_capacity()));
-    log_info(gc, init)("Young Generation Max: " EXACTFMT, EXACTFMTARGS(young->max_capacity()));
-
-    ShenandoahOldGeneration* old = heap->old_generation();
-    log_info(gc, init)("Old Generation Soft Size: " EXACTFMT, EXACTFMTARGS(old->soft_max_capacity()));
-    log_info(gc, init)("Old Generation Max: " EXACTFMT, EXACTFMTARGS(old->max_capacity()));
-  }
-
 protected:
   void print_gc_specific() override {
     ShenandoahInitLogger::print_gc_specific();
@@ -141,8 +126,8 @@ void ShenandoahGenerationalHeap::initialize_heuristics() {
   size_t initial_capacity_old = max_capacity() - max_capacity_young;
   size_t max_capacity_old = max_capacity() - initial_capacity_young;
 
-  _young_generation = new ShenandoahYoungGeneration(max_workers(), max_capacity_young, initial_capacity_young);
-  _old_generation = new ShenandoahOldGeneration(max_workers(), max_capacity_old, initial_capacity_old);
+  _young_generation = new ShenandoahYoungGeneration(max_workers(), max_capacity_young);
+  _old_generation = new ShenandoahOldGeneration(max_workers(), max_capacity_old);
   _young_generation->initialize_heuristics(mode());
   _old_generation->initialize_heuristics(mode());
 }
@@ -244,7 +229,7 @@ oop ShenandoahGenerationalHeap::evacuate_object(oop p, Thread* thread) {
     if (mark.has_displaced_mark_helper()) {
       // We don't want to deal with MT here just to ensure we read the right mark word.
       // Skip the potential promotion attempt for this one.
-    } else if (r->age() + mark.age() >= age_census()->tenuring_threshold()) {
+    } else if (age_census()->is_tenurable(r->age() + mark.age())) {
       oop result = try_evacuate_object(p, thread, r, OLD_GENERATION);
       if (result != nullptr) {
         return result;
