@@ -1452,10 +1452,12 @@ void Arguments::check_unsupported_dumping_properties() {
     sp = sp->next();
   }
 
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
   // Check for an exploded module build in use with -Xshare:dump.
   if (!has_jimage()) {
     vm_exit_during_initialization("Dumping the shared archive is not supported with an exploded module build");
   }
+#endif
 }
 
 bool Arguments::check_unsupported_cds_runtime_properties() {
@@ -3045,6 +3047,13 @@ jint Arguments::parse_each_vm_init_arg(const JavaVMInitArgs* args, bool* patch_m
       return JNI_EINVAL;
     }
     LogConfiguration::configure_stdout(LogLevel::Info, true, LOG_TAGS(class, path));
+  }
+
+  // Enable CDS info logging to stdout during -Xshare:dump, so that
+  // JDK8-compatible CDS dump progress messages (e.g. "Loading classes to share")
+  // are visible without requiring -Xlog:cds=info.
+  if (DumpSharedSpaces) {
+    LogConfiguration::configure_stdout(LogLevel::Info, true, LOG_TAGS(cds));
   }
 
   fix_appclasspath();

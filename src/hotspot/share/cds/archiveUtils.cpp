@@ -221,9 +221,9 @@ void DumpRegion::append_intptr_t(intptr_t n, bool need_to_mark) {
 }
 
 void DumpRegion::print(size_t total_bytes) const {
-  log_debug(cds)("%-3s space: " SIZE_FORMAT_W(9) " [ %4.1f%% of total] out of " SIZE_FORMAT_W(9) " bytes [%5.1f%% used] at " INTPTR_FORMAT,
-                 _name, used(), percent_of(used(), total_bytes), reserved(), percent_of(used(), reserved()),
-                 p2i(ArchiveBuilder::current()->to_requested(_base)));
+  log_info(cds)("%s space: " SIZE_FORMAT_W(9) " [ %4.1f%% of total] out of " SIZE_FORMAT_W(9) " bytes [%5.1f%% used] at " INTPTR_FORMAT,
+               _name, used(), percent_of(used(), total_bytes), reserved(), percent_of(used(), reserved()),
+               p2i(ArchiveBuilder::current()->to_requested(_base)));
 }
 
 void DumpRegion::print_out_of_space_msg(const char* failing_region, size_t needed_bytes) {

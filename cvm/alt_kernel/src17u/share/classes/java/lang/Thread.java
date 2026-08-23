@@ -1044,6 +1044,15 @@ public class Thread implements Runnable {
     }
 
     /**
+     * Tests if some Thread has been interrupted.  The interrupted state
+     * is cleared or not based on the value of ClearInterrupted that is passed.
+     *
+     * This native method exists only for JDK8 libjava.so registerNatives()
+     * compatibility. Actual interrupt handling uses the {@code interrupted} field.
+     */
+    private native boolean isInterrupted(boolean ClearInterrupted);
+
+    /**
      * Tests if this thread is alive. A thread is alive if it has
      * been started and has not yet died.
      *

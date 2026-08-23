@@ -641,9 +641,11 @@ void ClassLoader::setup_bootstrap_search_path_impl(JavaThread* current, const ch
 
 #if INCLUDE_CDS
   if (Arguments::is_dumping_archive()) {
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
     if (!Arguments::has_jimage()) {
       vm_exit_during_initialization("CDS is not supported in exploded JDK build", NULL);
     }
+#endif
   }
 #endif
 
@@ -1321,7 +1323,9 @@ void ClassLoader::record_result(JavaThread* current, InstanceKlass* ik, const Cl
     return;
   }
 
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
   assert(has_jrt_entry(), "CDS dumping does not support exploded JDK build");
+#endif
 
   ResourceMark rm(current);
   int classpath_index = -1;
@@ -1356,7 +1360,11 @@ void ClassLoader::record_result(JavaThread* current, InstanceKlass* ik, const Cl
             classpath_index = i;
             break;
           } else {
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
             if ((i >= 1) &&
+#else
+            if ((i >= 0) &&
+#endif
                 (i < ClassLoaderExt::app_class_paths_start_index())) {
               // The class must be from boot loader append path which consists of
               // -Xbootclasspath/a and jvmti appended entries.
@@ -1397,7 +1405,9 @@ void ClassLoader::record_result(JavaThread* current, InstanceKlass* ik, const Cl
     // The shared path table is set up after module system initialization.
     // The path table contains no entry before that. Any classes loaded prior
     // to the setup of the shared path table must be from the modules image.
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
     assert(stream->from_boot_loader_modules_image(), "stream must be loaded by boot loader from modules image");
+#endif
     assert(FileMapInfo::get_number_of_shared_paths() == 0, "shared path table must not have been setup");
     classpath_index = 0;
   }
@@ -1572,9 +1582,11 @@ void ClassLoader::classLoader_init2(JavaThread* current) {
   // As more modules are defined during module system initialization, more
   // entries will be added to the exploded build array.
   if (!has_jrt_entry()) {
+#if !defined(HOTSPOT_TARGET_CLASSLIB) || HOTSPOT_TARGET_CLASSLIB >= 9
     assert(!DumpSharedSpaces, "DumpSharedSpaces not supported with exploded module builds");
     assert(!DynamicDumpSharedSpaces, "DynamicDumpSharedSpaces not supported with exploded module builds");
     assert(!UseSharedSpaces, "UsedSharedSpaces not supported with exploded module builds");
+#endif
     // Set up the boot loader's _exploded_entries list.  Note that this gets
     // done before loading any classes, by the same thread that will
     // subsequently do the first class load. So, no lock is needed for this.
