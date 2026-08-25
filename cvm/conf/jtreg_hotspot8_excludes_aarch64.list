@@ -116,3 +116,6 @@ compiler/arguments/TestUseCountLeadingZerosInstructionOnUnsupportedCPU.java
 compiler/arguments/TestUseCountTrailingZerosInstructionOnUnsupportedCPU.java
 compiler/7184394/TestAESMain.java
 compiler/intrinsics/sha/cli/TestUseSHA512IntrinsicsOptionOnSupportedCPU.java
+
+# RunUnitTestsConcurrently.java was moved to CVM hotspot gtest.
+runtime/memory/RunUnitTestsConcurrently.java

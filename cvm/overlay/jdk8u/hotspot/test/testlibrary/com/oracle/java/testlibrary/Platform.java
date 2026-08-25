@@ -36,6 +36,7 @@ public class Platform {
     private static final String osArch      = System.getProperty("os.arch");
     public static final String vmName      = System.getProperty("java.vm.name");
     private static final String userName    = System.getProperty("user.name");
+    private static final String rtVersion   = System.getProperty("java.runtime.version");
 
     public static boolean isClient() {
         return vmName.endsWith(" Client VM");
@@ -98,7 +99,7 @@ public class Platform {
     }
 
     public static boolean isDebugBuild() {
-        return vmVersion.toLowerCase().contains("debug");
+        return (rtVersion.toLowerCase().contains("debug"));
     }
 
     public static String getVMVersion() {
