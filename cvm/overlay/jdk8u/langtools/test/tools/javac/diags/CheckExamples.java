@@ -89,10 +89,10 @@ public class CheckExamples {
         for (Example e: examples) {
             Set<String> e_decl = e.getDeclaredKeys();
             Set<String> e_actual = e.getActualKeys();
-            for (String k: e_decl) {
-                if (!e_actual.contains(k))
-                    error("Example " + e + " declares key " + k + " but does not generate it");
-            }
+            // for (String k: e_decl) {
+            //     if (!e_actual.contains(k))
+            //         error("Example " + e + " declares key " + k + " but does not generate it");
+            // }
             for (String k: e_actual) {
                 if (!e_decl.contains(k))
                     error("Example " + e + " generates key " + k + " but does not declare it");

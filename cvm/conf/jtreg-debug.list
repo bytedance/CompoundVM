@@ -2,7 +2,6 @@
 hotspot/runtime/version/CrashReportTest.java 0000000 linux-all
 
 # maybe cvm bug, test will trigger jvm assert, needed to investigate later
-compiler/intrinsics/unsafe/UnsafeGetAddressTest.java 0000000 linux-all
 runtime/containers/cgroup/CgroupSubsystemFactory.java 0000000 linux-all
 
 # maybe cvm uncompatibale to jdk8 api

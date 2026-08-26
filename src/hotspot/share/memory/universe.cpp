@@ -902,7 +902,6 @@ void Universe::initialize_known_methods(TRAPS) {
                           "register",
                           vmSymbols::object_void_signature(), true, CHECK);
 
-#if HOTSPOT_TARGET_CLASSLIB == 17
   initialize_known_method(_throw_illegal_access_error_cache,
                           vmClasses::internal_Unsafe_klass(),
                           "throwIllegalAccessError",
@@ -912,7 +911,6 @@ void Universe::initialize_known_methods(TRAPS) {
                           vmClasses::internal_Unsafe_klass(),
                           "throwNoSuchMethodError",
                           vmSymbols::void_method_signature(), true, CHECK);
-#endif
 
   // Set up method for registering loaded classes in class loader vector
   initialize_known_method(_loader_addClass_cache,
