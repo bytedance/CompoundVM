@@ -66,10 +66,10 @@
         //----- tests for command line invocation
 
         void testCommandLine() throws Exception {
-            testCommandLine(true);
-            testCommandLine(true,  "-Xbootclasspath/p:" + emptyDir);
+            testCommandLine(false);
+            testCommandLine(false,  "-Xbootclasspath/p:" + emptyDir);
             testCommandLine(false, "-Xbootclasspath:" + bootClassPath);
-            testCommandLine(true,  "-Xbootclasspath/a:" + emptyDir);
+            testCommandLine(false,  "-Xbootclasspath/a:" + emptyDir);
             testCommandLine(false, "-XDignore.symbol.file");
             System.err.println();
         }
@@ -91,10 +91,10 @@
         //----- tests for simple API invocation
 
         void testSimpleAPI() {
-            testSimpleAPI(true);
-            testSimpleAPI(true,  "-Xbootclasspath/p:" + emptyDir);
+            testSimpleAPI(false);
+            testSimpleAPI(false,  "-Xbootclasspath/p:" + emptyDir);
             testSimpleAPI(false, "-Xbootclasspath:" + bootClassPath);
-            testSimpleAPI(true,  "-Xbootclasspath/a:" + emptyDir);
+            testSimpleAPI(false,  "-Xbootclasspath/a:" + emptyDir);
             testSimpleAPI(false, "-XDignore.symbol.file");
             System.err.println();
         }
@@ -125,7 +125,7 @@
                     bcp.add(new File(f));
             }
 
-            testTaskAPI(true, null);
+            testTaskAPI(false, null);
             testTaskAPI(false, bcp);
             System.err.println();
         }

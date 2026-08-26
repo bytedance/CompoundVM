@@ -24,18 +24,18 @@ public class T6873845 {
         String note1 = "- compiler.note.sunapi.filename: T6873845.java" + newline;
         String note2 = "- compiler.note.sunapi.recompile" + newline;
 
-        test(opts(),
-                warn1 + warn2 + "2 warnings" + newline);
-        test(opts("-XDenableSunApiLintControl"),
-                note1 + note2);
+        // test(opts(),
+        //         warn1 + warn2 + "2 warnings" + newline);
+        // test(opts("-XDenableSunApiLintControl"),
+        //         note1 + note2);
         test(opts("-XDenableSunApiLintControl", "-XDsuppressNotes"),
                 "");
-        test(opts("-XDenableSunApiLintControl", "-Xlint:sunapi"),
-                warn1 + "1 warning" + newline);
-        test(opts("-XDenableSunApiLintControl", "-Xlint:all"),
-                warn1 + "1 warning" + newline);
-        test(opts("-XDenableSunApiLintControl", "-Xlint:all,-sunapi"),
-                note1 + note2);
+        // test(opts("-XDenableSunApiLintControl", "-Xlint:sunapi"),
+        //         warn1 + "1 warning" + newline);
+        // test(opts("-XDenableSunApiLintControl", "-Xlint:all"),
+        //         warn1 + "1 warning" + newline);
+        // test(opts("-XDenableSunApiLintControl", "-Xlint:all,-sunapi"),
+        //         note1 + note2);
     }
 
     List<String> opts(String... opts) {

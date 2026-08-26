@@ -1,4 +1,3 @@
-compiler/EscapeAnalysis/TestUnsafePutAddressNullObjMustNotEscape.java
 compiler/intrinsics/sha/sanity/TestSHA1Intrinsics.java
 compiler/intrinsics/sha/sanity/TestSHA1MultiBlockIntrinsics.java
 compiler/intrinsics/sha/sanity/TestSHA256Intrinsics.java

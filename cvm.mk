@@ -438,6 +438,9 @@ endif
 -overlay-langtools8:
 	$(call overlay_single,jdk8u,langtools/test/tools/javac/annotations/8218152/MalformedAnnotationProcessorTests.java, $(JDK8_SRCROOT))
 	$(call overlay_single,jdk8u,langtools/test/tools/javac/6508981/TestInferBinaryName.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,langtools/test/tools/javac/api/T6430241.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,langtools/test/tools/javac/diags/CheckExamples.java, $(JDK8_SRCROOT))
+	$(call overlay_single,jdk8u,langtools/test/tools/javac/T6873845.java, $(JDK8_SRCROOT))
 
 -overlay-hotspot8:
 	$(call overlay_single,jdk8u,hotspot/test/testlibrary/com/oracle/java/testlibrary/Platform.java, $(JDK8_SRCROOT))

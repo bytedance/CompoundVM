@@ -26,13 +26,15 @@
 package sun.misc;
 
 import jdk.internal.vm.annotation.ForceInline;
-import jdk.internal.misc.VM;
-import jdk.internal.reflect.CallerSensitive;
-import jdk.internal.reflect.Reflection;
+import sun.misc.VM;
+import sun.reflect.CallerSensitive;
+import sun.reflect.Reflection;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Field;
-import java.util.Set;
+import java.lang.reflect.Modifier;
+
+import java.security.ProtectionDomain;
 
 
 /**
@@ -55,8 +57,10 @@ import java.util.Set;
 
 public final class Unsafe {
 
+    private static native void registerNatives();
     static {
-        Reflection.registerMethodsToFilter(Unsafe.class, Set.of("getUnsafe"));
+        registerNatives();
+        Reflection.registerMethodsToFilter(Unsafe.class, "getUnsafe");
     }
 
     private Unsafe() {}
@@ -395,6 +399,189 @@ public final class Unsafe {
         theInternalUnsafe.putDouble(address, x);
     }
 
+    /**
+     * This method, like all others with 32-bit offsets, was native
+     * in a previous release but is now a wrapper which simply casts
+     * the offset to a long value.  It provides backward compatibility
+     * with bytecodes compiled against 1.4.
+     * @deprecated As of 1.4.1, cast the 32-bit offset argument to a long.
+     * See {@link #staticFieldOffset}.
+     */
+    @Deprecated
+    @ForceInline
+    public int getInt(Object o, int offset) {
+        return theInternalUnsafe.getInt(o, (long)offset);
+    }
+
+    /**
+     * @deprecated As of 1.4.1, cast the 32-bit offset argument to a long.
+     * See {@link #staticFieldOffset}.
+     */
+    @Deprecated
+    @ForceInline
+    public void putInt(Object o, int offset, int x) {
+        theInternalUnsafe.putInt(o, (long)offset, x);
+    }
+
+    /**
+     * @deprecated As of 1.4.1, cast the 32-bit offset argument to a long.
+     * See {@link #staticFieldOffset}.
+     */
+    @Deprecated
+    @ForceInline
+    public Object getObject(Object o, int offset) {
+        return theInternalUnsafe.getObject(o, (long)offset);
+    }
+
+    /**
+     * @deprecated As of 1.4.1, cast the 32-bit offset argument to a long.
+     * See {@link #staticFieldOffset}.
+     */
+    @Deprecated
+    @ForceInline
+    public void putObject(Object o, int offset, Object x) {
+        theInternalUnsafe.putObject(o, (long)offset, x);
+    }
+
+    /**
+     * @deprecated As of 1.4.1, cast the 32-bit offset argument to a long.
+     * See {@link #staticFieldOffset}.
+     */
+    @Deprecated
+    @ForceInline
+    public boolean getBoolean(Object o, int offset) {
+        return theInternalUnsafe.getBoolean(o, (long)offset);
+    }
+
+    /**
+     * @deprecated As of 1.4.1, cast the 32-bit offset argument to a long.
+     * See {@link #staticFieldOffset}.
+     */
+    @Deprecated
+    @ForceInline
+    public void putBoolean(Object o, int offset, boolean x) {
+        theInternalUnsafe.putBoolean(o, (long)offset, x);
+    }
+
+    /**
+     * @deprecated As of 1.4.1, cast the 32-bit offset argument to a long.
+     * See {@link #staticFieldOffset}.
+     */
+    @Deprecated
+    @ForceInline
+    public byte getByte(Object o, int offset) {
+        return theInternalUnsafe.getByte(o, (long)offset);
+    }
+
+    /**
+     * @deprecated As of 1.4.1, cast the 32-bit offset argument to a long.
+     * See {@link #staticFieldOffset}.
+     */
+    @Deprecated
+    @ForceInline
+    public void putByte(Object o, int offset, byte x) {
+        theInternalUnsafe.putByte(o, (long)offset, x);
+    }
+
+    /**
+     * @deprecated As of 1.4.1, cast the 32-bit offset argument to a long.
+     * See {@link #staticFieldOffset}.
+     */
+    @Deprecated
+    @ForceInline
+    public short getShort(Object o, int offset) {
+        return theInternalUnsafe.getShort(o, (long)offset);
+    }
+
+    /**
+     * @deprecated As of 1.4.1, cast the 32-bit offset argument to a long.
+     * See {@link #staticFieldOffset}.
+     */
+    @Deprecated
+    @ForceInline
+    public void putShort(Object o, int offset, short x) {
+        theInternalUnsafe.putShort(o, (long)offset, x);
+    }
+
+    /**
+     * @deprecated As of 1.4.1, cast the 32-bit offset argument to a long.
+     * See {@link #staticFieldOffset}.
+     */
+    @Deprecated
+    @ForceInline
+    public char getChar(Object o, int offset) {
+        return theInternalUnsafe.getChar(o, (long)offset);
+    }
+
+    /**
+     * @deprecated As of 1.4.1, cast the 32-bit offset argument to a long.
+     * See {@link #staticFieldOffset}.
+     */
+    @Deprecated
+    @ForceInline
+    public void putChar(Object o, int offset, char x) {
+        theInternalUnsafe.putChar(o, (long)offset, x);
+    }
+
+    /**
+     * @deprecated As of 1.4.1, cast the 32-bit offset argument to a long.
+     * See {@link #staticFieldOffset}.
+     */
+    @Deprecated
+    @ForceInline
+    public long getLong(Object o, int offset) {
+        return theInternalUnsafe.getLong(o, (long)offset);
+    }
+
+    /**
+     * @deprecated As of 1.4.1, cast the 32-bit offset argument to a long.
+     * See {@link #staticFieldOffset}.
+     */
+    @Deprecated
+    @ForceInline
+    public void putLong(Object o, int offset, long x) {
+        theInternalUnsafe.putLong(o, (long)offset, x);
+    }
+
+    /**
+     * @deprecated As of 1.4.1, cast the 32-bit offset argument to a long.
+     * See {@link #staticFieldOffset}.
+     */
+    @Deprecated
+    @ForceInline
+    public float getFloat(Object o, int offset) {
+        return theInternalUnsafe.getFloat(o, (long)offset);
+    }
+
+    /**
+     * @deprecated As of 1.4.1, cast the 32-bit offset argument to a long.
+     * See {@link #staticFieldOffset}.
+     */
+    @Deprecated
+    @ForceInline
+    public void putFloat(Object o, int offset, float x) {
+        theInternalUnsafe.putFloat(o, (long)offset, x);
+    }
+
+    /**
+     * @deprecated As of 1.4.1, cast the 32-bit offset argument to a long.
+     * See {@link #staticFieldOffset}.
+     */
+    @Deprecated
+    @ForceInline
+    public double getDouble(Object o, int offset) {
+        return theInternalUnsafe.getDouble(o, (long)offset);
+    }
+
+    /**
+     * @deprecated As of 1.4.1, cast the 32-bit offset argument to a long.
+     * See {@link #staticFieldOffset}.
+     */
+    @Deprecated
+    @ForceInline
+    public void putDouble(Object o, int offset, double x) {
+        theInternalUnsafe.putDouble(o, (long)offset, x);
+    }
 
     /**
      * Fetches a native pointer from a given memory address.  If the address is
@@ -618,6 +805,58 @@ public final class Unsafe {
     public static final int INVALID_FIELD_OFFSET = jdk.internal.misc.Unsafe.INVALID_FIELD_OFFSET;
 
     /**
+     * Returns the offset of a field, truncated to 32 bits.
+     * This method is implemented as follows:
+     * <blockquote><pre>
+     * public int fieldOffset(Field f) {
+     *     if (Modifier.isStatic(f.getModifiers()))
+     *         return (int) staticFieldOffset(f);
+     *     else
+     *         return (int) objectFieldOffset(f);
+     * }
+     * </pre></blockquote>
+     * @deprecated As of 1.4.1, use {@link #staticFieldOffset} for static
+     * fields and {@link #objectFieldOffset} for non-static fields.
+     */
+    @Deprecated
+    public int fieldOffset(Field f) {
+        if (Modifier.isStatic(f.getModifiers()))
+            return (int) staticFieldOffset(f);
+        else
+            return (int) objectFieldOffset(f);
+    }
+
+    /**
+     * Returns the base address for accessing some static field
+     * in the given class.  This method is implemented as follows:
+     * <blockquote><pre>
+     * public Object staticFieldBase(Class c) {
+     *     Field[] fields = c.getDeclaredFields();
+     *     for (int i = 0; i < fields.length; i++) {
+     *         if (Modifier.isStatic(fields[i].getModifiers())) {
+     *             return staticFieldBase(fields[i]);
+     *         }
+     *     }
+     *     return null;
+     * }
+     * </pre></blockquote>
+     * @deprecated As of 1.4.1, use {@link #staticFieldBase(Field)}
+     * to obtain the base pertaining to a specific {@link Field}.
+     * This method works only for JVMs which store all statics
+     * for a given class in one place.
+     */
+    @Deprecated
+    public Object staticFieldBase(Class<?> c) {
+        Field[] fields = c.getDeclaredFields();
+        for (int i = 0; i < fields.length; i++) {
+            if (Modifier.isStatic(fields[i].getModifiers())) {
+                return staticFieldBase(fields[i]);
+            }
+        }
+        return null;
+    }
+
+    /**
      * Reports the location of a given field in the storage allocation of its
      * class.  Do not expect to perform any sort of arithmetic on this offset;
      * it is just a cookie which is passed to the unsafe heap memory accessors.
@@ -637,16 +876,6 @@ public final class Unsafe {
      */
     @ForceInline
     public long objectFieldOffset(Field f) {
-        if (f == null) {
-            throw new NullPointerException();
-        }
-        Class<?> declaringClass = f.getDeclaringClass();
-        if (declaringClass.isHidden()) {
-            throw new UnsupportedOperationException("can't get field offset on a hidden class: " + f);
-        }
-        if (declaringClass.isRecord()) {
-            throw new UnsupportedOperationException("can't get field offset on a record class: " + f);
-        }
         return theInternalUnsafe.objectFieldOffset(f);
     }
 
@@ -669,16 +898,6 @@ public final class Unsafe {
      */
     @ForceInline
     public long staticFieldOffset(Field f) {
-        if (f == null) {
-            throw new NullPointerException();
-        }
-        Class<?> declaringClass = f.getDeclaringClass();
-        if (declaringClass.isHidden()) {
-            throw new UnsupportedOperationException("can't get field offset on a hidden class: " + f);
-        }
-        if (declaringClass.isRecord()) {
-            throw new UnsupportedOperationException("can't get field offset on a record class: " + f);
-        }
         return theInternalUnsafe.staticFieldOffset(f);
     }
 
@@ -694,16 +913,6 @@ public final class Unsafe {
      */
     @ForceInline
     public Object staticFieldBase(Field f) {
-        if (f == null) {
-            throw new NullPointerException();
-        }
-        Class<?> declaringClass = f.getDeclaringClass();
-        if (declaringClass.isHidden()) {
-            throw new UnsupportedOperationException("can't get base address on a hidden class: " + f);
-        }
-        if (declaringClass.isRecord()) {
-            throw new UnsupportedOperationException("can't get base address on a record class: " + f);
-        }
         return theInternalUnsafe.staticFieldBase(f);
     }
 
@@ -712,18 +921,9 @@ public final class Unsafe {
      * needed in conjunction with obtaining the static field base of a
      * class.
      *
-     * @deprecated No replacement API for this method.  As multiple threads
-     * may be trying to initialize the same class or interface at the same time.
-     * The only reliable result returned by this method is {@code false}
-     * indicating that the given class has been initialized.  Instead, simply
-     * call {@link java.lang.invoke.MethodHandles.Lookup#ensureInitialized(Class)}
-     * that does nothing if the given class has already been initialized.
-     * This method is subject to removal in a future version of JDK.
-     *
      * @return false only if a call to {@code ensureClassInitialized} would have no effect
      *
      */
-    @Deprecated(since = "15", forRemoval = true)
     @ForceInline
     public boolean shouldBeInitialized(Class<?> c) {
         return theInternalUnsafe.shouldBeInitialized(c);
@@ -734,10 +934,7 @@ public final class Unsafe {
      * needed in conjunction with obtaining the static field base of a
      * class.
      *
-     * @deprecated Use the {@link java.lang.invoke.MethodHandles.Lookup#ensureInitialized(Class)}
-     * method instead.  This method is subject to removal in a future version of JDK.
      */
-    @Deprecated(since = "15", forRemoval = true)
     @ForceInline
     public void ensureClassInitialized(Class<?> c) {
         theInternalUnsafe.ensureClassInitialized(c);
@@ -855,6 +1052,32 @@ public final class Unsafe {
     /// random trusted operations from JNI:
 
     /**
+     * Tell the VM to define a class, without security checks.  By default, the
+     * class loader and protection domain come from the caller's class.
+     */
+    public native Class<?> defineClass(String name, byte[] b, int off, int len,
+                                       ClassLoader loader,
+                                       ProtectionDomain protectionDomain);
+
+    /**
+     * Define a class but do not make it known to the class loader or system dictionary.
+     * <p>
+     * For each CP entry, the corresponding CP patch must either be null or have
+     * the a format that matches its tag:
+     * <ul>
+     * <li>Integer, Long, Float, Double: the corresponding wrapper object type from java.lang
+     * <li>Utf8: a string (must have suitable syntax if used as signature or name)
+     * <li>Class: any java.lang.Class object
+     * <li>String: any object (not just a java.lang.String)
+     * <li>InterfaceMethodRef: (NYI) a method handle to invoke on that call site's arguments
+     * </ul>
+     * @params hostClass context for linkage, access control, protection domain, and class loader
+     * @params data      bytes of a class file
+     * @params cpPatches where non-null entries exist, they replace corresponding CP entries in data
+     */
+    public native Class<?> defineAnonymousClass(Class<?> hostClass, byte[] data, Object[] cpPatches);
+
+    /**
      * Allocates an instance but does not run any constructor.
      * Initializes the class if it has not yet been.
      */
@@ -864,6 +1087,24 @@ public final class Unsafe {
         return theInternalUnsafe.allocateInstance(cls);
     }
 
+    /** Lock the object.  It must get unlocked via {@link #monitorExit}. */
+    @Deprecated
+    public native void monitorEnter(Object o);
+
+    /**
+     * Unlock the object.  It must have been locked via {@link
+     * #monitorEnter}.
+     */
+    @Deprecated
+    public native void monitorExit(Object o);
+
+    /**
+     * Tries to lock the object.  Returns true or false to indicate
+     * whether the lock succeeded.  If it did, the object must be
+     * unlocked via {@link #monitorExit}.
+     */
+    @Deprecated
+    public native boolean tryMonitorEnter(Object o);
     /** Throws the exception without telling the verifier. */
     @ForceInline
     public void throwException(Throwable ee) {
@@ -1241,22 +1482,5 @@ public final class Unsafe {
     @ForceInline
     public void fullFence() {
         theInternalUnsafe.fullFence();
-    }
-
-    /**
-     * Invokes the given direct byte buffer's cleaner, if any.
-     *
-     * @param directBuffer a direct byte buffer
-     * @throws NullPointerException if {@code directBuffer} is null
-     * @throws IllegalArgumentException if {@code directBuffer} is non-direct,
-     * or is a {@link java.nio.Buffer#slice slice}, or is a
-     * {@link java.nio.Buffer#duplicate duplicate}
-     * @since 9
-     */
-    public void invokeCleaner(java.nio.ByteBuffer directBuffer) {
-        if (!directBuffer.isDirect())
-            throw new IllegalArgumentException("buffer is non-direct");
-
-        theInternalUnsafe.invokeCleaner(directBuffer);
     }
 }
