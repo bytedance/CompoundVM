@@ -478,8 +478,7 @@ JVM_END
 
 JVM_LEAF(jint, JVM_SocketShutdown(jint fd, jint howto))
   //%note jvm_r6
-  //return os::socket_shutdown(fd, howto);
-  return 0;
+  return os::socket_shutdown(fd, howto);
 JVM_END
 
 
