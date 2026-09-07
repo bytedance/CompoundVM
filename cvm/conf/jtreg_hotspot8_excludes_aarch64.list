@@ -59,7 +59,6 @@ gc/TestMemoryMXBeansAndPoolsPresence.java
 gc/TestVerifyDuringStartup.java
 gc/TestVerifySilently.java
 gc/TestVerifySubSet.java
-runtime/6929067/Test6929067.sh
 runtime/6981737/Test6981737.java
 runtime/7110720/Test7110720.sh
 runtime/7162488/Test7162488.sh
@@ -78,7 +77,6 @@ runtime/containers/docker/TestCPUAwareness.java
 runtime/containers/docker/TestMemoryAwareness.java
 runtime/contended/Options.java
 runtime/InternalApi/ThreadCpuTimesDeadlock.java
-runtime/InitialThreadOverflow/testme.sh
 runtime/containers/docker/TestMisc.java
 runtime/invokedynamic/BootstrapMethodErrorTest.java
 runtime/Metaspace/MaxMetaspaceSizeTest.java
