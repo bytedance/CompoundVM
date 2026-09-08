@@ -194,7 +194,7 @@ def check_forbidden_lines(lines: List[str], result: CheckResult):
     for line in lines:
         stripped = line.strip()
         for prefix in FORBIDDEN_LINES:
-            if stripped.startswith(prefix):
+            if stripped.casefold().startswith(prefix.casefold()):
                 result.error(f"Commit message must not contain '{prefix}'")
 
 
