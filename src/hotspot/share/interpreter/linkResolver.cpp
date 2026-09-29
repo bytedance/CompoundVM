@@ -278,9 +278,6 @@ void LinkInfo::print() {
 // Klass resolution
 
 void LinkResolver::check_klass_accessibility(Klass* ref_klass, Klass* sel_klass, TRAPS) {
-#if defined(HOTSPOT_TARGET_CLASSLIB) && HOTSPOT_TARGET_CLASSLIB == 8
-  return;
-#endif
   Klass* base_klass = sel_klass;
   if (sel_klass->is_objArray_klass()) {
     base_klass = ObjArrayKlass::cast(sel_klass)->bottom_klass();

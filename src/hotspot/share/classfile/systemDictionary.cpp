@@ -1489,9 +1489,7 @@ void SystemDictionary::define_instance_class(InstanceKlass* k, Handle class_load
   Symbol*  name_h = k->name();
   Dictionary* dictionary = loader_data->dictionary();
   unsigned int name_hash = dictionary->compute_hash(name_h);
-#if HOTSPOT_TARGET_CLASSLIB == 17
   check_constraints(name_hash, k, class_loader, true, CHECK);
-#endif
 
   // Register class just loaded with class loader (placed in ArrayList)
   // Note we do this before updating the dictionary, as this can
