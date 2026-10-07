@@ -1,0 +1,10 @@
+super public class LegacyInterfaceMethodrefCaller
+version 52:0
+{
+    public static Method call:"()I"
+        stack 1 locals 0
+    {
+        invokestatic Method LegacyStaticInterface.value:"()I";
+        ireturn;
+    }
+}

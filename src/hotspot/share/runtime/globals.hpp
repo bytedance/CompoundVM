@@ -2112,6 +2112,10 @@ const intx ObjectAlignmentInBytes = 8;
           "(default) disables native heap trimming.")                       \
           range(0, UINT_MAX)                                                \
                                                                             \
+  CLASSLIB8_ONLY(product(bool, AllowLegacyInterfaceMethodref, true,          \
+                 "Allow invokestatic to reference an interface static "     \
+                 "method with a Methodref constant"))                       \
+                                                                            \
   CLASSLIB8_ONLY(develop(bool, VerifyLatin1NamesOnly, false,                \
                  "Ensure class/method/field names are encoded in Latin1"))  \
                                                                             \
