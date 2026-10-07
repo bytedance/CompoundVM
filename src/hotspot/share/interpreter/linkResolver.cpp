@@ -859,7 +859,16 @@ Method* LinkResolver::resolve_interface_method(const LinkInfo& link_info, Byteco
   }
 
   // check constant pool tag for called method - must be JVM_CONSTANT_InterfaceMethodref
-  if (!link_info.tag().is_invalid() && !link_info.tag().is_interface_method()) {
+#if HOTSPOT_TARGET_CLASSLIB == 8
+  const bool invalid_tag = !link_info.tag().is_invalid() &&
+                           !link_info.tag().is_interface_method() &&
+                           (!AllowLegacyInterfaceMethodref ||
+                            code != Bytecodes::_invokestatic ||
+                            !link_info.tag().is_method());
+#else
+  const bool invalid_tag = !link_info.tag().is_invalid() && !link_info.tag().is_interface_method();
+#endif
+  if (invalid_tag) {
     ResourceMark rm(THREAD);
     stringStream ss;
     ss.print("Method '");
